@@ -1,0 +1,64 @@
+; ----------------------------------------- 
+;
+; Tuned Simons' Basic
+;
+; by Arndt Dettke, 1986
+;
+; part 0, declarations
+;
+; ----------------------------------------- 
+
+	*= $8000
+	!ct pet
+
+; ----------------------------------------- 
+; 
+	pport	= $01
+	int	= $14
+	progz	= $7a
+	helpvec	= $b0
+	drive	= $be
+	numkeys	= $c6
+
+	chrget	= $0073
+	chrgot	= $0079
+	linenum	= $0100
+	autozi	= $01fe
+	basinbuf	= $0200
+	keybuf	= $0277
+	ramstart	= $0281
+	aktfarb	= $0286
+	video	= $0288
+	basvecs	= $0300
+	irqvec	= $0314
+	brkvec	= $0316
+	nmivec	= $0318
+	iovecs	= $0330
+
+	sbnmi	= $82ff
+	faststack	= $c400
+	settings1	= $c500
+	settings2	= $cb00
+	extension	= $cc00
+
+	bsout	= $ffd2
+	load	= $ffd5
+
+; ----------------------------------------- 
+
+	neustr	= $b47d
+	pushstr	= $b4ca
+	fnnrm	= $c8e0
+
+	!src "tsb_pt1.a"
+	!src "tsb_pt2.a"
+	!src "tsb_pt3.a"
+	!src "tsb_pt4.a"
+	!src "tsb_pt5.a"
+	!src "tsb_pt6.a"
+	!src "tsb_pt7.a"
+	!src "tsb_pt8.a"
+
+; ----------------------------------------- 
+
+	!eof
