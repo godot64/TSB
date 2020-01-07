@@ -1,0 +1,183 @@
+; ----------------------------------------- 
+;
+; Tuned Simons' Basic
+;
+; by Arndt Dettke, 1986
+;
+; part 7, variables
+;
+; ----------------------------------------- 
+
+	!ct pet
+
+; ----------------------------------------- 
+
+	lpx		= $c500
+	lpy		= $c501
+	rotgr		= $c502
+	drgrz		= $c503
+	flashfls		= $c504
+	detecterg		= $c514
+	detectart		= $c515
+	zaeirq		= $c516
+	zaesec		= $c517
+	strz1		= $c518
+	strz2		= $c519
+	vgle		= $c51a
+	errln		= $c51d
+	pos		= $c51f
+	pos1		= $c520
+	vgla		= $c523
+	hilffl1		= $c52b
+	hilfflag		= $c52c
+	xmaxlow		= $c52d
+	xmaxhigh		= $c52e
+	ueberdreh		= $c52f
+	tracetab		= $c531
+	drehsinn		= $c57c
+	zwspei1		= $c57d
+	zn		= $c586
+	pspeinmi		= $c58b
+	pageflag		= $c58c
+	pagewert		= $c58d
+	portspei		= $c596
+	ax		= $c597
+	procnffl		= $c597
+	mfreq		= $c599
+	ydiff		= $c59f
+	diffv		= $c5a1
+	dry		= $c5a3
+	xdiff		= $c5a6
+	ey		= $c5a8
+	ex		= $c5aa
+	ay		= $c5ac
+	gflag		= $c5ae
+	multijn		= $c5b0
+	autoinc		= $c5b1
+	autoflag		= $c5b2
+	gmemflag		= $c5b3
+	mobbew		= $c5b4
+	mobspeed		= $c5b5
+	mobnr2		= $c5bb
+	mobnr		= $c5bc
+	flashsp		= $c5c4
+	flashzae		= $c5c5
+	flashfl		= $c5c6
+	ifflag		= $c5cb
+	lcode		= $c5d5
+	inkey		= $c5d6
+	bflashsp		= $c5d7
+	bflzae		= $c5d8
+	bflashf1		= $c5d9
+	bflashf2		= $c5da
+	bflashjn		= $c5db
+	optflag		= $c5dc
+	pendflag		= $c5dd
+	copbyte		= $c5e2
+	codezae		= $c5e4
+	copzaey		= $c5e6
+	onkeypos		= $c5e7
+	onkeyzeig		= $c5e8
+	onkeyflag		= $c5ea
+	keyon		= $c5ec
+	okstring		= $c5ed
+	okstrlen		= $c5ef
+	basbzk		= $c5f0
+	delay		= $c5f8
+	onerrzeig		= $c5f9
+	onerrorflag	= $c5fb
+	errn		= $c5fc
+
+; -----------------------------------------
+
+	stack		= $c600
+	traceflag		= $c601
+	doflag		= $c602
+	stackrepeat	= $c603
+	sprepeat		= $c617
+	stackexec		= $c618
+	spexec		= $c62c
+	stackloop		= $c62d
+	sploop		= $c641
+	lastkey		= $c642
+	keyflag		= $c646
+	wavetab		= $c64a
+	keytab		= $c64d
+
+; ----------------------------------------- 
+
+	pxhtab		= $c751
+	pxltab		= $c850 
+	pytab		= $c94f
+
+; ----------------------------------------- 
+
+	pzeig		= $ca4e
+	pymerk		= $ca4f
+	pyalt		= $ca50
+	pakty		= $ca51
+	flag1		= $ca52
+	localtab		= $ca7f
+
+; ----------------------------------------- 
+
+	lcfarb12		= $cb1b
+	lcfarb3		= $cb1c
+	lowcolflag	= $cb1d
+	movetab		= $cb1e
+	krx		= $cb48
+	kmy		= $cb49
+	kmx		= $cb4b
+	winksw		= $cb4d
+	schrart		= $cb4d
+	drstrz		= $cb4f
+	drstatus		= $cb50
+	dryanf		= $cb51
+	zwisp2		= $cb54
+	drawtabx		= $cb59
+	drawtaby		= $cb5d
+	drricht		= $cb61
+	drincx		= $cb65
+	drincy		= $cb69
+	drx		= $cb6d
+	chgr		= $cb6e
+	fetchanz		= $cb6f
+	joywert		= $cb70
+	zwisp4		= $cb71
+	fetchlen		= $cb72
+	zeileanf		= $cb76
+	spalteanf		= $cb77
+	spaltenanz	= $cb78
+	zeilenanz		= $cb79
+	zaehler		= $cb7a
+	richtz		= $cb7c
+	zaehlm1		= $cb7e
+	zaehlm2		= $cb80
+	bwflag		= $cb82
+	zwisp3		= $cb84
+	musicz2		= $cb86
+	musicz3		= $cb88
+	musicz4		= $cb8a
+	mregadr		= $cb8c
+	playflag		= $cb91
+	musicdau		= $cb96
+	musicadr		= $cb9b
+	musicz1		= $cb9d
+	musiclen		= $cb9e
+	musicz5		= $cb9f
+	srtab		= $cba0
+	adtab		= $cba4
+	stimmenr		= $cba8
+	str1		= $cbab
+	dwert		= $cbae
+	plpos		= $cbb1
+	strlen2		= $cbb4
+	strlen1		= $cbb7
+	idivsor		= $cbbb
+	idivdend		= $cbc0
+	idivrest		= $cbc2
+	kry		= $cbc5
+
+; ----------------------------------------- 
+
+
