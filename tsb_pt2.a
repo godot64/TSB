@@ -1,0 +1,1234 @@
+; ----------------------------------------- 
+;
+; Tuned Simons' Basic
+;
+; by Arndt Dettke, 1986
+;
+; part 2
+;
+; ----------------------------------------- 
+
+	!ct pet
+
+; ----------------------------------------- TSB Functions
+; 88bc			recoded
+fnjoy	ldy #$00		; set $dc00
+	sty helpvec
+	lda #$dc
+	sta helpvec+1
+	jsr incbasbz	; (better: chrget)
+	jsr chrgot	; anything more?
+	beq +		; .y=0
+
+	lda #$28		; yes, "("?
+	jsr schkzei
+	jsr sgetbyt1	; value to .x
+	jsr schkklz	; ")"?
+	txa
+	and #1		; delimit to 0/1
+	tay
+
++	lda (helpvec),y	; get joy
+	sta $20
+	and #$6f		; skip fire
+	sta joywert
+
+	ldx #0
+-	lda tabjoy,x	; convert to joy value
+	cmp joywert
+	beq +
+	inx
+	cpx #8
+	bne -
+
+	lda #0		; not in tab, so $00
+	sta joywert
+	beq ++
+
++	inx		; we have a joy value
+	stx joywert
+
+++	lda $20		; now isolate fire
+	and #$10
+	bne +
+	lda joywert	; and indicate in value
+	ora #$80
+	sta joywert
+
++	ldy joywert	; convert to float
+	jmp sxyflp3	; $8CCB
+
+; ----------------------------------------- 
+
+tabjoy	!by $6e,$66,$67,$65,$6d,$69,$6b,$6a
+
+; ----------------------------------------- 
+; 891a			original
+fnpot	jsr chrget
+	jsr $aefa		; sys "("?
+	jsr sgetadr2
+	jsr $aef7		; sys ")"?
+	lda $65
+	bne +
+	ldy $d419		; get paddle 0 value
+	jmp ++
++	ldy $d41a		; get paddle 1 value
+++	sty $63
+	ldx #0
+	jmp sxyflp	; convert to float
+
+fnpenx	jsr penabfr
+	ldy lpx		; lightpen x
+	jmp +
+
+fnpeny	ldy lpy		; lightpen y
++	ldx #0
+	jsr incbasbz
+	jmp sxyflp
+
+penabfr	lda $d019
+	and #8		; wait for strobe
+	beq penabfr
+	lda $d013		; get lp x
+	sta lpx
+	lda $d014		; get lp y
+	sta lpy
+	lda $d019		; clear strobe
+	and #$f7
+	sta $d019
+	rts
+
+; ----------------------------------------- 
+; 896a
+trace1	lda $d3		; save cursor
+	pha
+	lda $d5
+	pha
+	lda $d6
+	pha
+	lda $d4
+	pha
+
+	lda $028d		; C= key?
+	and #$02
+	beq +
+
+---	ldx #8		; yes, slowdown
+	stx helpvec
+--	ldx #$2d
+	ldy #0
+-	dey
+	bne -
+	dex
+	bne -
+	dec helpvec
+	bne --
+
++	lda $028d		; Shift?
+	and #$01
+	bne ---		; yes, slowdown
+
+	jsr $e566		; sys home
+	jsr trace2
+	jsr $aad7		; sys out cr/lf
+	ldx helpvec
+	jsr $e88c		; sys set cursor
+	ldy helpvec+1
+	sty $d3
+	lda ($d1),y	; revert char
+	eor #$80
+	sta ($d1),y
+
+	pla		; restore cursor
+	sta $d4
+	pla
+	tax
+	jsr $e88c		; sys set cursor
+	pla		; restore cursor
+	sta $d5
+	pla
+	sta $d3
+-	rts
+
+; ----------------------------------------- 
+; 89bd
+trace3	lda #$20
+	ldy $d3
+--	sta ($d1),y
+	cpy $d5
+	bcs -
+	iny
+	bne --
+; 89ca
+trace2	jsr $bdc9		; sys out: line # (.x/.a)
+	lda $39
+	ldx $3a
+	sta int
+	stx int+1
+	jsr $a613		; sys compute start of line
+	lda $d6
+	ldx $d3
+	sta helpvec
+	stx helpvec+1
+	ldy #3
+	sty $0b
+	sty $49
+	lda #$20
+tr2	ldy $49
+	and #$7f
+; 89ec
+tr1	jsr $ab47		; sys out char in .a
+	cmp #$22		; string?
+	bne tr0
+	lda $0b		; contains: 3
+	eor #$ff
+	sta $0b
+tr0	iny
+	ldx $60
+	tya
+	clc
+	adc $5f
+	bcc +
+	inx
++	cmp progz
+	bne +
+	cpx progz+1
+	bne +
+	lda $d6
+	ldx $d3
+	sta helpvec
+	stx helpvec+1
++	lda ($5f),y
+	beq trace3
+	bmi ++
+	cmp #$64		; sb token?
+	bne +
+	jsr tr3		; yes
+	ldy $49
+	bne tr0
+
++	jmp tr1
+++	cmp #$ff
+	beq tr1
+	bit $0b
+	bmi tr1
+	jsr trace4
+	bmi tr2
+; 8a34
+trace4	ldx #$a0		; sys address of basic commands
+	stx $21
+	ldx #$9e
+	stx $20
+; 8a3c
+trace7	sty $49
+	tax
+	ldy #0
+	asl
+	beq ++
+--	dex
+	bpl +
+-	jsr inc20
+	lda ($20),y
+	bmi --
+	cmp #$40
+	bne -
+	beq --
+-
++	iny
+++	lda ($20),y
+	bmi +
+	cmp #$40
+	beq +
+	jsr $ab47		; sys out char in  .a
+	bne -
+tr3	iny
+	jmp trace5
+
+	nop
+
+; ----------------------------------------- 
+; 8a67
+sirqplay	lda musicz4	; from sirq5
+	beq sip0
+	dec musicz2
+	lda musicz2
+	beq sip1
++	rts
+
+sip1	dec musicz4
+	lda musicz4
+	beq sip0
+	lda musicz3
+	sta musicz2
+	rts
+
+sip0	lda musicadr
+	sta $fc
+	lda musicadr+1
+	sta $fd
+	ldy musicz1
+	lda ($fc),y
+	cmp #$8d		; beyond f8?
+	bcs sip9
+	cmp #$85		; below f1?
+	bcc sip9
+	sbc #$84		; make value
+	sta musicz2
+	sta musicz3
+	lda musicdau
+	sta musicz4
+	jmp sip4
+
+sip2	sty musicz5
+	jsr notesuch
+	jsr svmregadr
+	ldy #1
+	sta ($fe),y
+	txa
+	dey
+	sta ($fe),y
+	jsr stimmein
+	ldy musicz5
+
+sip4	cpy musiclen
+	bcs playend
+	iny
+	sty musicz1
+	rts
+
+playend	lda #0
+	sta musicz1
+	sta playflag
+	rts
+
+sip9	cmp #$93		; clr (choose voice)
+	bne sip2
+	iny
+	lda ($fc),y
+	ldx #$00
+	stx musicz4
+	cmp #$33		; beyond voice 3?
+	bcs sip5
+	cmp #$31		; below voice 1?
+	bcc sip5
+	sbc #$30		; make value from voice #
+	tax
+	dex
+	lda #$d4		; set $d4xx (from voice)
+	sta mregadr+1
+	lda mregs,x
+	sta mregadr
+	stx stimmenr
+-	jmp sip4
+
+sip5	cmp #$47		; "g" voice off
+	bne sip3
+	tya
+	pha
+	jsr svmregadr
+	ldy stimmenr
+	lda wavetab,y
+	and #$fe
+	ldy #4
+	sta ($fe),y
+	pla
+	tay
+	bne -
+
+sip3	cmp #$54		; "t" sync bit
+	bne sip6
+	tya
+	pha
+	jsr svmregadr
+	ldy stimmenr
+	lda wavetab,y
+	eor #$02
+--	ldy #4		; ### shorter!
+	sta ($fe),y
+	pla
+	tay
+	bne -
+
+sip6	cmp #$43		; "c" waveform
+	bne sip7
+	tya
+	pha
+	jsr svmregadr
+	lda #0
+	beq --
+
+sip7	cmp #$52		; "r" repeat
+	bne -
+	ldy #0
+	sty musicz1
+	sty musicz4
+	rts
+
+svmregadr	ldy mregadr
+	sty $fe
+	ldy mregadr+1
+	sty $ff
+	rts
+
+notesuch	ldy #$13		; search in 20 notes
+-	cmp nottab,y
+	beq sip8
+	dey
+	bpl -
+	lda #0		; not found
+	tax
+	rts
+
+sip8	lda frqtabh,y	; found, set frequency
+	sta mfreq+1
+	lda frqtabl,y
+	sta mfreq
+	inc musicz5
+	ldy musicz5
+	lda ($fc),y
+	sec
+	sbc #$30
+	tax
+	beq sip10
+-	asl mfreq
+	rol mfreq+1
+	dex
+	bne -
+
+sip10	lda mfreq+1
+	ldx mfreq
+	rts
+
+; ----------------------------------------- 
+; 8b8e
+mregs	!by $00,$07,$0e
+
+nottab	!by $43,$c3,$44,$c4,$45,$46,$c6,$47,$c7,$41,$c1,$42,$5a
+	!by $ac,$b1,$bb,$a5,$b0,$bf,$bc
+
+frqtabl	!by $12,$23,$34,$46,$5a,$6e,$84,$9b
+	!by $b3,$cd,$e9,$06,$00,$23,$46,$5a
+	!by $84,$b3,$e9,$06
+frqtabh	!by $01,$01,$01,$01,$01,$01,$01,$01
+	!by $01,$01,$01,$02,$00,$01,$01,$01
+	!by $01,$01,$01,$02
+
+; ----------------------------------------- 
+; 8bcd
+stimmein	ldy #6
+	ldx stimmenr
+	lda srtab,x	; sustain/release
+	sta ($fe),y
+	dey
+	lda adtab,x	; attack/decay
+	sta ($fe),y
+	dey
+	lda wavetab,x	; waveform
+	and #$fe		; clear key bit
+	sta ($fe),y
+	ora #1
+	sta ($fe),y
+	rts
+
+; ----------------------------------------- bef GRAPHICS
+; 8bea			new
+befgraphics
+	ldx #<namehsg	; load high speed graphics
+	ldy #>namehsg
+	jsr loadext
+	bcs +
+	jsr $7000		; init HSG
+	jmp bef0
+
++	jmp iffail1
+
+; ----------------------------------------- 
+; 8bfc
+	ldy drive
+	sty $ba
+	jmp $f4a5		; sys LOAD
+; 8c03
+	ldy drive
+	sty $ba
+	jmp $f5ed		; sys SAVE
+
+; ----------------------------------------- 
+; 8c0a
+loadsave	!wo $8bfc,$8c03
+
+; ----------------------------------------- 
+; 8c0e
+cold2	ldy #3
+-	lda loadsave,y
+	sta $0330,y	; sys set vectors
+	dey
+	bpl -
+	rts
+
+; ----------------------------------------- Old copy of stimmein
+; 			unused
+l8c1a	ldy stimmenr
+	lda adtab,y
+	ldy #5
+	sta ($fe),y
+	ldy stimmenr
+	lda $cba0,y
+	ldy #6
+	sta ($fe),y
+	ldy stimmenr
+	lda wavetab,y
+	and #$fe
+	ldy #4
+	sta ($fe),y
+	ldy #4
+	ora #1
+	sta ($fe),y
+	rts		; 39 bytes
+
+; ----------------------------------------- 
+; 8c41
+mobexs	lda $d01d
+	ora mbittabs,x
+	sta $d01d
+	rts
+
+mobeys	lda $d017
+	ora mbittabs,x
+	sta $d017
+	rts
+
+mobexl	lda $d01d
+	and mbittabl,x
+	sta $d01d
+	rts
+
+mobeyl	lda $d017
+	and mbittabl,x
+	sta $d017
+	rts
+
+; ----------------------------------------- 
+; 8c69
+sclose	jsr $ffcc		; sys clrch
+	lda #1
+	jsr $ffc3		; sys close 1
+	jmp $ffcc		; sys clrch
+
+; ----------------------------------------- 
+
+	!by 0		; brk
+
+; ----------------------------------------- 
+; 8c75
+getbytc	jsr $aefd		; sys chkcom
+	jmp $b79e		; sys getbyt
+
+; ----------------------------------------- 
+; 8c7b
+sgetstr1	lda portspei
+	pha
+	jsr sgetstr
+	sta zwspei1
+	pla
+	sta portspei
+	lda zwspei1
+	rts
+
+; ----------------------------------------- 
+; 8c8d			enhanced
+sgetari	lda #0
+	sta $0d
+	jsr chrget
+fromat	bcs +		; 8c94
+	jmp sascflp
+
++	cmp #$24		; "$"?
+	beq gethex
+	cmp #$25		; "%"?
+	beq getbin
+	cmp #$64		; sb token?
+	beq +
+	jmp sgetari1	; no : sys
++	jmp csgetari1	; yes: tsb
+
+; ----------------------------------------- 
+; 8cab
+chhexchr	cmp #$30		; kleiner "0"?
+	bcc +
+	cmp #$47		; größer "f"?
+	bcs +
+	cmp #$3a		; kleiner ":"?
+	bcc ++
+	cmp #$41		; größer "@"?
+	bcs ++
++	pla
+	pla
+	ldx #$25		; error "not hex char"
+	jmp ($0300)
+-
+++	rts		; sonst: ok
+
+; ----------------------------------------- func %
+; 8cc3
+getbin	jsr getdouble
+	jsr bincon
+	ldy $a8
+
+; ----------------------------------------- to Float
+; 8ccb
+sxyflp3	ldx #0
+sxyflp	sty $63
+	stx $62
+sxyflp2	ldx #$90
+	sec
+	jmp $bc49		; sys convert to float
+
+; ----------------------------------------- func $
+; 8cd7
+gethex	jsr getdouble
+	bne +		; uncond. branch
+
+hexcon	jsr chrget
++	sty $a5
+hcon0	jsr chhexchr
+	tax
+	jsr chrget
+	jsr chhexchr
+	tay
+	txa
+	jsr hex2w
+	ldy $a5
+	iny
+	cpy #3
+	bvs +
+	sta $0060,y
+	bcc hexcon
+
++	jsr chrget
+	jmp sxyflp2
+
+; ----------------------------------------- 
+
+l8d02	jsr sbzply
+	ldy #2		; found prog end?
+	lda (progz),y
+	beq -		; yes, to RTS
+	ldy #5
+--	jsr sbzply
+; 8d10
+sfordo	jsr schdo		; search for DO
+	cmp #0		; found line end?
+	beq l8d02		; continue search
+-	iny
+	lda (progz),y
+	cmp tuned+1,y
+	beq -
+	cpy #4
+	bcc --
+	jmp sbzply
+
+; ----------------------------------------- 
+
+	!by $ea,$00
+
+; ----------------------------------------- 
+; 8d28
+hex2w	pha
+	tya
+	jsr hexw
+	sta zwisp2
+	pla
+	jsr hexw
+	asl
+	asl
+	asl
+	asl
+	ora zwisp2
+	rts
+
+hexw	sec
+	sbc #$30
+	cmp #10
+	bcc +
+	sbc #7
++	rts
+
+; ----------------------------------------- func EXOR
+; 8d46			original
+fnexor	jsr chrget
+	jsr $aefa		; sys "("?
+	jsr sgetadr2
+	sty $aa
+	sta $ab
+	jsr $aefd		; sys chkcom
+	jsr sgetadr2
+	jsr $aef7		; sys ")"?
+	lda $65
+	eor $aa
+	tay
+	lda $64
+	eor $ab
+	tax
+	jmp sxyflp
+
+; ----------------------------------------- func DUP
+; 8d69			original
+fndup	jsr chrget
+	jsr $aefa		; sys "("?
+	jsr sgetstr1
+	ldy $69
+	sty pos
+	sta str1+1
+	stx str1
+	jsr $aefd		; sys chkcom
+	jsr sgetadr2
+	jsr $aef7		; sys ")"?
+	ldx $65
+	stx dwert
+	ldy #0
+	sty pos1
+--	ldy #$00
+-	inc pos1
+	iny
+	cpy pos
+	bne -
+	dex
+	bne --
+	lda pos1
+	jsr neustr
+	lda str1+1
+	sta $21
+	lda str1
+	sta $20
+	ldx dwert
+	ldy #0
+	sty strz1
+-	lda ($20),y
+	sty strz2
+	ldy strz1
+	sta ($62),y
+	iny
+	sty strz1
+	ldy strz2
+	iny
+	cpy pos
+	bne -
+	ldy #0
+	sty pos1
+	dex
+	bne -
+	lda #$ff
+	sta $0d
+	jmp pushstr
+
+; ----------------------------------------- 
+; 8ddc
+csgetari1	jsr chrget
+	ldy #0		; ### shorter!
+	lda (progz),y
+
+; ----------------------------------------- 
+
+	cmp #$55		; DUP?
+	bne +
+	jmp fndup
+
+; ----------------------------------------- 
+
++	cmp #$5a		; EXOR?
+	bne +
+	jmp fnexor
+
+; ----------------------------------------- 
+
++	cmp #$51		; JOY?
+	bne +
+	jmp fnjoy
+
+; ----------------------------------------- 
+
++	cmp #$0e		; FRAC?
+	bne csgetari2
+
+; ----------------------------------------- func FRAC
+; 8dfc			enhanced
+fnfrac	jsr chrget
+	ldy #0
+	jsr sxyflp3
+	jsr $bc0c		; sys fac->arg
+	jsr $aefa		; sys "("?
+	jsr $ad9e		; sys frmevl
+	lda $66		; save sign
+	sta $aa
+	bpl +
+	jsr $bfb4		; sys toggle sign
++	jsr $aef7		; sys ")"?
+	jsr $bc1b		; sys runden fac
+	jsr $bc0c		; sys fac->arg
+	jsr $bccc		; sys INT()
+	jsr $b853		; sys arg-fac
+	lda #0
+	sta $0d
+	lda $aa
+	bpl +
+	jsr $bfb4		; sys toggle sign
++	jmp $bc1b		; sys runden fac
+
+; ----------------------------------------- 
+
+getdouble	ldy #1
+	cmp (progz),y
+	beq +
+	jmp chrget
+
++	pha
+	jsr chrget
+	jsr chrget
+	jmp $c750		; func %%/$$
+
+; ----------------------------------------- 
+
+	!by $ea,$00
+
+; ----------------------------------------- 
+; 8e48
+csgetari2	cmp #$10		; PLACE?
+	beq fnplace
+	jmp csgetari3
+
+; ----------------------------------------- func PLACE
+; 8e4f			original
+fnplace	jsr chrget
+	jsr $aefa		; sys "("?
+	jsr sgetstr1
+	sta $a8
+	stx $a7
+	lda $69
+	sta strlen1
+	jsr $aefd		; sys chkcom
+	jsr sgetstr1
+	sta $aa
+	stx $a9
+	lda $69
+	sta strlen2
+	jsr $aef7		; sys ")"?
+	ldy #0
+	sty plpos
+-	lda ($a7),y
+	cmp ($a9),y
+	bne +
+	iny
+	cpy strlen1
+	bne -
+	inc plpos
+	lda plpos
+--	tay
+	lda #0
+	sta $0d
+	ldx #0		; ### shorter!
+	jmp sxyflp
+
++	ldy #0
+	inc $a9
+	bne +
+	inc $aa
++	inc plpos
+	lda plpos
+	cmp strlen2
+	bne -
+	lda #0		; ### shorter!
+	jmp --
+
+; ----------------------------------------- 
+; 8eac
+csgetari3	cmp #$5b		; INSERT?
+	beq fninsert
+	jmp csgetari4
+
+; ----------------------------------------- func INSERT
+; 8eb3			enhanced
+fninsert	jsr chrget
+	jsr $aefa		; sys "("?
+	jsr sgetstr1
+	sta $a8
+	stx $a7
+	lda $69
+	sta strlen1
+	jsr $aefd		; sys chkcom
+	jsr sgetstr1
+	sta $aa
+	stx $a9
+	lda $69
+	sta strlen2
+	jsr getbytc
+	stx pos
+	jsr $aef7		; sys ")"?
+	clc
+	lda strlen2
+	adc strlen1
+	bcc +
+err23	ldx #$23		; error "string too large"
+	jmp ($0300)
+-	ldx #$22		; error "insert too large"
+	jmp ($0300)
+
++	jsr neustr
+	ldy #0
+--	cpy pos
+	beq +
+	lda ($a9),y
+	sta ($62),y
+	iny
+	cpy strlen2
+	beq -
+	bne --
+
++	sty pos1
+	sty dwert
+	ldy #0
+	sty $bf
+-	ldy $bf
+	cpy strlen1
+	beq +
+	lda ($a7),y
+	inc $bf
+	ldy pos1
+	sta ($62),y
+	inc pos1
+	bne -
+	nop
+
++	ldy dwert
+-	lda ($a9),y
+	inc dwert
+	ldy pos1
+	sta ($62),y
+	inc pos1
+	ldy dwert
+	cpy strlen2
+	bne -
+	lda #$ff
+	sta $0d
+	jmp pushstr
+
+; ----------------------------------------- 
+; 8f45
+idiv	lda #0
+	sta idivrest
+	sta idivrest+1
+	lda idivsor
+	ora idivsor+1
+	bne +
+	pla
+	pla
+	ldx #$14		; error "division by zero"
+	jmp ($0300)
+
++	ldx #$10
+-	rol idivdend
+	rol idivdend+1
+	rol idivrest
+	rol idivrest+1
+	sec
+	lda idivrest
+	sbc idivsor
+	tay
+	lda idivrest+1
+	sbc idivsor+1
+	bcc +
+	sty idivrest
+	sta idivrest+1
++	dex
+	bne -
+	rol idivdend
+	rol idivdend+1
+	rts
+
+; ----------------------------------------- 
+; 8f8a
+csgetari4	cmp #$53		; DIV?
+	bne csgetari5
+
+; ----------------------------------------- func DIV
+; 8f8e			original
+fndiv	jsr chrget
+	jsr $aefa		; sys "("?
+	jsr sgetadr2
+	sta idivdend+1
+	sty idivdend
+	jsr $aefd		; sys chkcom
+	jsr sgetadr2
+	sta idivsor+1
+	sty idivsor
+	jsr $aef7		; sys ")"?
+	jsr idiv
+	ldy idivdend
+	ldx idivdend+1
+	jmp sxyflp
+
+; ----------------------------------------- 
+; 8fb8
+csgetari5	cmp #$52		; MOD?
+	bne csgetari6
+
+; ----------------------------------------- func MOD
+; 8fbc			original
+fnmod	jsr chrget
+	jsr $aefa		; sys "("?
+	jsr sgetadr2
+	sta idivdend+1
+	sty idivdend
+	jsr $aefd		; sys chkcom
+	jsr sgetadr2
+	sta idivsor+1
+	sty idivsor
+	jsr $aef7		; sys ")"?
+	jsr idiv
+	ldy idivrest
+	ldx idivrest+1
+	jmp sxyflp
+
+; ----------------------------------------- 
+; 8fe6
+csgetari6	cmp #$59		; LIN?
+	bne csgetari7
+
+; ----------------------------------------- func LIN
+; 8fea			original
+fnlin	jsr incbasbz
+	sec
+	jsr $fff0		; sys plot
+	txa
+	tay
+	ldx #0
+	jmp sxyflp
+
+; ----------------------------------------- 
+; 8ff8
+csgetari7	cmp #$58		; TEST?
+	bne csgetari8
+
+; ----------------------------------------- func TEST
+; 8ffc			original
+fntest	jsr chrget
+	jsr $aefa		; sys "("?
+	jsr sgetadr2
+	sty $09
+	sta $0a
+	jsr $aefd		; sys chkcom
+	jsr sgetadr2
+	sty $a4
+	jsr $aef7		; sys ")"?
+	lda #$0b
+	sta $f7
+	jsr basromau
+	jsr punkt
+	ldx #0
+	ldy $90
+	jsr basromei
+	jsr kerromein
+	cli
+	jmp sxyflp
+
+; ----------------------------------------- 
+; 902c
+csgetari8	cmp #$57		; INST?
+	beq fninst
+	jmp csgetari9
+
+; ----------------------------------------- func INST
+; 9033			enhanced
+fninst	jsr chrget
+	jsr $aefa		; sys "("?
+	jsr sgetstr1
+	sta $a8
+	stx $a7
+	lda $69
+	sta strlen1
+	jsr $aefd		; sys chkcom
+	jsr sgetstr1
+	sta $aa
+	stx $a9
+	lda $69
+	sta strlen2
+	jsr getbytc
+	stx pos
+	jsr $aef7		; sys ")"?
+	clc
+	lda strlen1
+	beq +
+	adc pos
+	cmp strlen2
+	bcc +
+	beq ++
+	jmp err23
+
++	lda strlen2
+++	jsr neustr
+	ldy #0
+-	cpy strlen2
+	beq +
+	lda ($a9),y
+	sta ($62),y
+	iny
+	bne -
++	ldy #$00
+	sty $bf
+-	ldy $bf
+	cpy strlen1
+	beq +
+	lda ($a7),y
+	inc $bf
+	ldy pos
+	sta ($62),y
+	inc pos
+	bne -
++	lda #$ff
+	sta $0d
+	jmp pushstr
+
+; ----------------------------------------- 
+; 90a4			enhanced
+csgetari9	cmp #$56		; INKEY?
+	bne csgetaria
+
+	jsr incbasbz
+	ldy inkey
+	jmp sxyflp3
+
+; ----------------------------------------- 
+; 90b1
+csgetaria	cmp #$5c		; POT?
+	bne csgetarib
+	jmp fnpot
+
+; ----------------------------------------- 
+; 90b8
+csgetarib	cmp #$5d		; PENX?
+	bne csgetaric
+	jmp fnpenx
+
+; ----------------------------------------- 
+
+csgetaric	cmp #$5f		; PENY?
+	bne csgetarid
+	jmp fnpeny
+
+; ----------------------------------------- 
+
+csgetarid	cmp #$61		; GRAPHICS?
+	bne csgetarie
+
+; ----------------------------------------- 
+; 90ca			original
+fngraphics
+	jsr incbasbz
+	ldx #$d0		; =$d000
+-	ldy #$00
+	jmp sxyflp
+
+; ----------------------------------------- 
+
+csgetarie	cmp #$60		; SOUND?
+	bne csgetarif
+
+; ----------------------------------------- 
+; 90d8			original
+fnsound	jsr incbasbz
+	ldx #$d4		; =$d400
+	bne -
+
+; ----------------------------------------- 
+
+csgetarif	cmp #$67		; NRM?
+	bne csgetarig
+	jmp fnnrm
+
+; ----------------------------------------- 
+
+csgetarig	cmp #$28		; AT?
+	bne csgetarih
+	jmp fnat
+
+; ----------------------------------------- 
+
+csgetarih	cmp #$7c		; CHECK?
+	bne fnerr
+
+; ----------------------------------------- 
+; 90f1			original
+fncheck	jsr incbasbz
+	jsr $aefa		; sys "("?
+	jsr sgetadr2
+	sty pos
+	lda detectart
+	bne ++
+
+	jsr $aefd		; sys chkcom
+	jsr sgetadr2
+	sty pos1
+	jsr $aef7		; sys ")"?
+	ldy pos
+	lda detecterg
+	ora mbittabs,y
+	cmp detecterg
+	bne +
+	ldy pos1
+	lda detecterg
+	ora mbittabs,y
+	cmp detecterg
+	bne +
+-	ldy #0
+	jmp sxyflp3
+--
++	ldy #1
+	bne -
+
+; -----------------------------------------
+
+++	jsr $aef7		; sys ")"?
+	ldy pos
+	lda detecterg
+	ora mbittabs,y
+	cmp detecterg
+	bne --
+	beq -
+
+; ----------------------------------------- ERR entry
+; 9146			original
+fnerr	jsr incbasbz
+	ldy #0
+	lda (progz),y
+	cmp #$4e		; "n" (errn)
+	beq fnerrn
+
+; ----------------------------------------- func ERRLN
+; 9151
+fnerrln	cmp #$4c		; "l" (errln)
+	beq +
+-	jmp endsmb
+
++	jsr incbasbz
+	lda (progz),y
+	cmp #$4e		; "n" (errln)
+	bne -
+
+	ldy errln
+	ldx errln+1
+-	jsr incbasbz
+	jmp sxyflp
+
+; ----------------------------------------- func ERRN 
+; 916d
+fnerrn	ldy errn
+	ldx #0
+	beq -
+
+; ----------------------------------------- 
+; 9174
+;
+; End of part 2
+;
+
+
+
