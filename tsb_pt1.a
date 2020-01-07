@@ -1,0 +1,896 @@
+; ----------------------------------------- 
+;
+; Tuned Simons' Basic
+;
+; by Arndt Dettke, 1986
+;
+; part 1
+;
+; ----------------------------------------- 
+
+	!ct pet
+
+; ----------------------------------------- 
+
+startvec	!wo sstart
+smnivec	!wo sbnmi
+
+; ----------------------------------------- 
+
+modultext	!tx "CBM80"
+
+; ----------------------------------------- 
+
+	!by $ff
+
+; ----------------------------------------- 
+
+sstart	jmp befcold
+
+; ----------------------------------------- Calls to BASIC ROM
+
+sfrmnum	jsr pspeibe
+	jsr $ad8a		; get numerical expression
+	jmp prestor
+
+sfacadr	jsr pspeibe
+	jsr $b7f7		; FAC to word (.y=lo, .a=hi, :INT)
+	jmp prestor
+
+ssin	jsr pspeibe
+	jsr $e26b		; func SIN
+	jmp prestor
+
+scos	jsr pspeibe
+	jsr $e264		; func COS
+	jmp prestor
+
+schkcom	jsr pspeibe
+	jsr $aefd		; check for comma
+	jmp prestor
+
+sfrmevl	jsr pspeibe
+	jsr $ad9e		; retrieve expression
+	jmp prestor
+
+sfrestr	jsr pspeibe
+	jsr $b6a3		; retrieve string parameters
+	jmp prestor
+
+sintout	jsr pspeibe
+	jsr $bdd1		; out digits in .a (hi) and .x (lo)
+	jmp prestor
+
+sgoto1	jsr pspeibe
+	jsr $a8a3		; bef GOTO (to line in INT)
+	jmp prestor
+
+schkzei	jsr pspeibe
+	jsr $aeff		; check if char in .a is at pz
+	jmp prestor
+
+sxflppl	jsr pspeibe
+	jsr $bc44		; integer to float (hi: $62, lo: $63, .x:#$90)
+	jmp prestor
+
+sstrpz	jsr pspeibe
+	jsr $a613		; compute address of line start (number in INT)
+	jmp prestor
+
+sascflp	jmp $bcf3		; digits from basic to float
+
+sgetari1	jmp $ae92		; get arithmetical expression from basic
+
+schkklz	jsr pspeibe
+	jsr $aef7		; check for "Klammer zu"
+	jmp prestor
+
+sxflp	jsr pspeibe
+	jsr $bc49		; convert to FAC (.x=exponent)
+	jmp prestor
+
+sfacarg	jsr pspeibe
+	jsr $bc0c		; FAC to ARG
+	jmp prestor
+
+sfmult	jsr pspeibe
+	jsr $ba30		; FAC*ARG
+	jmp prestor
+
+sfldfack	jsr pspeibe
+	jsr $bba2		; const (.a=lo, .y=hi) to FAC
+	jmp prestor
+
+sfdiv	jsr pspeibe
+	jsr $bb14		; ARG/FAC
+	jmp prestor
+
+sfacasc	jsr pspeibe
+	jsr $bddd		; FAC to ASCII (in $0100)
+	jmp prestor
+
+sgetvar	jsr pspeibe
+	jsr $b08b		; get var from basic
+	jmp prestor
+
+stestdirm	jsr pspeibe
+	jsr $b3a6		; check for direct mode (error if yes)
+	jmp prestor
+
+sclrch	jsr pspeibe
+	jsr $abb5		; clear open device channels
+	jmp prestor
+
+srem	jsr pspeibe
+	jsr $a8f8		; find colon and add to progz
+	jmp prestor
+
+snexttr	jsr pspeibe
+	jsr $a906		; find colon, offset in .y
+	jmp prestor
+
+sinput1	jsr pspeibe
+	jsr $ac0d		; bef INPUT
+	jmp prestor
+
+spuf0cr	jsr pspeibe
+	jsr $aaca		; write buffer $0200 and cr
+	jmp prestor
+
+sbzply	jsr pspeibe
+	jsr $a8fb		; progz plus .y
+	jmp prestor
+
+sgetbyt1	jsr pspeibe
+	jsr $b79e		; getbyt from basic (to .x)
+	jmp prestor
+
+sbind	jsr pspeibe
+	jsr $a533		; bind basic lines
+	jmp prestor
+
+ssmni	lda pport
+	sta pspeinmi
+	jsr kerromein
+	jmp $fe43		; sys NMI
+
+sopen	jsr pspeibe
+	jsr $e1be		; bef OPEN
+	jmp prestor
+
+; ----------------------------------------- 
+; 812c/813b
+pspeibe	sta zwspei1
+	lda pport
+	sta portspei
+	jsr basromei
+	lda zwspei1
+	rts
+
+prestor	sta zwspei1
+	lda portspei
+	sta pport
+	lda zwspei1
+	rts
+
+; ----------------------------------------- Bef COLD (TSB)
+; 8147			recoded
+befcold	jsr basromei
+	ldx #$00
+	stx ramstart
+	ldy #$80
+	jsr $fd8c		; sys set memory top
+	jsr $e453		; sys load basic vectors
+	jsr $e3bf		; sys init ram
+	sei
+	jsr $fda3		; sys init cias
+	jsr $ff5b		; sys init VIC
+	cli
+	lda #0
+	tax
+-	sta faststack,x
+	sta settings1,x
+	sta settings2,x
+	inx
+	bne -
+	jsr cold1		; set drive 8 and vectors
+	ldx #11
+-	lda tsbvecs,x
+	sta basvecs,x
+	dex
+	bpl -
+	ldx #$81
+	stx $fffa+1	; sys nmi vector hi
+	inx
+	stx nmivec+1
+	inx
+	stx brkvec+1
+	lda #$14
+	sta brkvec
+	lda #$18
+	sta $fffa		; sys nmi vector lo
+	lda #$fa
+	sta nmivec
+	lda $2b		; get start of basic program
+	ldy $2c
+	jsr $a408		; sys free memory
+	jsr $e422		; sys out start message of sb
+	ldx #$fb
+	txs
+	jmp dscbmout	; show "tuned"
+
+; ----------------------------------------- 
+; 81ab
+tsbvecs	!wo $9e9c,$825c,$8234,$8240,$917a,$8c8d
+
+; ----------------------------------------- 
+; 81b7
+tsbpudef	!by $00,$23,$2a,$2c,$2e,$2b,$2d	; #*,.+-
+
+; ----------------------------------------- 
+; 81be
+signature	!tx "ad'86"
+
+; ----------------------------------------- part of USE
+; 81c3
+useready	pla
+	pla
+	lda #$00
+	jsr genout
+	lda #$a7
+	ldy #$02
+	pha
+	jsr basromei
+	pla
+	jsr $ab1e		; sys string out
+	jsr chrgot
+	bne +
+	jmp $aad7		; sys cr/lf out
+-	jmp swarm		; bad mode	
+
+; ----------------------------------------- 
+
++	lda #$3b		; ";"?
+use6	ldy #0		; compare to running code char
+	cmp (progz),y	; if not equal: error bad mode
+	bne -
+	jmp chrget	; and get next if equal
+
+; ----------------------------------------- part of USE
+; 81ec			recoded
+use0	jsr sgetbytn	; USE #n
+	stx $13		; .x= device #
+	jsr $e4ad		; sys basic ckout
+	bcs use2		; on error: continue anyway
+	jsr schkcom	; comma?
+	bne use2		; uncond. branch
+
+; ----------------------------------------- 
+
+	nop
+
+; ----------------------------------------- 
+; 81fc
+sgetbytc	jsr schkcom
+	jmp sgetbyt1
+
+; ----------------------------------------- 
+; 8202
+sgetbytn	jsr incbasbz
+	jmp sgetbyt1
+
+; ----------------------------------------- 
+; 8208
+	jsr incbasbz	; USE?
+
+; ----------------------------------------- bef USE
+; 820b			recoded
+befuse	jsr chrget	; next char: digit?
+	bcc +		; yes, branch
+
+	cmp #$23		; "#"?
+	beq use0		; yes, open file (81ec)
+
+use2	jmp use1		; no, continue normal use (9ce3)
+
++	jmp usedrv	; change drive#
+
+; ----------------------------------------- 
+
+	!by 0		; brk
+
+; ----------------------------------------- part of TRACE
+; 821b
+trace6	dex
+	txa
+	ora #$80
+	ldx #>tabbef
+	stx $21
+	ldx #<tabbef
+	stx $20
+	jmp trace7
+
+; ----------------------------------------- 
+; 822a
+endsmb	jsr kerromein
+	cli
+	jsr basromei
+	jmp $a7ae		; sys Interpreterschleife
+
+; ----------------------------------------- 
+; 8234
+zeiumw	jsr basromau
+	jsr zeiumw1
+	jsr basromei
+	jmp $a57c		; sys tokenizer
+
+; ----------------------------------------- 
+; 8240
+slist	php
+	pha
+	jsr basromau
+	pla
+	plp
+	jmp slist3
+
+; ----------------------------------------- 
+; 824a
+slist1	pha
+	jsr basromei
+	pla
+	plp
+	jmp $a71a		; sys detokenizer
+
+; ----------------------------------------- 
+; 8253
+slist2	pha
+	jsr basromei
+	pla
+	plp
+	jmp $a6f6		; sys part of LIST
+
+; ----------------------------------------- Eingabewarteschleife
+; 825c			recoded
+sloop	sei
+	lda #>sirq	; change irq to tsb
+	sta irqvec+1
+	lda #<sirq
+	sta irqvec
+	sta playflag
+	ldx #0
+	stx $d01a
+	stx onerrorflag
+	stx onkeyflag
+	stx basbzk+1
+	stx doflag
+	cli
+	lda $d011
+	and #$20
+	beq +
+	inx		; (.x not needed anymore)
+	jsr basromau
+	jsr slp1		; do NRM
++	jsr basromei
+	lda autoflag
+	cmp #10
+	beq auto
+	jmp $a483		; sys Eingabewarteschleife
+
+; ----------------------------------------- 
+; 8297			enhanced
+auto	clc
+	lda autozi
+	adc autoinc
+	sta $63
+	sta autozi
+	lda autozi+1
+	adc #0
+	sta $62
+	sta autozi+1
+	jsr sxyflp2
+	jsr $bddf		; sys fac2ascii
+	ldx #0
+-	lda linenum,x
+	beq +
+	sta keybuf,x
+	inx
+	bne -
++	lda #$20		; space
+	sta keybuf,x
+	inx
+	stx numkeys
+	lda #0
+	sta autoflag
+	jsr $a560		; sys Basiczeile einlesen
+	sty $aa
+
+	ldy #0
+-	iny
+	lda basinbuf,y
+	beq +
+	cmp #$3a		; ":"?
+	bcc -
+	cmp #$5b		; "["? (beyond "z"?)
+	bcs -
+	lda #10
++	sta autoflag
+
+	ldy $aa
+	jmp $a486		; sys Eingabewarteschleife (ohne inc)
+
+; ----------------------------------------- 
+; 82ec
+basromau	lda pport
+	and #$fe
+	sta pport
+	rts
+
+; ----------------------------------------- 
+; 82f3
+basromei	lda pport
+	ora #$01
+	sta pport
+	rts
+
+; ----------------------------------------- 
+; 82fa
+snmi	pha
+	txa
+	pha
+	tya
+	pha
+	jsr kerromein
+	lda #$7f
+	sta $dd0d
+	ldy $dd0d
+	bmi rs232nmi
+	jsr $f6bc		; sys STOP?
+	jsr $ffe1		; sysvec really STOP?
+	bne rs232nmi
+
+; ----------------------------------------- 
+; 8314
+sbrk	lda #$04
+	sta video		; video at $0400
+	jsr $fda3
+	jsr $e518		; sys init screen
+	lda #12		; backgr: mgr
+	sta $d021
+	lda #11		; border: dgr
+	sta $d020
+	lda #0		; cursor: blk
+	sta aktfarb
+	sta $d4
+	sta mobbew
+	sta gmemflag
+	lda #8		; CTRL h
+	sta playflag
+	jsr bsout		; fix keyb
+	jmp ($a002)	; system nmi
+
+rs232nmi	jmp $fe72		; nmi when rs323
+
+; ----------------------------------------- bef MERGE (TSB)
+; 8344			recoded
+befmerge	jsr incbasbz
+	jsr basromei
+	lda #0		; force LOAD
+	sta $0a
+	jsr $e1d4		; sys get params for LOAD/SAVE
+	lda $0a
+	ldx $2d		; get basic start
+	ldy $2e
+	jsr load
+	bcs +
+	jsr $ffb7		; sys read status
+	and #$bf		; EOF?
+	beq ++
+	jmp $e19c		; sys yes, load error
++	jmp $e0f9		; sys no, break in...
+
+; ----------------------------------------- 
+; 8369
+++	jsr basromau
+	jsr domerge	; continue MERGE:
+endmrge	jsr $a660		; sys clear
+	jmp $a474		; sys out: ready.
+
+; ----------------------------------------- 
+; 8375
+schkstr	jsr pspeibe
+	jsr $ad8f		; sys check for string
+	jmp prestor
+
+; ----------------------------------------- 
+
+	!by 0
+
+; ----------------------------------------- bef RENUMBER (TSB)
+; 837f			recoded
+befrenum	jsr incbasbz
+	jsr sgetadr	; result in .y (lo) and .a (lo)
+	sty $a4
+	sta $a5
+	jsr ren0
+	tay
+	lda $2b		; get start of basic prog
+	ldx $2c
+	sta $a8
+	stx $a9
+-	lda ($a8),y
+	sta $09
+	jsr inca8a9
+	lda ($a8),y
+	sta $0a
+	jsr inca8a9
+	iny
+	lda $a5
+	cmp #$fa
+	bcs sbready
+	sta ($a8),y
+	dey
+	lda $a4
+	sta ($a8),y
+	lda $09
+	ora $0a
+	beq sbready
+	lda $09
+	sta $a8
+	lda $0a
+	sta $a9
+	clc
+	lda $a4
+	adc ay
+	sta $a4
+	lda $a5
+	adc ay+1
+	sta $a5
+	jmp -
+
+; 83d1
+sbready	jsr $a659		; sys basic bef CLR
+	jmp $a474		; sys out: ready.
+
+; ----------------------------------------- 
+
+	!by $ad,$ad,$ad,$ad
+
+; ----------------------------------------- 
+; 83db
+incbasbz	inc progz
+	bne +
+	inc progz+1
++	rts
+
+; ----------------------------------------- Table of Commands
+; 83e2
+tabbef	!tx "hires@"	; 1
+	!tx "plot@"
+	!tx "line@"
+	!tx "block@"
+	!tx "fchr@"
+	!tx "fcol@"
+	!tx "fill@"
+	!tx "rec@"
+	!tx "rot@"	; 9
+	!tx "draw@"
+	!tx "char@"
+	!tx "hi col@"
+	!tx "inv@"
+	!tx "frac@"
+	!tx "move@"
+	!tx "place@"
+	!tx "upb@"	; 17
+	!tx "upw@"
+	!tx "leftw@"
+	!tx "leftb@"
+	!tx "downb@"
+	!tx "downw@"
+	!tx "rightb@"
+	!tx "rightw@"
+	!tx "multi@"	; 25
+	!tx "colour@"
+	!tx "mmob@"
+	!tx "bflash@"
+	!tx "mob set@"
+	!tx "music@"
+	!tx "flash@"
+	!tx "repeat@"
+	!tx "play@"	; 33
+	!tx "do@"
+	!tx "centre@"
+	!tx "envelope@"
+	!tx "cgoto@"
+	!tx "wave@"
+	!tx "fetch@"
+	!tx "at(@"
+	!tx "until@"	; 41
+	!tx ">>@"
+	!tx ">>@"
+	!tx "use@"
+	!tx ">>@"
+	!tx "global@"
+	!tx ">>@"
+	!tx "reset@"
+	!tx "proc@"	; 49
+	!tx "call@"
+	!tx "exec@"
+	!tx "end proc@"
+	!tx "exit@"
+	!tx "end loop@"
+	!tx "on key@"
+	!tx "disable@"
+	!tx "resume@"	; 57
+	!tx "loop@"
+	!tx "delay@"
+	!tx ">>@"
+	!tx ">>@"
+	!tx ">>@"
+	!tx ">>@"
+	!tx "secure@"
+	!tx "disapa@"	; 65
+	!tx "circle@"
+	!tx "on error@"
+	!tx "no error@"
+	!tx "local@"
+	!tx "rcomp@"
+	!tx "else@"
+	!tx "retrace@"
+	!tx "trace@"	; 73
+	!tx "dir@"
+	!tx "page@"
+	!tx "dump@"
+	!tx "find@"
+	!tx "option@"
+	!tx "auto@"
+	!tx "old@"
+	!tx "joy@"	; 81
+	!tx "mod@"
+	!tx "div@"
+	!tx "d!@"
+	!tx "dup@"
+	!tx "inkey@"
+	!tx "inst@"
+	!tx "test@"
+	!tx "lin@"	; 89
+	!tx "exor@"
+	!tx "insert@"
+	!tx "pot@"
+	!tx "penx@"
+	!tx ">>@"
+	!tx "peny@"
+	!tx "sound@"
+	!tx "graphics@"	; 97
+	!tx "design@"
+	!tx "rlocmob@"
+	!tx "cmob@"
+	!tx "bckgnds@"
+	!tx "pause@"
+	!tx "nrm@"
+	!tx "mob off@"
+	!tx "off@"	; 105
+	!tx "angl@"
+	!tx "arc@"
+	!tx "cold@"
+	!tx "scrsv@"
+	!tx "scrld@"
+	!tx "text@"
+	!tx "cset@"
+	!tx "vol@"	; 113
+	!tx "disk@"
+	!tx "hrdcpy@"
+	!tx "key@"
+	!tx "paint@"
+	!tx "low col@"
+	!tx "copy@"
+	!tx "merge@"
+	!tx "renumber@"	; 121
+	!tx "mem@"
+	!tx "detect@"
+	!tx "check@"
+	!tx "display@"
+	!tx "err@"
+	!tx "out@"
+	!by 0		; end of tab
+
+; ----------------------------------------- 
+; 86a3
+tuned	!tx " tuned", $0d	; tsb start message 
+	!by 0
+
+; ----------------------------------------- 
+; 86ab
+tsbblcopy	jsr pspeibe
+	jsr $a3b8		; sys block copy
+	jmp prestor
+
+; ----------------------------------------- 
+; 86b4 / 86b7
+sgetstrn	jsr incbasbz
+sgetstr	jsr sfrmevl	; get string from basic
+	jsr sfrestr
+	sta $69		; len
+	lda $23		; location
+	ldx $22
+	rts
+
+; ----------------------------------------- Table of BEFs
+; 86c4
+sprtab	!wo befhires-1	;   1 $91ff 
+	!wo befplot-1	;   2 $9266
+	!wo befline-1	;   3 $934f
+	!wo befblock-1	;   4 $bbcb
+	!wo movebef-1	;   5 $ac5c fchr
+	!wo movebef-1	;   6 $ac5c fcol
+	!wo movebef-1	;   7 $ac5c fill
+	!wo befrec-1	;   8 $baf7
+	!wo befrot-1	;   9 $a15d
+	!wo befdraw-1	;  10 $a056
+	!wo befchar-1	;  11 $a185
+	!wo befhicol-1	;  12 $a26f
+	!wo movebef-1	;  13 $ac5c inv
+	!wo swarm-1	;     $9e99 bad mode (fn frac)
+	!wo movebef-1	;  15 $ac5c move
+vecplace	!wo befplace-1	;  16 $ccd6 (changed from 86e2)
+	!wo movebef-1	;  17 $ac5c upb
+	!wo movebef-1	;  18 $ac5c upw
+	!wo movebef-1	;  19 $ac5c leftw
+	!wo movebef-1	;  20 $ac5c leftb
+	!wo movebef-1	;  21 $ac5c downb
+	!wo movebef-1	;  22 $ac5c downw
+	!wo movebef-1	;  23 $ac5c rightb
+	!wo movebef-1	;  24 $ac5c rightw
+	!wo befmulti-1	;  25 $94e9
+	!wo befcolour-1	;  26 $952d
+	!wo befmmob-1	;  27 $95c7
+	!wo befbflash-1	;  28 $9668
+	!wo befmobset-1	;  29 $96d9
+	!wo befmusic-1	;  30 $9758
+	!wo befflash-1	;  31 $978f
+	!wo befrepeat-1	;  32 $9af6
+	!wo befplay-1	;  33 $9917
+	!wo befdo-1	;  34 $b56f
+	!wo befcentre-1	;  35 $9946
+	!wo befenvelope-1	;  36 $9978
+	!wo befcgoto-1	;  37 $99e7
+	!wo befwave-1	;  38 $99f6
+	!wo beffetch-1	;  39 $b003
+	!wo befat-1	;  40 $b8b3 (also fn at)
+	!wo befuntil-1	;  41 $9b14
+	!wo $a33b		;     (*)
+	!wo $a33b		;     (+)
+	!wo befuse-1	;  44 $820a
+	!wo $b392		;     (-)
+	!wo befglobal-1	;  46 $a33b
+	!wo $9c04		;     reset
+	!wo befreset-1	;  48 $9c04
+	!wo befproc-1	;  49 $9e30
+	!wo befcall-1	;  50 $9c29
+	!wo befexec-1	;  51 $9ceb
+	!wo befendproc-1	;  52 $9d18
+	!wo befexit-1	;  53 $9d36
+	!wo befendloop-1	;  54 $c97d
+	!wo befonkey-1	;  55 $9d6c
+	!wo befdisable-1	;  56 $9d9f
+	!wo befresume-1	;  57 $9df4
+	!wo befloop-1	;  58 $9e53
+	!wo befdelay-1	;  59 $c946
+	!wo $9e4a		;     (<)
+	!wo $9e4a		;     (=)
+	!wo $9e4a		;     (>)
+	!wo $9e4a		;     (?)
+	!wo befsecure-1	;  64 $c94f
+	!wo bef0-1	;  65 $9173 (disapa)
+	!wo befcircle-1	;  66 $9488
+	!wo befonerror-1	;  67 $9e6f
+	!wo befnoerr-1	;  68 $9e91 (no error)
+	!wo beflocal-1	;  69 $a2f3
+	!wo befrcomp-1	;  70 $9f1e
+	!wo befelse-1	;  71 $a2c0
+	!wo befretrace-1	;  72 $9b47
+	!wo beftrace-1	;  73 $9b59
+	!wo befdir-1	;  74 $9545
+	!wo befpage-1	;  75 $9835
+	!wo befdump-1	;  76 $9f39
+	!wo beffind-1	;  77 $a593
+	!wo befoption-1	;  78 $9b62
+	!wo befauto-1	;  79 $9bd5
+	!wo befold-1	;  80 $9ed9
+	!wo swarm-1	;     $9e99 bad mode (fn joy)
+	!wo befmod-1	;  82 $bfe2 (also fn mod)
+	!wo swarm-1	;     $9e99 bad mode (fn div)
+	!wo befdelete-1	;  84 $b8e9 d!
+	!wo befdup-1	;  85 $b7b7 (also fn dup)
+	!wo swarm-1	;     $9e99 bad mode (fn inkey)
+	!wo befinst-1	;  87 $ca19 (also fn inst)
+	!wo swarm-1	;     $9e99 bad mode (fn test)
+	!wo beflin-1	;  89 $c83c (also fn lin)
+	!wo swarm-1	;     $9e99 bad mode (fn exor)
+	!wo befinsert-1	;  91 $af41 (also fn insert)
+	!wo swarm-1	;     $9e99 bad mode (fn pot)
+	!wo swarm-1	;     $9e99 bad mode (fn penx)
+vecbmode	!wo $9e99		;     (^)
+	!wo swarm-1	;     $9e99 bad mode (fn peny)
+	!wo swarm-1	;     $9e99 bad mode (fn sound)
+	!wo befgraphics-1	;  97 $8be9 (also fn graphics)
+	!wo befdesign-1	;  98 $a62d
+	!wo befrlocm-1	;  99 $a767
+	!wo befcmob-1	; 100 $a7a5
+	!wo befbckgnds-1	; 101 $a7b4
+	!wo befpause-1	; 102 $a7e1
+	!wo befnrm-1	; 103 $a830 (also fn nrm, 90df)
+	!wo befmoboff-1	; 104 $a855
+	!wo befoff-1	; 105 $a864
+	!wo befangl-1	; 106 $ab0f
+	!wo befarc-1	; 107 $a875
+	!wo befcold-1	; 108 $8146
+	!wo befscrsv-1	; 109 $b18e
+	!wo befscrld-1	; 110 $b1db
+	!wo beftext-1	; 111 $b228
+	!wo befcset-1	; 112 $b30c
+	!wo befvol-1	; 113 $b339
+	!wo befdisk-1	; 114 $b357
+	!wo befhrdcpy-1	; 115 $b4b7
+	!wo befkey-1	; 116 $b58b
+	!wo befpaint-1	; 117 $b5e7
+	!wo beflowcol-1	; 118 $93db
+	!wo befcopy-1	; 119 $b9f0
+	!wo befmerge-1	; 120 $8343
+vecrenum	!wo befrenum-1	; 121 $837e (changed from 87b4)
+	!wo befmem-1	; 122 $bdac
+	!wo befdetect-1	; 123 $bdf6
+	!wo $bdf6		; 124 fn check
+	!wo befdisplay-1	; 125 $be12
+	!wo beferror-1	; 126 $bfba (also fn err)
+	!wo befout-1	; 127 $9ed0
+
+; ----------------------------------------- 
+
+tsbf1	!tx "proc not founD"	; 33
+tsbf2	!tx "insert too largE"	; 34
+tsbf3	!tx "string too largE"	; 35
+tsbf4	!tx "not binary chaR"	; 36
+tsbf5	!tx "not hex chaR"		; 37
+tsbf6	!tx "end proc without exeC"	; 38
+tsbf7	!tx "end loop without looP"	; 39
+tsbf8	!tx "until without repeaT"	; 40
+tsbf9	!tx "stack too largE"	; 41
+tsbfa	!tx "too few lineS"		; 42
+tsbfb	!tx "bad char for a moB"	; 43
+tsbf0	!tx "bad modE"		; 32
+
+; ----------------------------------------- 
+; 887f
+serrout	txa
+	bpl +
+	jmp $a474		; sys out: ready.
+
++	jsr kerromein
+	txa
+	and #$20
+	bne +
+	jmp $a43a		; sys out: error
+
++	txa
+	and #$1f
+	asl
+	tax
+	lda fehlmtab,x
+	sta $22
+	lda fehlmtab+1,x
+	sta $23
+	jmp $a447		; sys out: (tsb) error
+
+; ----------------------------------------- Table Error Addresses
+; 88a2
+fehlmtab	!wo tsbf0,tsbf1,tsbf2,tsbf3,tsbf4,tsbf5,tsbf6,tsbf7
+	!wo tsbf8,tsbf9,tsbfa,tsbfb,tsbfc
+
+; ----------------------------------------- 
+; 88bc
+;
+; End of part 1
+;
+
+
+
