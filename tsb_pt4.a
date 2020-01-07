@@ -1,0 +1,1646 @@
+; ----------------------------------------- 
+;
+; Tuned Simons' Basic
+;
+; by Arndt Dettke, 1986
+;
+; part 4
+;
+; ----------------------------------------- 
+
+	!ct pet
+
+; ----------------------------------------- bef DUMP
+; 9f3a			enhanced
+befdump	lda $2d		; get start of vars
+	sta $20
+	lda $2e
+	sta $21
+dit6	lda #$0d		; sys out cr
+	jsr bsout
+	lda $21
+	ldy #0
+	cmp $30		; is at start of arrays?
+	bcc dit0
+	beq +
+	bcs dit1
++	lda $20
+	cmp $2f
+	bcc dit0
+dit1	jmp bef0		; yes, end of command
+
+; ----------------------------------------- 
+
+dit0	lda ($20),y
+	sta $a6
+	bpl dit3
+	and #$7f
+	jsr bsout
+	jsr inc20
+	lda ($20),y
+	bmi dit4
+	jsr bsout
+	lda #$21		; !
+	jsr bsout
+	ldy #6
+	bne dit5
+
+dit4	and #$7f
+	jsr bsout
+	lda #$25		; %
+	jsr bsout
+	jsr outeql
+	jsr inc20
+	lda ($20),y
+	sta $62
+	jsr inc20
+	lda ($20),y
+	sta $63
+	ldx #$90
+	sec
+	jsr sxflppl
+	jsr sfacasc
+	jsr outasc
+	ldy #4
+	bne dit5
+
+dit3	and #$7f
+	jsr bsout
+	jsr inc20
+	lda ($20),y
+	sta $a6
+	bpl dit7
+
+	and #$7f
+	jsr bsout
+	lda #$24		; $
+	jsr bsout
+	jsr outeql
+
+	lda #$22		; string
+	jsr bsout
+	jsr inc20
+	lda ($20),y
+	sta $a8
+	jsr inc20
+	lda ($20),y
+	sta $23
+	jsr inc20
+	lda ($20),y
+	sta $24
+	ldy #0
+-	cpy $a8
+	beq dit8
+	lda ($23),y
+	jsr bsout
+	iny
+	bne -
+dit8	lda #$22		; string end
+	jsr bsout
+	ldy #3
+dit5	jsr inc20
+	dey
+	bne dit5
+
+	jsr getkey	; get key
+	jmp dit6		; start over
+
+; ----------------------------------------- 
+; 9ffb
+dit7	and #$7f
+	jsr bsout
+	jsr inc20
+	lda $20
+	ldy $21
+	jsr sfldfack
+	jsr sfacasc
+	jsr outeql
+	jsr outasc
+	ldy #5
+	bne dit5
+
+; ----------------------------------------- 
+; a017
+outasc	ldx #$00
+-	lda linenum,x
+	beq +
+	jsr bsout
+	inx
+	bne -
++	rts
+
+; ----------------------------------------- 
+; a025
+outeql	lda #$3d		; =
+	jmp bsout
+
+; ----------------------------------------- part of DO
+; a02a
+do8	jsr sfordo	; search for DO
+	pla
+	pla
+	jmp do9
+
+; ----------------------------------------- 
+
+	!by $ea,$ea,$00
+
+; ----------------------------------------- part of INST and MEM
+; a035
+setbmode	iny		; change bef vectors
+-	lda vecbmode,y	; to bad mode
+	sta vecplace,y
+	sta vecrenum,y
+	dey
+	bpl -
+	jmp bef0
+
+; ----------------------------------------- 
+; a045
+charen1	lda pport
+	ora #4
+	sta pport
+	rts
+
+; ----------------------------------------- 
+; a04c
+charen0	lda pport
+	sei
+	and #$fb
+	sta pport
+	rts
+
+; ----------------------------------------- 
+; a054
+-	jmp endsmb
+
+; ----------------------------------------- bef DRAW
+; a057			enhanced
+befdraw	jsr incbasbz
+	jsr sgetstr
+	stx $ac
+	sta $ad
+	lda $69
+	pha
+	jsr schkcom
+	jsr sgetadr
+	sty drx
+	sta drx+1
+	jsr sgetbytc
+	stx dry
+	jsr getpktf
+	pla
+	sta $5f
+	lda #0
+	sta drstrz
+	lda rotgr
+	sta drgrz
+
+--	sty drstatus
+	stx dryanf
+	ldy drstrz
+	lda ($ac),y
+	cpy $5f
+	beq -
+	iny
+	clc
+	sbc #$2f
+	pha
+	dec drgrz
+	lda drgrz
+	bne +
+	lda rotgr
+	sta drgrz
+	sty drstrz
++	ldx dryanf
+	pla
+	ldy drstatus
+	cmp #9
+	bcs -
+	sta drricht
+	cmp #5
+	bcc +
+	clc
+	sbc #4
++	tax
+	lda drawtabx,x
+	sta drincx
+	lda drawtaby,x
+	sta drincy
+	lda drincx
+	beq +++
+	cmp #$ff
+	bne ++
+	lda drx
+	bne +
+	dec drx+1
++	dec drx
+	jmp +++
+
+++	inc drx
+	bne +++
+	inc drx+1
++++	lda drincy
+	beq ++
+	cmp #$ff
+	bne +
+	dec dry
+	jmp ++
+
++	inc dry
+++	lda drx
+	sta $09
+	lda drx+1
+	sta $0a
+	lda dry
+	sta $a4
+	lda drricht
+	cmp #5
+	bcc +
+	jsr punkt
+	jsr kerromein
++	jmp --
+
+; ----------------------------------------- 
+; a11e
+
+tabrot	!by $01,$00,$00,$ff,$00,$ff,$01,$00
+	!by $01,$01,$ff,$ff,$01,$ff,$01,$ff
+	!by $00,$01,$ff,$00,$01,$00,$00,$ff
+	!by $ff,$01,$ff,$01,$01,$01,$ff,$ff
+	!by $ff,$00,$00,$01,$00,$01,$ff,$00
+	!by $ff,$ff,$01,$01,$ff,$01,$ff,$01
+	!by $00,$ff,$01,$00,$ff,$00,$00,$01
+	!by $01,$ff,$01,$ff,$ff,$ff,$01,$01
+
+; ----------------------------------------- bef ROT
+; a15e			original
+befrot	jsr sgetbytn
+	cpx #8
+	bcc +
+	jmp swarm		; error bad mode
+	nop
+	nop
++	txa
+	asl
+	asl
+	asl
+	tax
+	ldy #0
+-	lda tabrot,x
+	sta drawtabx,y
+	inx
+	iny
+	cpy #8
+	bmi -
+	jsr sgetbytc
+	stx rotgr
+	jmp endsmb
+
+; ----------------------------------------- bef CHAR
+; a186			original
+befchar	jsr incbasbz
+	jsr sgetadr
+	sty $09
+	sta $0a
+	jsr sgetbytc
+	stx $a4
+	jsr schkcom
+	jsr sgetadr
+	sty $ac
+	sta $ad
+	jsr getpktf
+	jsr sgetbytc
+	cpx #0
+	bne +
+	ldx #1
++	stx chgr
+	jsr charzei
+	jmp endsmb
+
+; ----------------------------------------- 
+; a1b4
+charzei	lda #0
+	sta drx
+	jsr charen0
+	asl $ac
+	rol $ad
+	asl $ac
+	rol $ad
+	asl $ac
+	rol $ad
+	clc
+	lda #0
+	adc $ac
+	sta ey
+	lda #$d0		; add $d000
+	adc $ad
+	sta ey+1
+	lda #$00
+	sta $ac
+	sta $ad
+	inc $ad
+	lda $09
+	sta ax
+	lda $0a
+	sta ax+1
+	lda $a4
+	sta ay
+
+-	ldy drx
+	lda $ac
+	and #7
+	tax
+	lda ey
+	sta $fe
+	lda ey+1
+	sta $ff
+	lda ($fe),y
+	and gbittabs,x
+	beq +
+	jsr punkt
+	jsr kerromein
++	inc $ac
+	inc ax
+	bne +
+	inc ax+1
++	lda $ac
+	cmp #8
+	bne chz0
+	lda #0
+	sta $ac
+	clc
+	lda ax
+	sbc #7
+	sta ax
+	lda ax+1
+	sbc #0
+	sta ax+1
+	lda $ad
+	cmp chgr
+	bne +
+	inc drx
+	lda #0
+	sta $ad
++	inc ay
+	inc $ad
+	lda drx
+	cmp #8
+	bne chz0
+	jmp charen1
+
+chz0	lda ax
+	sta $09
+	lda ax+1
+	sta $0a
+	lda ay
+	sta $a4
+	jmp -
+
+; ----------------------------------------- 
+; a261
+ptest1	sty $90
+	lda ($a8),y
+	and gbittabs,x
+	beq +
+	iny
+	sty $90
++	jmp kerromein
+
+; ----------------------------------------- bef HICOL
+; a270			original
+befhicol	lda #0
+	sta lowcolflag
+	jmp bef0
+
+; ----------------------------------------- 
+; a278
+	!fill 73,$ad
+
+; ----------------------------------------- bef ELSE
+; a2c1			recoded
+befelse	lda doflag
+	beq +
+	lda #$47
+	sta doflag
++	jmp befproc
+
+; ----------------------------------------- 
+; a2ce
+	!fill 38,$ad
+
+; ----------------------------------------- bef LOCAL
+; a2f4			original
+beflocal	ldx #0
+	jsr incbasbz
+--	txa
+	pha
+	jsr sgetvar
+	pla
+	tax
+	lda $5f
+	sta localtab,x
+	inx
+	lda $60
+	sta localtab,x
+	inx
+	ldy #0
+-	lda ($5f),y
+	sta localtab,x
+	inx
+	iny
+	cpy #2
+	bne -
+	ldy #0
+	lda #$ff
+	sta ($5f),y
+	lda (progz),y
+	beq +
+-	jsr incbasbz
+	lda (progz),y
+	cmp #$2c		; comma?
+	bne --
+	cmp #$20		; space?
+	beq -
++	lda #0
+	sta localtab,x
+	inx
+	sta localtab,x
+	jmp endsmb
+
+; ----------------------------------------- bef GLOBAL
+; a33c			original
+befglobal	ldx #0
+--	lda localtab,x
+	sta $5f
+	inx
+	lda localtab,x
+	sta $60
+	bne +
+	jmp bef0
+
++	inx
+	ldy #0
+-	lda localtab,x
+	sta ($5f),y
+	inx
+	iny
+	cpy #2
+	bne -
+	beq --
+
+; ----------------------------------------- 
+; a35e
+linzei	clc
+	lda ax
+	sbc xmaxlow
+	lda ax+1
+	sbc xmaxhigh
+	bcc +
+	lda xmaxlow
+	sta ax
+	lda xmaxhigh
+	sta ax+1
++	clc
+	lda ex
+	sbc xmaxlow
+	lda ex+1
+	sbc xmaxhigh
+	bcc +
+	lda xmaxlow
+	sta ex
+	lda xmaxhigh
+	sta ex+1
++	lda ay
+	cmp #$c7		; 199?
+	bcc +
+	lda #$c7		; no, now 199
+	sta ay
++	lda ey
+	cmp #$c7
+	bcc mobbeweg
+	lda #$c7
+	sta ey
+
+; ----------------------------------------- 
+; a3ac
+mobbeweg	lda #0
+	sta ydiff
+	sta ay+1
+	sta ey+1
+	sta ydiff+1
+	sta diffv
+	sta diffv+1
+; a3c0
+vloop	lda ax
+	sta $09
+	lda ax+1
+	sta $0a
+	lda ay
+	sta $a4
+	lda ay+1
+	sta $a5
+	lda mobbew
+	cmp #$f0
+	bne +
+	jsr mobposs
+	jmp vergl
++	jsr punkt
+; a3e4
+vergl	lda diffv
+	ora diffv+1
+	beq +
+; a3ec
+vergl1	jsr ynext
+	jmp vloop
+
++	lda ax+1
+	sta vgla+1
+	lda ax
+	sta vgla
+	lda ex+1
+	sta vgle+1
+	lda ex
+	sta vgle
+	jsr vglae
+	bne diff
+	lda ay+1
+	sta vgla+1
+	lda ay
+	sta vgla
+	lda ey+1
+	sta vgle+1
+	lda ey
+	sta vgle
+	jsr vglae
+	beq +
+	jsr ynext
+	jmp vloop
++	rts
+
+; ----------------------------------------- 
+; a433
+diff	sec
+	lda ey
+	sbc ay
+	tay
+	lda ey+1
+	sbc ay+1
+	pha
+	tya
+	pha
+	bcs +
+	pla
+	pla
+	sec
+	lda ay
+	sbc ey
+	tay
+	lda ay+1
+	sbc ey+1
+	pha
+	tya
+	pha
++	clc
+	pla
+	adc ydiff
+	sta ydiff
+	pla
+	adc ydiff+1
+	sta ydiff+1
+	sec
+	lda ex
+	sbc ax
+	tay
+	lda ex+1
+	sbc ax+1
+	pha
+	tya
+	pha
+	bcs +
+	pla
+	pla
+	sec
+	lda ax
+	sbc ex
+	tay
+	lda ax+1
+	sbc ex+1
+	pha
+	tya
+	pha
++	pla
+	sta xdiff
+	pla
+	sta xdiff+1
+	lda #0
+	sta diffv+1
+; a49b
+-	sta diffv
+	sec
+	lda ydiff
+	sbc xdiff
+	tay
+	lda ydiff+1
+	sbc xdiff+1
+	pha
+	tya
+	pha
+	bcc ++
+	pla
+	sta ydiff
+	pla
+	sta ydiff+1
+	inc diffv
+	bne +
+	inc diffv+1
++	lda diffv
+	jmp -
+; a4c7
+++	pla
+	pla
+	lda ax+1
+	sta vgla+1
+	lda ax
+	sta vgla
+	lda ex+1
+	sta vgle+1
+	lda ex
+	sta vgle
+	jsr vglae
+	beq +++
+	bcc ++
+	lda ax
+	bne +
+	dec ax+1
++	dec ax
+	jmp +
+++	inc ax
+	bne +
+	inc ax+1
++	lda diffv
+	ora diffv+1
+	bne +
++++	jmp vloop
++	jmp vergl1
+
+; ----------------------------------------- 
+; a50c
+ynext	lda diffv
+	ora diffv+1
+	beq ++
+	lda diffv
+	bne +
+	dec diffv+1
++	dec diffv
+++	lda ay+1
+	sta vgla+1
+	lda ay
+	sta vgla
+	lda ey+1
+	sta vgle+1
+	lda ey
+	sta vgle
+	jsr vglae
+	beq +++
+	bcs ++
+	inc ay
+	bne +
+	inc ay+1
++	rts
+
+++	lda ay
+	bne +
+	dec ay+1
++	dec ay
++++	rts
+
+; ----------------------------------------- 
+; a553
+tofind	lda $a6
+	cmp $a8
+	bne +
+	lda $a7
+	cmp $a9
+	beq ++
++	lda $a6
+	sta $a8
+	sta $63
+	lda $a7
+	sta $62
+	sta $a9
+	ldx #$90
+	sec
+	jsr sxflp
+	jsr sfacasc
+	jsr outasc
+	sec
+	jsr $fff0		; sys get crsr pos
+	tya
+-	sbc #10
+	bcs -
+	eor #$ff
+	adc #1
+	tax
+	inx
+-	dex
+	bne +
+++	jmp fcont
+
++	lda #$20		; sys out space
+	jsr bsout
+	jmp -
+
+; ----------------------------------------- bef FIND
+; a594			original
+beffind	jsr incbasbz
+	lda #$ff
+	sta $a8
+	sta $a9
+	ldy #0
+	lda $2b		; get start of basic code
+	sta $20
+	lda $2c
+	sta $21
+	bne infind
+; a5a9
+fnd0	lda (progz),y
+	beq tofind
+	lda ($20),y
+	beq fcont
+	lda (progz),y
+	cmp ($20),y
+	bne fcont
+	iny
+	bne fnd0
+; a5ba
+fcont	jsr inc20
+	ldy #0
+	lda ($20),y
+	bne fnd0
+	jsr inc20
+	ldy #0
+	sty pendflag
+	lda ($20),y
+	bne infind
+	lda #1
+	sta pendflag
+infind	jsr inc20
+	lda ($20),y
+	bne +
+	lda pendflag
+	cmp #1
+	bne +
+	jmp $e386		; sys warmstart
+
++	jsr inc20
+	lda ($20),y
+	sta $a6
+	jsr inc20
+	lda ($20),y
+	sta $a7
+	jsr inc20
+	bne fnd0		; uncond. branch
+
+; ----------------------------------------- part of use
+; a5f8
+	tax
+use8	lda $63
+	cmp #$2a		; "*"?
+	beq +
+	lda #$20		; " "
+	bne +
+use9a	tax
+	lda #$30		; "0"
+-
++	jsr genout	; generate outstring
+	dex
+	bne -
+	rts
+; a60d
+genout	ldy $44
+gno0	sta $02a7,y
+	inc $44
+	rts
+
+; ----------------------------------------- 
+
+	!by $ea
+
+; ----------------------------------------- 
+; a616
+vglae	lda vgla
+	cmp vgle
+	beq +
+	lda vgla+1
+	sbc vgle+1
+	ora #1
+	rts
+
++	lda vgla+1
+	sbc vgle+1
+	rts
+
+; ----------------------------------------- bef DESIGN
+; a62e			original
+befdesign	jsr sgetbytn
+	stx $aa
+	cpx #4
+	bcc +
+	jmp swarm		; error bad mode
+	nop
+	nop
+
++	lda #0
+	sta ax
+	sta ay
+	sta $a6
+	jsr schkcom
+	jsr sgetadr
+	sty $ae
+	sta $af
+; a650
+des0	ldy #0
+	sty $a8
+	ldx #0
+-	lda (progz),y
+	beq +
+	jsr incbasbz
+	jmp -
+; a660
++	jsr incbasbz
+	lda (progz),y
+	sta ax+1
+	jsr incbasbz
+	lda (progz),y
+	ora ax+1
+	bne +
+	ldx #$2a		; error "too few lines"
+	jmp ($0300)
+
++	jsr incbasbz
+	jsr incbasbz
+-	jsr incbasbz
+	ldy #0
+	lda (progz),y
+	cmp #$40		; "@"?
+	beq -
+
+	lda $aa
+	beq +
+	cmp #2
+	beq +
+	jmp desmulti
+
++	lda ($7a),y
+	cmp #$42		; "b"?
+	beq +
+; a699
+indes	cmp #$2e		; "."?
+	beq descont
+	cmp #$20		; " "?
+	beq descont
+	cmp #$41		; "a"?
+	beq descont
+	ldx #$2b		; error "bad char f. a mob"
+	jmp ($0300)
+; a6aa
++	lda $a8
+	ora gbittabs,x
+	sta $a8
+; a6b1
+descont	inx
+	cpx #8
+	bne -
+
+	ldy $a6
+	lda $a8
+	sta ($ae),y
+	inc $a6
+	inc ay
+	ldx #0
+	stx $a8
+	lda $aa
+	cmp #2
+	bcs +
+	lda ay
+	cmp #3
+	bne -
++	ldy #0
+	sty ay
+	inc ax
+	lda $aa
+	cmp #2
+	bcc +
+	lda ax
+	cmp #8
+	beq ++
++	lda ax
+	cmp #21
+	beq ++
+	jmp des0
+
+-
+++	lda (progz),y
+	beq +
+	jsr incbasbz
+	jmp -
++	jmp endsmb
+
+; ----------------------------------------- part of DO
+; a6fe
+waitkey	jsr getkey+5
+	jmp befproc	; skip rest of line
+
+; ----------------------------------------- 
+
+	!by $ea,$ea,$ea,$ea,$ea,$00
+
+; ----------------------------------------- 
+; a70a
+destab3	!by $c0,$00,$30,$00,$0c,$00,$03,$00
+destab2	!by $80,$00,$20,$00,$08,$00,$02,$00
+destab1	!by $40,$00,$10,$00,$04,$00,$01,$00
+
+; ----------------------------------------- 
+; a722
+desmulti	ldy #0
+	lda (progz),y
+	cmp #$44		; "d"?
+	bne +
+	lda $a8
+	ora destab3,x
+	sta $a8
+	inx
+	jmp descont
+
++	cmp #$43		; "c"?
+	bne +
+	lda $a8
+	ora destab2,x
+	sta $a8
+	inx
+	jmp descont
+
++	cmp #$42		; "b"?
+	bne +
+	lda $a8
+	ora destab1,x
+	sta $a8
+	inx
+	jmp descont
+
++	inx
+	jmp indes
+
+; ----------------------------------------- part of DO
+; a757
+whichdo	bcs waitkey	; "null"? (if .c=1)
+
+	ldy #$ff		; no, DONE?
+-	iny
+	lda (progz),y
+	cmp $86a6,y	; "ne"?
+	beq -
+	cpy #2
+	jmp dodone
+
+; ----------------------------------------- bef RLOCMOB
+; a768			original
+befrlocm	jsr sgetbytn
+	stx mobnr2
+	stx mobnr
+	asl mobnr2
+	lda $d010
+	ora mbittabs,x
+	cmp $d010
+	bne +
+	lda #1
+	!by $2c
++	lda #0
+	sta ax+1
+	ldy mobnr2
+	lda $d000,y
+	sta ax
+	lda $d001,y
+	sta ay
+	lda #0
+	sta ay+1
+	jsr getxyf
+	jmp mobcont
+
+; ----------------------------------------- 
+; a7a1
+null	!tx "null"
+	!by $ff
+
+; ----------------------------------------- bef CMOB
+; a7a6			original
+befcmob	jsr sgetbytn
+	stx $d025
+	jsr sgetbytc
+	stx $d026
+	jmp endsmb
+
+; ----------------------------------------- bef BCKGNDS
+; a7b5			original
+befbckgnds
+	lda $d011
+	and #$df
+	ora #$40
+	sta $d011
+	lda $d016
+	and #$ef
+	sta $d016
+	jsr sgetbytn
+	stx $d021
+	jsr sgetbytc
+	stx $d022
+	jsr sgetbytc
+	stx $d023
+	jsr sgetbytc
+	stx $d024
+	jmp endsmb
+
+; ----------------------------------------- bef PAUSE
+; a7e2			recoded
+befpause	jsr chrget
+	cmp #$30		; below "0"?
+	bcc +		; ok, string follows
+	cmp #$3a		; below "9"?
+	bcc ++		; ok, time follows
+
++	jsr sgetstr
+	sta $a9
+	stx $a8
+	ldy #0
+-	cpy $69
+	beq +
+	lda ($a8),y	; sys out string
+	jsr bsout
+	iny
+	bne -
++	lda #$0d
+	jsr bsout
+
+	jsr schkcom
+++	jsr sgetadr
+	lda #0
+	sta zaesec
+	sta zaeirq
+-	jsr $ffe4		; sys getin keyboard
+	cmp #$0d		; return?
+	beq +
+	lda zaesec
+	cmp $65
+	bne -
+
++	jmp endsmb
+
+; ----------------------------------------- resume?
+; a826
+	sty doflag
+	jsr chrget
+	beq +
+	jmp whichdo
+
+; ----------------------------------------- bef NRM
+; a831			enhanced
+befnrm	jsr nrm
+nrm1	jmp nrm2
+
+; a837
+nrm	lda #$1b
+	sta $d011
+	lda #$15		; upper case chars
+	sta $d018
+	lda #$c8
+	sta $d016
+	lda #$c7
+	sta $dd00
+	lda #$63
+	sta gmemflag
+	lda #4		; video at $0400
+	sta $0288
+	rts
+
+; ----------------------------------------- bef MOB OFF
+; a856			original
+befmoboff	jsr sgetbytn
+	lda $d015
+	and mbittabl,x
+	sta $d015
++	jmp endsmb
+
+; ----------------------------------------- bef OFF
+; a865			original
+befoff	ldx #0
+	stx flashfl
+	txa
+-	sta flashfls,x
+	inx
+	cpx #16
+	bcc -
+	jmp bef0
+
+; ----------------------------------------- bef ARC
+; a876			enhanced
+befarc	jsr arc1
+	lda strz1
+	sta $a8
+	lda strz2
+	sta $a9
+	lda #$0a
+	sta $21
+	jsr kreis1
+	jmp endsmb
+
+; ----------------------------------------- 
+; a88d
+arc1	jsr incbasbz
+	lda #0
+	sta drehsinn
+	sta ueberdreh
+	jsr sgetadr
+	sty kmx
+	sta kmx+1
+	jsr schkcom
+	jsr sgetadr
+	sty kmy
+	jsr schkcom
+	jsr sgetadr
+	sty $a8
+	sta $a9
+	jsr schkcom
+	jsr sgetadr
+	sty $ac
+	sta $ad
+	jsr schkcom
+	jsr sgetadr
+	sta winksw+1
+	sty winksw
+	lda $a9
+	sta vgla+1
+	lda $a8
+	sta vgla
+	lda $ad
+	sta vgle+1
+	lda $ac
+	sta vgle
+	jsr vglae
+	bcc +
+	lda drehsinn
+	eor #$0a
+	sta drehsinn
+	ldx $ac
+	ldy $ad
+	lda $a8
+	sta $ac
+	lda $a9
+	sta $ad
+	stx $a8
+	sty $a9
++	lda $ac
+	sta strz1
+	lda $ad
+	sta strz2
+getrxryf	jsr sgetbytc
+	stx krx
+	jsr sgetbytc
+	stx kry
+	jsr getpktf
+; a914
+kreis	lda #$13
+	sta $21
+	jsr kreis1
+	inc $21
+	bne kreis1
+
+; ----------------------------------------- 
+
+	!fill 42,$ad
+
+; ----------------------------------------- 
+; a949
+kreis1	lda $a8
+	pha
+	lda $a9
+	pha
+	jsr a8a9div90
+	jsr sinmalkrx
+	sty $aa
+	sta $ab
+	jsr $aa1c
+	sty $ae
+	sta $af
+	jsr $aa71
+	lda $ae
+	sta ay
+	lda $aa
+	sta ax
+	lda $ab
+	sta ax+1
+	lda ax
+	pha
+	lda ay
+	pha
+	lda ax+1
+	pha
+	lda $21
+	cmp #$13
+	beq +
+	jsr linzei
+	jsr kerromein
++	pla
+	sta ex+1
+	pla
+	sta ey
+	pla
+	sta ex
+	pla
+	sta $a9
+	pla
+	sta $a8
+	lda $21
+	cmp #$14
+	beq +
+	rts
+
++	lda drehsinn
+	cmp #$0a
+	bne +
+	sec
+	lda $a8
+	sbc winksw
+	sta $a8
+	lda $a9
+	sbc winksw+1
+	sta $a9
+	bcs ++
+	lda #$0a
+	sta ueberdreh
+	lda #$68		; 360°
+	sta $a8
+	lda #1
+	sta $a9
+	jmp ++
+
++	clc
+	lda $a8
+	adc winksw
+	sta $a8
+	lda $a9
+	adc winksw+1
+	sta $a9
+++	sta vgla+1
+	lda $a8
+	sta vgla
+	lda $ad
+	sta vgle+1
+	lda $ac
+	sta vgle
+	lda drehsinn
+	cmp #$0a
+	bne +
+	jmp kreis2
+
++	jsr vglae
+	beq +
+	bcc +
+	rts
+
++	jmp kreis1
+
+; ----------------------------------------- 
+; aa01
+sinmalkrx	jsr a8a9bogm
+	jsr ssin
+	jsr sfacarg
+	lda krx
+scm0	sta $63
+	lda $a9
+	sta $62
+	jsr scflp
+	jsr sfmult
+	jmp sfacadr
+; aa1c
+cosmalkry	jsr a8a9bogm
+	jsr scos
+	jsr sfacarg
+	lda kry
+	jmp scm0
+; aa2b
+scflp	ldx #$90
+	sec
+	jmp sxflp
+;aa31
+a8a9bogm	lda $a8
+	sta $63
+	lda $a9
+	sta $62
+	jsr scflp
+	jsr sfacarg
+	lda #$a8		; sys PI
+	ldy #$ae
+	jsr sfldfack
+	jsr sfmult
+	jsr sfacarg
+	lda #$b4		; 180
+	sta $63
+	lda #$00
+	sta $62
+	jsr scflp
+	lda $61
+	ldy $70
+	jmp sfdiv
+
+; ----------------------------------------- 
+; aa5e
+	jsr $ffbd		; sys setnam
+	ldx $ba
+	lda #1
+	ldy #0
+	jsr $ffba		; sys setlfs
+	jsr $ffc0		; sys OPEN
+	jmp l9f35
+
+; ----------------------------------------- 
+
+	!by 0
+
+; ----------------------------------------- 
+; aa71
+pkber	lda $20
+	cmp #0
+	bne +
+	jsr kmyminus
+	jmp kmxplus
+
++	cmp #1
+	bne +
+	jsr kmyplus
+	jmp kmxplus
+
++	cmp #2
+	bne +
+	jsr kmxminus
+	jmp kmyplus
+
++	jsr kmxminus
+	jmp kmyminus
+; aa97
+kmxplus	clc
+	lda $aa
+	adc kmx
+	sta $aa
+	lda $ab
+	adc kmx+1
+	sta $ab
+	rts
+; aaa7
+kmyplus	clc
+	lda $ae
+	adc kmy
+	sta $ae
+	rts
+; aab0
+kmxminus	sec
+	lda kmx
+	sbc $aa
+	sta $aa
+	lda kmx+1
+	sbc $ab
+	sta $ab
+	bcs +
+	lda #0
+	sta $aa
+	sta $ab
++	rts
+; aac8
+kmyminus	sec
+	lda kmy
+	sbc $ae
+	sta $ae
+	bcs +
+	lda #0
+	sta $ae
++	rts
+; aad7
+a8a9div90	lda #$5a		; 90
+	sta idivsor
+	lda #0
+	sta idivsor+1
+	lda $a8
+	sta idivdend
+	lda $a9
+	sta idivdend+1
+	jsr idiv
+	lda idivrest
+	sta $a8
+	lda idivrest+1
+	sta $a9
+	lda idivdend
+	sta $20
+	cmp #1
+	beq +
+	cmp #3
+	beq +
+	rts
+; ab06
++	sec
+	lda #$5a
+	sbc $a8
+	sta $a8
+	lda $20
+	rts
+
+; ----------------------------------------- bef ANGL
+; ab10			original
+befangl	jsr incbasbz
+	jsr sgetadr
+	sty kmx
+	sty ex
+	sta kmx+1
+	sta ex+1
+	jsr schkcom
+	jsr sgetadr
+	sty kmy
+	sty ey
+	sta kmy+1
+	sta ey+1
+	jsr schkcom
+	jsr sgetadr
+	sty $a8
+	sta $a9
+	jsr sgetbytc
+	stx krx
+	jsr sgetbytc
+	stx kry
+	jsr getpktf
+	lda #$0a
+	sta $21
+	jsr kreis1
+	jmp endsmb
+
+; ----------------------------------------- 
+; ab57
+kreis2	jsr vglae
+	beq +
+	bcs +
+	lda ueberdreh
+	cmp #$0a
+	bne +
+	rts
+
++	jmp kreis1
+
+; ----------------------------------------- tokenizer
+; ab69
+zum2	jmp tok5
+
+; ----------------------------------------- 
+; ab6c
+zeiumw1	ldy #5		; entry point
+zum0	lda $01fb,y
+	bne +
+--	rts
+; ab74
++	cmp #$22
+	bne +
+-	iny
+	lda $01fb,y
+	beq --
+	cmp #$22
+	bne -
+	beq zum2
+; ab84
++	cmp #$40		; "@"?
+	bne +
+zum1	iny
+	lda $01fb,y
+	bne zum1
+	beq zum0
+
++	cmp #$44		; "d"?
+	bne ++
+	pha
+	tya
+	pha
+	ldx #$ff
+-	inx
+	iny
+	lda $01fb,y
+	cmp ata,x		; "ata"?
+	bne +
+	cpx #2
+	bne -
+	pla
+	tay
+	pla
+	bne zum1
+
++	pla
+	tay
+	pla
+++	cmp #$41
+	bcc zum2
+	cmp #$db
+	bcs zum2
+	sty zwisp2
+	ldx #>tabbef
+	stx $21
+	ldx #<tabbef
+	stx $20
+	ldx #0
+	stx codezae
+tok3	cmp ($20,x)
+	beq $abee		; !!!
+	and #$7f
+	cmp ($20,x)
+	beq tok0
+	lda ($20,x)
+	cmp #$40		; "@"?
+	beq tok1
+-	lda ($20,x)	; end of line?
+	beq tok5
+	cmp #$40		; "@"?
+	beq tok2
+	inc $20
+	bne -
+	inc $21
+	bne -
+; abe7
+tok2	inc codezae
+	ldy zwisp2
+	lda #$c8		; $abee: $c8=INY!
+	lda $01fb,y
+	inc $20
+	bne tok3
+	inc $21
+	bne tok3
+tok0	cpy zwisp2
+	beq tok5
+	iny
+tok1	ldx zwisp2
+	lda #$64		; write token prefix
+	sta $01fb,x
+	inx
+	lda codezae	; write token number
+	sta $01fb,x
+	inc $01fb,x
+	cmp #$40		; bef SECURE?
+	bne tok4
+	lda #$3a		; yes, write 4 ":"
+	ldy #0
+-	inx
+	iny
+	sta $01fb,x
+	cpy #4
+	bmi -
+	txa
+	tay
+	jmp zum0
+
+tok4	dey		; move rest of line
+-	iny
+	inx
+	lda $01fb,y
+	sta $01fb,x
+	bne -
+-	inx
+	lda #0
+	sta $01fb,x
+	lda $01fc,x
+	bne -
+	ldy zwisp2
+	iny
+tok5	iny
+	jmp zum0
+
+; ----------------------------------------- part of USE
+; ac46
+use4	sta $43		; len of ctrl string
+	stx $49		; and address
+	sty $4a
+	cmp #$59		; >88 chars?
+	bcs +		; yes, error
+	rts
+
++	jmp err23		; error "string too large"
+
+; ----------------------------------------- 
+; ac54
+	!by $ea,$ea,$ea,$ea,$ea,$00
+
+; ----------------------------------------- 
+; ac5a
+ata	!by $41,$54,$41
+
+; ----------------------------------------- 
+; ac5d
+;
+; End of part 4
+;
+
+
+
