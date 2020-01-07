@@ -1,0 +1,601 @@
+; ----------------------------------------- 
+;
+; Tuned Simons' Basic
+;
+; by Arndt Dettke, 1986
+;
+; part 0, extension area
+;
+; ----------------------------------------- 
+
+	!ct pet
+
+; ----------------------------------------- 
+; cc00 
+klaa	lda #$28		; 0 "("
+	!by $2c
+klaz	lda #$29		; 3 ")"
+	!by $2c
+glei	lda #$3d		; 6 "="
+	!by $2c
+retn	lda #$0d		; 9 cr
+	!by $2c
+comm	lda #$2c		; c ","
+	!by $2c
+doll	lda #$24		; f "$"
+	!by $2c
+proz	lda #$25		; 12 "%"
+	!by $2c
+spac	lda #$20		; 15 " "
+	!by $2c
+colo	lda #$3a		; 18 ":"
+	!by $2c
+anfz	lda #$22		; 1b quote
+	!by $2c
+leer	lda #$93		; 1e clr/home
+	jmp bsout		; out
+
+; ----------------------------------------- 
+; cc23
+arrbreak	jsr $ffe1		; sys STOP?
+	beq stopped	; yes
+	jsr getkey	; get key
+	jsr $ffe1
+	beq stopped
+	rts
+; cc31
+stopped	pla
+	pla
+	jmp nrm1		; back to all normal
+
+; ----------------------------------------- 
+; cc36
+initvecs	lda $2f
+	sta $20
+	sta $5f
+	lda $30
+	sta $21
+	sta $60
+	rts
+
+; ----------------------------------------- 
+; cc43
+skiparr	ldy #$02
+	clc
+	lda ($5f),y
+	adc $5f
+	tax
+	iny
+	lda ($5f),y
+	adc $60
+	sta $60
+	sta $21
+	txa
+	sta $5f
+	sta $20
+	rts
+
+; ----------------------------------------- 
+; cc5a
+outdigits	jsr $b395		; sys int to float
+	jsr $bddf		; sys fac to asc
+	jmp $ab1e		; out
+
+; ----------------------------------------- 
+; cc63
+arrdims	jsr klaa		; "("
+	jsr getdims	; dims out
+	jsr klaz		; ")"
+	jsr glei		; "="
+	jsr retn		; cr
+	jmp retn		; cr
+
+; ----------------------------------------- 
+; cc75
+getdims	jsr inc20
+	jsr inc20
+	jsr inc20
+	lda ($20),y
+	sta $0b
+	sta $af
+	asl
+	sta $02
+	ldx #$ff
+	stx helpvec
+-	ldy $02
+	lda ($20),y
+	tax
+	dey
+	lda ($20),y
+	dex
+	cpx #$ff
+	bne +
+	sec
+	sbc #1
++	jsr $bdcd		; sys int out
+	ldy $02
+	ldx $b0
+	inx
+	lda ($20),y
+	sta $02c0,x
+	dey
+	inx
+	lda ($20),y
+	sta $02c0,x
+	stx helpvec
+	stx helpvec+1
+	dec $02
+	dec $02
+	beq +
+	jsr comm		; out ","
+	bne -
+
++	inc helpvec
+	lda helpvec
+	tax
+	asl
+	sta $02
+	lda #0
+-	sta $02c0,x	; and clear for next one
+	inx
+	cpx $02
+	bmi -
+	rts
+
+; ----------------------------------------- 
+; ccd1
+endplace	jsr chrget
+	jmp endsmb
+
+; ----------------------------------------- bef PLACE
+; ccd7			new
+befplace	jsr basromei
+	jsr chrget
+	jsr $b113		; sys is char? (one array)
+	bcc +
+	jmp onearray	; yes
+
++	cmp #$30		; no, is "0"? (all arrays)
+	beq +
+	jmp $af08		; no, sys syntax error
+
++	jsr retn		; yes, cr
+	jsr initvecs	; init vecs
+-	lda $21
+	cmp $32
+	bne +
+	lda $20
+	cmp $31
+	beq endplace
+
++	jsr arrays	; array found, out 
+	jsr skiparr
+	jsr retn		; out cr
+	bne -
+; cd09
+arrays	ldy #0
+	lda ($20),y
+	sta $45
+	bmi intarr
+	jsr bsout		; out array name 1
+	jsr inc20
+	lda ($20),y
+	sta $46
+	bmi strarr
+	jsr bsout		; out float array name 2
+	lda #0
+	beq +
+; cd24
+intarr	and #$7f		; out int array name 1
+	jsr bsout
+	jsr inc20
+	lda ($20),y
+	sta $46
+	and #$7f		; out int array name 2
+	jsr bsout
+	jsr proz		; out "%"
+	lda #$80
+; cd3a
++	sta $0e
+	jsr arrdims	; out dims
+	jsr $b194		; sys first element
+-	jsr arrbreak	; STOP? (doesn't return if yes)
+	lda helpvec+1
+	sta helpvec
+	jsr outpos	; out position in array
+	ldx #0		; set as numeric
+	stx $0d
+	jsr fltarr	; out float array
+	bne -
+	rts
+
+; ----------------------------------------- 
+; cd56
+strarr	and #$7f		; out string array name 2
+	jsr bsout
+	jsr doll		; out "$"
+
+	jsr arrdims	; out dims
+	jsr $b194		; sys first element
+-	jsr arrbreak	; STOP? (doesn't return if yes)
+	lda helpvec+1
+	sta helpvec
+	jsr outpos	; out position in array
+	ldx #$ff		; set as string
+	stx $0d
+	jsr $af2b		; sys get variable
+	jsr anfz		; out quote
+	ldy #2
+	lda ($64),y
+	cmp #8
+	bcc +
+	jsr $ab21		; sys out string
++	jsr anfz		; out quote
+	jsr nextarr
+	bne -
+	rts
+
+; ----------------------------------------- 
+; cd8c
+outpos	lda $af		; show position in array
+	sta $02
+	sta $0b
+	asl
+	sta helpvec
+-	ldx helpvec
+	lda $02c0,x
+	tay
+	inx
+	lda $02c0,x
+	pha
+	tax
+	tya
+	pha
+	txa
+	inc helpvec
+	inc helpvec
+	jsr outdigits
+	dec $02
+	beq +
+	jsr comm
+	bne -
++	jsr spac
+	jsr colo
+	jsr spac
+	ldy #4
+	jmp $b2ea		; sys search for element
+
+; ----------------------------------------- 
+; cdc2
+fltarr	jsr $af2b		; get variable
+	jsr $bddd		; fac to asc
+	jsr $ab1e		; out
+
+nextarr	jsr arrbreak
+	jsr retn
+	lda $af
+	asl
+	sta $02
+	tax
+	ldy #0
+-	inc $02c0,x
+	bne +
+	inc $02c1,x
++	lda $02c0,x
+	cmp $02c0,y
+	bne +
+	lda $02c1,x
+	cmp $02c1,y
+	bne +
+	lda #0
+	sta $02c0,x
+	sta $02c1,x
+	inx
+	inx
+	iny
+	iny
+	cpy $02
+	bne -
++	rts
+
+; ----------------------------------------- 
+; ce02
+onearray	sta $45		; store first char
+	ldx #0
+	jsr chrget
+	bcc +
+	jsr $b113		; sys is char?
+	bcc ++		; no
+
++	tax		; yes
+-	jsr chrget	; more chars in varname?
+	bcc -		; yes, skip all
+	jsr $b113
+	bcs -
+
+++	cmp #$24		; now: is "$"?
+	beq +
+	cmp #$25		; is "%"?
+	bne ++		; no
+
+	lda #$80		; mark as int
+	ora $45
+	sta $45
++	txa
+	ora #$80
+	tax
+++	stx $46		; mark as string
+	jsr retn		; out cr
+
+	jsr initvecs
+-	lda $21
+	cmp $32
+	bne +
+	lda $20
+	cmp $31
+	beq err2c		; error (not found)
++	ldy #0
+	lda ($20),y
+	cmp $45
+	bne +
+	iny
+	lda ($20),y
+	cmp $46
+	beq ++
++	jsr skiparr
+	jmp -
+
+++	jsr arrays	; found array, out
+	jmp endplace
+
+; ----------------------------------------- 
+
+err2c	ldx #$2c		; error "array nor found"
+	jmp ($0300)
+tsbfc	!tx "array not founD"
+
+; ----------------------------------------- part of RENUMBER
+; ce70
+ren5	lda ($a8),y
+	pha
+	iny
+	lda ($a8),y
+	sta int
+	iny
+	lda ($a8),y
+	sta int+1
+	txa
+	sta $a8
+	pla
+	sta $a9
+	jmp ren2		; back to ren2
+
+; ----------------------------------------- 
+; ce86
+	!by $aa,$aa,$aa,$00
+
+; ----------------------------------------- 
+; ce8a
+rbnb	jsr inca8a9
+	jsr inca8a9
+	lda ($a8),y
+	beq rnb2
+	jsr inca8a9
+	lda ($a8),y
+	sta $39
+	jsr inca8a9
+	lda ($a8),y
+	sta $3a
+--	ldx #7
+rnb0	jsr inca8a9
+-	lda ($a8),y
+	beq rbnb
+	cmp tokens-1,x
+	beq +
+	dex
+	bne -
+	beq --
+
++	cpx #6		; found one?
+	bcc rnb6
+	lda $a8		; no
+	bne +
+	dec $a9
++	dec $a8
+	lda ($a8),y
+	jsr inca8a9
+	cmp #$64		; sb token?
+	bne rnb0
+rnb6	jsr rnb1		; yes
+	beq +
+rnb5	jsr inca8a9
++	cmp #0
+	beq --
+	cmp #$3a		; ":"?
+	beq --
+	lda ($a8),y
+	cmp #$20		; " "?
+	beq rnb5
+	cmp #$2c		; ","?
+	beq rnb6
+	cmp #$ab		; token of "-"?
+	beq rnb6
+	ldx #7
+	bne -
+rnb2	rts
+
+; ----------------------------------------- 
+; ceed
+-	jsr inca8a9
+rnb1	lda $a8
+	ldx $a9
+	sta progz
+	stx progz+1
+	jsr chrget
+	cmp #$ab		; token of "-"?
+	beq -		; yes, skip
+	jsr chrgot
+	bcs rnb2
+	jsr $a96b		; sys linenumber to adr
+	jsr enternum
+	jsr $bc49		; int to float
+	jsr $bddf		; fac to asc (in linenum)
+	tax
+-	lda linenum,x
+	beq +		; end of digits
+	inx
+	bne -
++	inx
+	stx $71
+rnb8	ldy #0
+	sec
+	lda progz
+	sbc $a8
+	cmp $71
+	bmi rnb3
+	bne rnb4
+-	jsr inca8a9
+rnb7	ldx #0
+	lda linenum,y
+	beq +
+	sta ($a8,x)
+	iny
+	bne -
++	lda #1
+	ldy #0
+	rts
+
+; ----------------------------------------- 
+; cf3d
+rnb4	jsr inca8a9	; fill shorter nums
+	tax
+	dex
+	lda #$20
+-	sta ($a8),y
+	iny
+	dex
+	bne -
+	ldy #0
+	beq rnb7
+
+; ----------------------------------------- 
+
+rnb3	jsr moveprg	; returns .a=0
+	dec $71
+	tax
+	beq rnb8
+
+; ----------------------------------------- 
+; cf56
+tokens	!by $9b,$a7,$8d,$89,$8a,$30,$46
+	; tokens: LIST,THEN,GOSUB,GOTO,RUN,RESET,RCOMP
+
+; ----------------------------------------- 
+; cf5d
+enternum	ldy #0
+	sty $59
+	sty $58
+	lda $20
+	ldx $21
+	stx $62
+	sta $63
+	lda $2b
+	ldx $2c
+	sta $5f
+	stx $60
+-	iny
+	iny
+	iny
+	lda ($5f),y
+	cmp int+1
+	bne +
+	dey
+	lda ($5f),y
+	cmp int
+	beq rnb9
+	iny
++	dey
+	dey
+	inc $58
+	bne +
+	inc $59
++	lda ($5f),y
+	tax
+	dey
+	lda ($5f),y
+	sta $5f
+	txa
+	sta $60
+	bne -
+	jmp $bdc2		; sys out linenumber
+
+; ----------------------------------------- 
+; cf9c
+--	dec $59
+-	dec $58
+rnb9	clc
+	lda $63
+	adc ay
+	sta $63
+	lda $62
+	adc ay+1
+	sta $62
+	lda $58
+	bne -
+	lda $59
+	bne --
+	ldy $63
+	lda $62
+	cmp #$fa
+	bcs rnba
+	ldx #$90
+	sec
+	rts
+
+; ----------------------------------------- 
+; cfc3
+moveprg	lda $a8
+	ldx $a9
+	sta $58
+	stx $59
+	ldx $2d
+	ldy $2e
+	dex
+	bne +
+	dey
++	stx $a8
+	sty $a9
+	ldy #1
+	ldx #0
+-	lda ($a8,x)
+	sta ($a8),y
+	lda $a8
+	bne +
+	dec $a9
++	dec $a8
+	lda $a9
+	cmp $59
+	bne -
+	lda $a8
+	cmp $58
+	bne -
+	jsr $a533		; sys bind lines
+	inc $2d
+	bne +
+	inc $2e
++	rts
+
+; ----------------------------------------- 
+; cffd
+rnba	pla
+	pla
+	rts
+
+; ----------------------------------------- 
+; d000 End of TSB
+;
+; End of part 7
+;
+
+
+
