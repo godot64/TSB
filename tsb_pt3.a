@@ -1,0 +1,2008 @@
+; ----------------------------------------- 
+;
+; Tuned Simons' Basic
+;
+; by Arndt Dettke, 1986
+;
+; part 3
+;
+; ----------------------------------------- 
+
+	!ct pet
+
+; ----------------------------------------- TSB Commands
+; 9174
+bef0	jsr chrget
+	jmp endsmb
+
+; ----------------------------------------- TSB Interpreter
+; 917a			recoded
+sbasbef	tsx
+	stx stack		; save stack pointer
+	lda onkeyflag
+	beq sintprt0
+	jsr onkey1
+
+sintprt0	jsr chrget
+	jsr $c998
+	lda #0		; auto off
+	sta autoflag
+
+	lda traceflag	; trace active?
+	beq +
+
+	ldx $3a		; yes, get basic line hi
+	inx
+	beq +
+	jsr trace1
+
++	ldy #0
+	lda (progz),y	; current char:
+	beq ipr0		; line end?
+
+	cmp #$8b		; IF?
+	bne ipr1
+	jmp befif
+
+ipr1	cmp #$64		; sb token?
+	beq ipr5
+
+	cmp #$8a		; RUN?
+	beq ipr3
+	cmp #$9c		; CLR?
+	beq ipr3
+	cmp #$a2		; NEW?
+	beq ipr3
+
+	lda (progz),y	; reget char:
+	bmi ipr4		; standard token?
+
+	cmp #$3a		; ":"?
+	beq ipr0
+	jsr $a906		; find next ":" (in .y)
+	sty $22
+	ldx #$b2		; find "=" (in .y)
+	jsr $a90b
+	cpy $22		; beyond ":"?
+	bcs ipr2
+
+ipr4	jsr chrgot	; no, reget last char
+	jmp $a7e7		; and process
+
+ipr0	jmp $a7ae		; sys interpreter
+
+ipr2	sty autoflag
+	jmp $9cec
+
+ipr3	sty sprepeat	; clear stacks
+	sty spexec
+	sty sploop
+	beq ipr4
+
+ipr5	jsr incbasbz	; process sb command
+	jsr basromau
+	lda (progz),y
+	asl
+	tay
+	dey
+	dey
+	lda sprtab+1,y
+	pha
+	lda sprtab,y
+	pha
+	rts
+
+; ----------------------------------------- bef HIRES
+; 9200			original
+befhires	lda #$01
+	sta xmaxhigh
+	lda #$3f
+	sta xmaxlow
+	lda #0
+	sta $a6
+	tay
+	sty lowcolflag
+	lda #$e0
+	sta $a7
+	jsr $ca73		; get2nyb (farben)
+	ldx $aa
+	stx $ac
+
+	lda #0		; clear bitmap
+-	sta ($a6),y
+	jsr inca6a7
+	ldx $a6
+	cpx #$40
+	bne -
+	ldx $a7
+	cpx #$ff
+	bne -
+
+	lda #0
+	sta multijn
+	jsr nrm
+	lda #10
+	sta gmemflag
+	lda #$3b
+	sta $d011
+	lda #$0b
+	sta $d018
+	lda #$94
+	sta $dd00
+
+	ldy #0
+	sty lowcolflag
+	lda $ac		; clear colors
+setmod	sta $c000,y
+	sta $c0ff,y
+	sta $c1fe,y
+	sta $c2fd,y
+	iny
+	cpy #$ff
+	bne setmod
+	jmp endsmb
+
+; ----------------------------------------- bef PLOT
+; 9267			enhanced
+befplot	jsr incbasbz
+	jsr sgetadr	; x
+	sty $09
+	sta $0a
+	jsr sgetbytc	; y
+	stx $a4
+	jsr getpktf	; col
+	jsr punkt		; set dot
+	jmp endsmb
+
+; ----------------------------------------- 
+
+l927f	lda $39		; basic line #
+	sta errln
+	lda $3a
+	sta errln+1
+	rts
+
+; ----------------------------------------- part of DO
+
+dodone	bcs +		; DONE?
+	jmp befproc	; no, skip rest of line
++	jmp $b56a
+
+; ----------------------------------------- 
+
+-	lda #$08		; nicht plausibel
+	sta $90
+	rts
+
+; ----------------------------------------- set dot
+; 9297			original
+punkt	clc
+	lda $09		; plausibel?
+	sbc xmaxlow
+	lda $0a
+	sbc xmaxhigh
+	bcs -
+	lda $a4
+	cmp #200
+	bcs -
+
+	lda multijn
+	beq +
+	asl $09		; double x if multi
+	rol $0a
++	lda $09
+	and #$07
+	tax
+	lda $a4		; y
+	and #$07
+	sta $63
+	lda $09
+	and #$f8
+	sta $09
+
+	lda $f7		; color
+	cmp #$0b		; 11=test
+	beq +
+	lda lowcolflag	; no, low col?
+	beq +
+	lda gflag		; no, block?
+	bne +
+
+	lda $a4		; no, then test
+	pha
+	lda $09
+	pha
+	lda $0a
+	pha
+	jsr farbset
+	pla
+	sta $0a
+	pla
+	sta $09
+	pla
+	sta $a4
+
++	lda $a4		; lookup address
+	lsr
+	lsr
+	lsr
+	tay
+	clc
+	lda gadrtabl,y
+	adc $63
+	adc $09
+	sta $a8
+	lda gadrtabh,y
+	adc $0a
+	sta $a9
+	ldy #0
+	sty $90
+	sei
+	lda pport		; kernel off
+	and #$fd
+	sta pport
+	lda gflag
+	beq +
+	rts
+
+; ----------------------------------------- set dots
+; 9311
++	lda multijn	; now set dots, hires?
+	beq sethires	; yes
+	jmp setmulti	; no, go to multi
+
+; 9319
+sethires	lda $f7		; hires, get color source
+	beq herase
+	cmp #1
+	beq hset
+	cmp #2
+	beq hinvert
+
+	jmp $a261	
+
+hset	lda ($a8),y
+	ora gbittabs,x
+	sta ($a8),y
+	rts
+
+; 9330
+gbittabs	!by $80,$40,$20,$10,$08,$04,$02,$01
+
+herase	lda ($a8),y
+	and $9340,x
+	sta ($a8),y
+	rts
+
+; 9340
+gbittabl	!by $7f,$bf,$df,$ef,$f7,$fb,$fd,$fe
+
+hinvert	lda ($a8),y
+	eor gbittabs,x
+	sta ($a8),y
+	rts
+
+; ----------------------------------------- bef LINE
+; 9350			original
+befline	jsr getxyxyf
+	jsr linzei
+	jmp endsmb
+
+; 9359
+getxyxyf	jsr incbasbz
+	jsr sgetadr
+	sta ax+1
+	sty ax
+	jsr sgetbytc
+	stx ay
+; 936b
+getxyf	jsr schkcom
+	jsr sgetadr
+	sta ex+1
+	sty ex
+	jsr sgetbytc
+	stx ey
+
+getpktf	jsr sgetbytc
+	stx $f7
+	rts
+
+; 9383
+farbset	jsr kerromein
+	lda $09		; x/8
+	lsr
+	ror $0a
+	ror $09
+	lda $09
+	lsr
+	ror $0a
+	ror $09
+	lda $09
+	lsr
+	ror $0a
+	ror $09
+	lsr $a4		; y/8
+	lsr $a4
+	lsr $a4
+	jsr a4mal40
+
+	clc		; compute color address
+	lda $a4
+	adc $09
+	sta $a8
+	sta $aa
+	lda $a5
+	adc $0a
+	sta $a9
+	sta $ab
+	clc
+	lda $a8
+	adc #$00		; in $c000:
+	sta $a8
+	lda $a9
+	adc #$c0
+	sta $a9
+	ldy #0
+	lda lcfarb12	; low col color 1 and 2
+	sta ($a8),y
+
+	clc
+	lda $aa
+	adc #$00
+	sta $a8
+	lda $ab
+	adc #$d8		; and in $d800:
+	sta $a9
+	lda lcfarb3	; low col color 3
+	sta ($a8),y
+	rts
+
+; ----------------------------------------- bef LOW COL
+; 93dc			original
+beflowcol	jsr sgetbytn
+	stx lcfarb12
+	asl lcfarb12
+	asl lcfarb12
+	asl lcfarb12
+	asl lcfarb12
+	jsr sgetbytc
+	txa
+	ora lcfarb12
+	sta lcfarb12
+	lda #10
+	sta lowcolflag
+	jsr sgetbytc
+	stx lcfarb3
+	jmp endsmb
+
+; ----------------------------------------- 
+; 9406
+kerromaus	sei
+	lda pport
+	and #$fd
+	sta pport
+	rts
+
+; ----------------------------------------- 
+; 940e
+kerromein	lda pport
+	ora #2
+	sta pport
+	rts
+
+; ----------------------------------------- 
+; 9415
+sgetadr2	lda portspei
+	pha
+	jsr sgetadr
+	sta zwspei1
+	pla
+	sta portspei
+	lda zwspei1
+	rts
+
+; ----------------------------------------- 
+; 9427
+sgetadr	jsr sfrmnum
+	jmp sfacadr
+
+; ----------------------------------------- 
+; 942d
+gadrtabl	!by $00,$40,$80,$c0,$00,$40,$80,$c0
+	!by $00,$40,$80,$c0,$00,$40,$80,$c0
+	!by $00,$40,$80,$c0,$00,$40,$80,$c0
+	!by $00
+; 9446
+gadrtabh	!by $e0,$e1,$e2,$e3,$e5,$e6,$e7,$e8
+	!by $ea,$eb,$ec,$ed,$ef,$f0,$f1,$f2
+	!by $f4,$f5,$f6,$f7,$f9,$fa,$fb,$fc
+	!by $fe
+
+; ----------------------------------------- 
+; 945f
+a4mal40	lda #0
+	sta $a5
+	asl $a4
+	rol $a5
+	asl $a4
+	rol $a5
+	asl $a4
+	rol $a5
+	lda $a5
+	pha
+	lda $a4
+	pha
+	asl $a4
+	rol $a5
+	asl $a4
+	rol $a5
+	clc
+	pla
+	adc $a4
+	sta $a4
+	pla
+	adc $a5
+	sta $a5
+	rts
+
+; ----------------------------------------- bef CIRCLE
+; 9489			enhanced
+befcircle	jsr incbasbz
+	lda #0
+	sta drehsinn
+	sta ueberdreh
+	sta $a8		; startwinkel 0° 
+	sta $a9
+	sta winksw+1	; schrittweite (hi) 0
+	jsr sgetadr
+	sty kmx		; mittelpunkt
+	sta kmx+1
+	jsr sgetbytc
+	stx kmy
+	lda #$68		; endwinkel 360°
+	sta $ac
+	lda #$01
+	sta $ad
+	lda #12		; schrittweite (lo) 12
+	sta winksw
+	jsr getrxryf
+	jmp endsmb
+
+; ----------------------------------------- part of RENUMBER
+; 94bd
+ren3	jsr $cf5d
+	cmp #250
+	bcs +
+	jsr basromei
+	jmp ren4		; c8d3
++	jmp towarm
+
+; ----------------------------------------- 
+
+	!by 0
+
+; ----------------------------------------- 
+; 94ce
+l20pl40	clc
+	lda $20
+	adc #40
+	sta $20
+	lda $21
+	adc #0
+	sta $21
+	rts
+
+; ----------------------------------------- 
+; 94dc
+l23pl40	clc
+	lda $23
+	adc #40
+	sta $23
+	lda $24
+	adc #0
+	sta $24
+	rts
+
+; ----------------------------------------- bef MULTI
+; 94ea			enhanced
+befmulti	lda #$2c
+	sta multijn
+	lda #$9f
+	sta xmaxlow
+	lda #$00
+	sta xmaxhigh
+	jsr get2nyb	; get colors
+	ldy #0
+-	sta $c000,y	; clear video ram
+	sta $c0f9,y
+	sta $c1f3,y
+	sta $c2ed,y
+	iny
+	cpy #$fb
+	bne -
+	jsr sgetbytc
+	txa
+	ldy #0
+-	sta $d800,y	; clear color ram
+	sta $d8f9,y
+	sta $d9f3,y
+	sta $daed,y
+	iny
+	cpy #$fb
+	bne -
+	lda #$18
+	sta $d016
+	jmp endsmb
+
+; ----------------------------------------- bef COLOUR
+; 952e			recoded
+befcolour	jsr docolor
+	jmp endsmb
+
+; ----------------------------------------- part of USE
+; 9534
+usedrv	jsr sgetbyt1	; get drive# (constant)
+	stx drive		; and set
+	jmp endsmb
+
+; ----------------------------------------- 
+; 953c
+slp1	jsr nrm		; process NRM
+	ldx #$17		; set lower chars
+	stx $d018
+	rts
+
+; ----------------------------------------- 
+
+	!by 0
+
+; ----------------------------------------- bef DIR
+; 9546			enhanced
+befdir	jsr incbasbz
+	jsr sclose	; first: close file
+	jsr sgetstr
+	stx $ae
+	sta $af
+	ldy #0
+	lda ($ae),y
+	cmp #$24		; "$"?
+	beq dir0
+	jmp swarm		; error "Bad Mode"?
+
+dir0	ldy $af
+	lda drive
+	sta $ba
+	jsr basromau
+	lda $69
+	jsr $aa5e		; open file
+	jsr basromei
+
+	ldx #5
+dir1	jsr $ffcf		; skip 5 chars
+	dex
+	bne dir1
+
+	sta $63		; len lo
+	jsr $ffcf
+	sta $62		; and hi
+	jsr $bdd1		; sys out integer
+	lda #2
+	sta helpvec
+dir2	jsr $ffe1		; STOP?
+	beq dir5
+dir3	jsr $ffcf		; get char
+	ldx $90		; fail?
+	bne dir5
+dir4	jsr bsout		; write char
+	tay
+	cmp #$22		; quotes?
+	beq dir6
+	tya		; no, cont
+	bne dir2		; end of line?
+	lda helpvec
+	bne dir5
+	jsr $aad7		; yes, sys out cr/lf
+	ldx #3		; then skip 3 chars
+	bne dir1
+
+dir6	dec helpvec
+	bne dir2
+	lda #$3a		; out ":" after 2nd quote
+	bne dir4
+
+dir5	jmp dirend	; then close
+
+; ----------------------------------------- 
+
+	!by 0
+
+; ----------------------------------------- 
+; 95b3
+getkey	jsr $ffe4		; get char
+	beq +
+; 95b8
+-	jsr $ffe4		; warten
+	beq -
++	rts
+
+; ----------------------------------------- 
+; 95be
+dec7a	lda $7a
+	bne +
+	dec $7b
++	dec $7a
+	rts
+
+; ----------------------------------------- 
+
+	!by 0
+
+; ----------------------------------------- bef MMOB
+; 95c8			original
+befmmob	jsr sgetbytn
+	stx mobnr2
+	stx mobnr
+	asl mobnr2
+	jsr schkcom
+	jsr dec7a
+	jsr getxyxyf
+; 95dd
+mobcont	ldx mobnr
+	lda $f7
+	bne mmb0
+	jsr mobexl
+	jsr mobeyl
+	jmp mmb1
+
+mmb0	cmp #1
+	bne mmb2
+	jsr mobexs
+	jsr mobeyl
+	jmp mmb1
+
+mmb2	cmp #2
+	bne mmb3
+	jsr mobexl
+	jsr mobeys
+	jmp mmb1
+
+mmb3	jsr mobexs
+	jsr mobeys
+
+mmb1	jsr sgetbytc
+	stx mobspeed
+	lda #$f0
+	sta mobbew
+	jsr mobbeweg
+	sta mobbew
+	beq mmb4
+
+; ----------------------------------------- part of DO
+; 9620
+do7	jsr basromau
+	jmp do8
+
+; ----------------------------------------- 
+
+mobposs	lda $09
+	ldx #0
+mmb6	cpx mobspeed
+	beq mmb5
+	inx
+	ldy #0
+mmb7	cpy #10
+	beq mmb6
+	iny
+	bne mmb7
+mmb5	ldy mobnr2
+	sta $d000,y
+	lda $0a
+	cmp #1
+	bne mmb8
+
+	ldy mobnr
+	lda $d010
+	ora mbittabs,y
+	sta $d010
+mmb9	lda $a4
+	ldy mobnr2
+	sta $d001,y
+	rts
+
+mmb8	ldy mobnr
+	lda $d010
+	and mbittabl,y
+	sta $d010		; ### shorter!
+	jmp mmb9
+
+; ----------------------------------------- bef BFLASH
+; 9669			original
+befbflash	lda #10
+	sta bflashjn
+	jsr sgetbytn
+	cpx #0
+	bne +
+	lda #0
+	sta bflashjn
+	jmp endsmb
+
++	stx bflashsp
+	jsr sgetbytc
+	stx bflashf1
+	jsr sgetbytc
+	stx bflashf2
+	lda #0
+	sta bflzae
+mmb4	jmp endsmb
+
+; ----------------------------------------- 
+; 9694			enhanced
+sirq	inc zaeirq
+	lda zaeirq
+	cmp #60		; seconds
+	bne +
+	inc zaesec
+	lda #0
+	sta zaeirq
++	lda bflashjn
+	cmp #10
+	bne sq0
+
+	inc bflzae
+	lda bflzae
+	cmp bflashsp
+	bne sq0
+
+	lda #0
+	sta bflzae
+	sec
+	lda $d020
+	sbc #$f0
+	cmp bflashf1
+	beq +
+	lda bflashf1
+	sta $d020
+	jmp sq0
+
++	lda bflashf2
+	sta $d020
+sq0	jmp sirq2
+
+; ----------------------------------------- bef MOB SET
+; 96da			enhanced
+befmobset	jsr sgetbytn
+	stx $aa
+	lda $d015
+	ora mbittabs,x	; switch mob on
+	sta $d015
+
+	jsr sgetbytc
+	ldy $aa
+	lda $0288		; where is video?
+	cmp #$cc		; at $cc00 (mem)?
+	beq ifmem
+	lda gmemflag
+	cmp #10
+	bne ifnrm
+ifhires	txa
+	sta $c3f8,y	; move mobs accordingly
+	jmp msk0
+ifmem	txa
+	sta $cff8,y	; move mobs accordingly
+	jmp msk0
+ifnrm	txa
+	sta $07f8,y	; move mobs accordingly
+
+msk0	jsr sgetbytc
+	ldy $aa
+	txa
+	sta $d027,y	; set mob color
+
+	jsr sgetbytc
+	cpx #1
+	bne +
+
+	lda $d01b		; set priority
+	ldx $aa
+	ora mbittabs,x
+	sta $d01b
+	jmp ++
+
++	lda $d01b
+	ldx $aa
+	and mbittabl,x
+	sta $d01b
+
+++	jsr sgetbytc
+	cpx #1
+	bne +
+
+	lda $d01c		; set mob type (multi/hires)
+	ldx $aa
+	ora mbittabs,x
+	sta $d01c
+	jmp endsmb
+
++	ldx $aa
+	lda $d01c
+	and mbittabl,x
+	sta $d01c
+	jmp endsmb
+
+; ----------------------------------------- bef MUSIC
+; 9759			original
+befmusic	jsr sgetbytn
+	stx musicdau
+	jsr schkcom
+	jsr sgetstr
+	stx musicadr
+	sta musicadr+1
+	ldy #0
+	sty musicz1
+	lda $69
+	sta musiclen
+	jmp endsmb
+
+; ----------------------------------------- 
+; 9778
+mbittabs	!by $01,$02,$04,$08,$10,$20,$40,$80
+; 9780
+mbittabl	!by $fe,$fd,$fb,$f7,$ef,$df,$bf,$7f
+; 9788
+bitwtab	!by $80,$40,$20,$10,$08,$04,$02,$01
+
+; ----------------------------------------- bef FLASH
+; 9790			original
+befflash	lda #10
+	sta flashfl
+	jsr sgetbytn
+	cpx #16
+	bcs +
+	lda #10
+	sta flashfls,x
+	ldy #0
+	lda (progz),y
+	cmp #$2c
+	bne +
+	jsr sgetbytn
+	stx flashsp
+	lda #0
+	sta flashzae
++	jmp endsmb
+
+; ----------------------------------------- func AT
+; 97b7			original
+fnat	jsr sgetbytn
+	txa
+	pha
+	jsr sgetbytc
+	clc
+	pla
+	tay
+	jsr $fff0		; sys plot
+	jsr schkklz	; ")"?
+
+	lda #0
+	sta $0d
+	jsr chrgot
+	jmp fromat	; cont (8c94)
+
+; ----------------------------------------- 
+; 97d2
+sirq2	lda $ff
+	pha
+	lda $fe
+	pha
+	lda $fd
+	pha
+	lda $fc
+	pha
+
+	lda flashfl
+	cmp #10
+	beq +
+	jmp sirq3
+
++	inc flashzae
+	lda flashzae
+	cmp flashsp
+	beq +
+	jmp sirq3
+
++	lda #$d8
+	sta $ff
+	lda #$00
+	sta $fe
+	lda $0288
+	sta $fd
+	lda #0
+	sta flashzae
+	sta $fc
+	tay
+-	lda ($fe),y
+	and #$0f
+	tax
+	lda flashfls,x
+	beq +
+	lda ($fc),y
+	eor #$80
+	sta ($fc),y
++	inc $fe
+	bne +
+	inc $ff
++	inc $fc
+	bne +
+	inc $fd
++	lda $ff
+	cmp #$db
+	bne -
+	lda $fe
+	cmp #$e8
+	bne -
+	jmp sirq3
+
+; ----------------------------------------- bef PAGE
+; 9836			original
+befpage	jsr sgetbytn
+	cpx #0
+	bne +
+	lda #1
+	sta pageflag
+	jmp endsmb
+
++	lda #10
+	sta pageflag
+	stx pagewert
+	jmp endsmb
+
+; ----------------------------------------- 
+; 9850
+sirq3	lda $d4
+	beq +
+	jmp sirq4
+
++	ldy $028d
+	lda shwerttab,y
+	sta inkey
+	lda $cb
+	cmp #4		; F1?
+	beq wasf1
+	cmp #5
+	beq wasf3
+	cmp #6
+	beq wasf5
+	cmp #3
+	beq wasf7
+	lda #0
+	sta inkey
+	jmp sirq4
+
+wasf7	inc inkey
+	inc inkey
+wasf5	inc inkey
+	inc inkey
+wasf3	inc inkey
+	inc inkey
+wasf1	inc inkey
+	jmp sirq4
+
+; ----------------------------------------- 
+; 9892
+shwerttab	!by $00,$01,$08,$09
+
+; ----------------------------------------- 
+; 9896
+sirq4	lda $cc
+	beq +
+-	jmp sirq5
+
++	lda keyflag
+	cmp #10
+	beq -
+	lda $d4
+	bne -
+	lda $cb
+	cmp lastkey
+	beq ams5
+	lda $d8
+	bne ams5
+	lda inkey
+	beq ams5
+
+	lda inkey
+	sta $fe
+	cmp #17		; beyond 16?
+	bcs ams5
+	lda #0		; # mal 16
+	sta $ff
+	dec $fe
+	asl $fe
+	rol $ff
+	asl $fe
+	rol $ff
+	asl $fe
+	rol $ff
+	asl $fe
+	rol $ff
+	clc
+	lda $fe
+	adc #<keytab	; plus $c64d
+	sta $fe
+	lda $ff
+	adc #>keytab
+	sta $ff
+	ldy #0		; out inkey
+-	lda ($fe),y
+	beq ams4
+	cpy #15
+	beq ams4
+	sta $0277,y	; clear keybuf
+	iny
+	jmp -
+
+ams4	sty $c6
+ams5	lda $cb
+	sta lastkey
+	jmp sirq5		; ### shorter!
+
+; ----------------------------------------- 
+; 98ff
+sirq5	lda playflag
+	cmp #10
+	bne +
+	jsr sirqplay
++	pla
+	sta $fc
+	pla
+	sta $fd
+	pla
+	sta $fe
+	pla
+	sta $ff
+	jmp $ea31		; sys IRQ
+
+; ----------------------------------------- bef PLAY
+; 9918			original
+befplay	jsr sgetbytn
+	cpx #2
+	bne +
+	lda #0
+	sta musicz4
+	lda #10
+	sta playflag
+	jmp endsmb
+
++	cpx #1
+	bne +
+	lda #0
+	sta musicz4
+	lda #10
+	sta playflag
+-	lda playflag
+	cmp #10
+	beq -
++	jsr playend
+--	jmp endsmb
+
+; ----------------------------------------- bef CENTRE
+; 9947			enhanced
+befcentre	jsr sgetstrn
+	clc
+	lda #40
+	sbc $69		; halve len
+	sta $6a
+	lsr $6a
+	lda #$1d		; sys out CRSR right
+-	jsr bsout
+	dec $6a
+	bne -
+
+-	jsr basromei	; now sys out string
+	lda $69
+	jsr $ab24
+	beq --
+
+; ----------------------------------------- part of TRACE
+; 9966
+trace5	lda ($5f),y
+	tax
+	jmp trace6
+
+; ----------------------------------------- 
+; 996c
+rtc1	jsr incbasbz
+	bne -
+
+; ----------------------------------------- 
+; 9971
+cold1	lda #8
+	sta drive
+	jmp cold2
+
+; ----------------------------------------- 
+
+	!by 0
+
+; ----------------------------------------- bef ENVELOPE
+; 9979			original
+befenvelope
+	jsr sgetbytn
+	jsr x123
+	dex
+	stx $a6
+	jsr schkcom
+	jsr dec7a
+	jsr get2nyb
+	lda $aa
+	sta $a8
+	jsr schkcom
+	jsr dec7a
+	jsr get2nyb
+	asl $a6
+	ldx $a6
+	lda sidtab,x
+	sta $20
+	inx
+	lda sidtab,x
+	sta $21
+	lsr $a6
+	ldy #$06
+	lda $aa
+	sta ($20),y
+	ldy $a6
+	sta srtab,y
+	ldy #5
+	lda $a8
+	sta ($20),y
+	ldy $a6
+	sta adtab,y
+	jmp endsmb
+
+; ----------------------------------------- 
+; 99c2
+flinend	jsr chrget
+	cmp #0
+	bne flinend
+	rts
+
+; ----------------------------------------- 
+
+	!by $ea,$00
+
+; ----------------------------------------- 
+; 99cc
+get2nyb	jsr sgetbytn
+	jsr xnyb
+	stx $aa
+	asl $aa
+	asl $aa
+	asl $aa
+	asl $aa
+	jsr sgetbytn
+	jsr xnyb
+	txa
+	ora $aa
+	sta $aa
+	rts
+
+; ----------------------------------------- bef CGOTO
+; 99e8			original
+befcgoto	jsr incbasbz
+cgoto0	jsr sfrmnum
+	jsr sfacadr
+	jsr sgoto1
+	jmp endsmb
+
+; ----------------------------------------- bef WAVE
+; 99f7
+befwave	jsr sgetbytn
+	jsr x123
+	dex
+	stx $aa
+	jsr schkcom
+	jsr bincon
+	jmp bwv0
+
+; ----------------------------------------- 
+; 9a09
+bincon	lda #0
+	sta $a6
+	sta $a8
+-	ldy #0
+	lda (progz),y
+	cmp #$30		; "0"?
+	beq ++
+	cmp #$31		; "1"?
+	beq +
+	ldx #$24		; no, error "not binary char"
+	jmp ($0300)
+
++	ldy $a6
+	lda $a8
+	ora bitwtab,y
+	sta $a8
+++	inc $a6
+	jsr incbasbz
+	lda $a6
+	cmp #8
+	bne -
+	rts
+
+; ----------------------------------------- 
+; 9a35
+bwv0	asl $aa
+	ldy $aa
+	lda sidtab,y
+	sta $20
+	iny
+	lda sidtab,y
+	sta $21
+	ldy #4
+	lda $a8
+	sta ($20),y
+	lsr $aa
+	ldy $aa
+	sta wavetab,y
+	jmp endsmb
+
+; ----------------------------------------- 
+; 9a54
+sidtab	!wo $d400,$d407,$d40e
+
+; ----------------------------------------- part of RETRACE
+; 9a5a
+dscbmout	ldy #0
+-	lda tuned,y
+	beq +
+	jsr bsout
+	iny
+	bne -
++	jmp endsmb
+
+; ----------------------------------------- 
+; 9a6a
+xnyb	cpx #16
+	bcs towarm
+	rts
+
+x123	cpx #4
+	bcs towarm
+	cpx #0
+	beq towarm
+	rts
+
+towarm	pla
+	pla
+	jmp swarm		; error
+
+; ----------------------------------------- part of BLOCK
+; 9a7d
+setmulti	lda $f7		; color?
+	cmp #11		; test?
+	beq testdot
+
+	cmp #0
+	bne +
+	jsr gbitclr
+	jmp gbitclr
+
++	cmp #1
+	bne +
+	jsr gbitclr
+	jmp gbitset
+
++	cmp #2
+	bne +
+	jsr gbitset
+	jmp gbitclr
+
++	cmp #3
+	bne +
+	jsr gbitset
+	jmp gbitset
+
+; 9aab
+gbitset	lda ($a8),y
+	ora gbittabs,x
+	sta ($a8),y
+	inx
+	rts
+
+; 9ab4
+gbitclr	lda ($a8),y
+	and gbittabl,x
+	sta ($a8),y
+	inx
+	rts
+
++	cmp #4
+	bne testdot
+	lda ($a8),y
+	eor gbittabs,x
+	sta ($a8),y
+	inx
+	eor gbittabs,x
+	sta ($a8),y
+	rts
+
+; 9acf
+testdot	lda ($a8),y
+	and gbittabs,x
+	beq +
+	lda #2
+	sta $90
++	inx
+	lda ($a8),y
+	and gbittabs,x
+	beq +
+	lda $90
+	ora #1
+	sta $90
++	rts
+
+; ----------------------------------------- 
+; 9ae9
+inca6a7	inc $a6
+	bne +
+	inc $a7
++	rts
+
+; ----------------------------------------- 
+; 9af0
+inca8a9	inc $a8
+	bne +
+	inc $a9
++	rts
+
+; ----------------------------------------- bef REPEAT
+; 9af7			enhanced
+befrepeat	ldy sprepeat
+	cpy #20
+	bcc +
+err29	ldx #$29		; error "stack too large"
+	jmp ($0300)
+
++	lda $7a
+	sta stackrepeat,y
+	iny
+	lda $7b
+	sta stackrepeat,y
+	iny
+	sty sprepeat
+	jmp bef0
+
+; ----------------------------------------- bef UNTIL
+; 9b15			original
+befuntil	jsr incbasbz
+	lda sprepeat
+	cmp #2
+	bcs +
+	ldx #$28		; error "until w/o repeat"
+	jmp ($0300)
+
++	jsr sfrmevl
+	jsr chrgot
+	lda $61
+	beq +
+	dec sprepeat
+	dec sprepeat
+	jmp endsmb
+
++	ldy sprepeat
+	dey
+	lda stackrepeat,y
+	sta progz+1
+	lda stackrepeat-1,y
+	sta progz
+	jmp bef0
+
+; ----------------------------------------- bef RETRACE
+; 9b48			new
+befretrace
+	lda #<signature	; out "ad'86"
+	ldx #>signature
+	ldy #5
+	jmp trc1		; retc0 
+
+; ----------------------------------------- 
+; 9b51
+sadr2int	jsr pspeibe
+	jsr $a96b		; sys line# to int
+	jmp prestor
+
+; ----------------------------------------- bef TRACE
+; 9b5a
+beftrace	jsr sgetbytn
+	stx traceflag
+	jmp endsmb
+
+; ----------------------------------------- bef OPTION
+; 9b63			original
+befoption	jsr sgetbytn
+	stx optflag
+	jmp endsmb
+
+; ----------------------------------------- bef IF
+; 9b6c			recoded
+befif	jsr incbasbz
+	jsr sfrmevl
+	jsr chrgot
+	cmp #$89		; GOTO?
+	beq +
+
+	lda #$a7		; no, check for THEN
+	jsr schkzei
+; 9b7e
+inif	jsr schdo		; then search for DO
+	cmp $22
+	beq fnddo
+
++	lda $61
+	sta ifflag
+	bne iftrue
+
+	jsr schelse	; search for ELSE
+	iny
+	cmp $22
+	beq fndelse
+
+	dey
+	jsr sbzply
+	jmp endsmb
+
+; ----------------------------------------- 
+; 9b9b
+iftrue	jsr chrgot	; process THEN
+	bcs +
+	jmp cgoto0	; sb goto
+
+; ----------------------------------------- 
+
+fnddo	sty $c51c
+	dey
+fndelse	jsr sbzply
++	jsr dec7a
+	jmp ($0308)	; sys get bef address
+
+; ----------------------------------------- 
+; 9bb0
+schdo	lda #$22		; search for DO
+	!by $2c
+schelse	lda #$47		; search for ELSE
+	sta $22
+	ldy #$ff
+-	iny
+	lda (progz),y	; end of line?
+	beq +		; yes
+	cmp #$64		; sb token?
+	bne -		; no
+	iny
+	lda (progz),y	; found? (after token!)
+	cmp $22
+	bne -
++	rts		; equal if yes
+
+; ----------------------------------------- part of RENUMBER
+; 9bca
+ren1	lda $2b
+	ldx $2c
+	sta $a8
+	stx $a9
+	jmp ren2		; b9df
+
+; ----------------------------------------- 
+
+	!by 0
+
+; ----------------------------------------- bef AUTO
+; 9bd6			original
+befauto	jsr incbasbz
+	jsr sfrmnum
+	jsr sfacadr
+	sta autozi+1
+	sty autozi
+	jsr sgetbytc
+	stx autoinc
+	lda #10
+	sta autoflag
+	sec
+	lda autozi
+	sbc autoinc
+	sta autozi
+	lda autozi+1
+	sbc #0
+	sta autozi+1
+	jmp endsmb
+
+; ----------------------------------------- bef RESET
+; 9c05			original
+befreset	jsr incbasbz
+	jsr sfrmnum
+	jsr sfacadr
+	sta int+1
+	sta $40		; sys line# DATA
+	sty int
+	sty $3f
+	jsr sstrpz
+	sec
+	lda $5f
+	sbc #1
+	ldy $60
+	bcs +
+	dey
++	sta $41
+	sty $42
+	jmp endsmb
+
+; ----------------------------------------- bef CALL
+; 9c2a			recoded
+befcall	clc
+	lda $2b
+	adc #3
+	sta $20
+	lda $2c
+	adc #0
+	sta $21
+
+	lda #$31		; search for PROC
+	sta $22
+	lda #10
+	sta procnffl
+-	jsr suchcode
+
+--	iny
+	lda ($20),y
+	beq +
+	cmp (progz),y
+	bne -
++	lda (progz),y
+	beq +
+	cmp #$3a		; ":"?
+	bne --
+
++	ldy #0
+	lda $20
+	sta progz
+	lda $21
+	sta progz+1
+	jmp befproc	; skip rest of line
+
+; 9c61
+suchcode	ldy #0
+scd0	jsr inc20
+suchcode1	lda ($20),y	; end of line?
+	beq scd1
+	cmp #$64		; sb token?
+	beq scd3
+	cmp #$22
+	beq scd2
+	bne scd0
+
+scd1	ldy #2
+	ora ($20),y
+	beq +
+	ldx #4
+-	jsr inc20
+	dex
+	bne -
+	beq suchcode
+
++	lda procnffl
+	cmp #10
+	bne scd5
+
+	ldx #$21		; error "proc not found"
+	stx procnffl
+	dec spexec
+	dec spexec
+	jmp ($0300)
+
+; ----------------------------------------- 
+; 9c99
+scd5	pla
+	pla
+	jmp endsmb
+
+; ----------------------------------------- 
+; 9c9e
+scd3	jsr inc20
+	lda ($20),y
+	cmp $22
+	bne scd0
+	iny
+	lda ($20),y
+	cmp #$20
+	bne +
+	jsr inc20
++	lda ($7a),y
+	cmp #$20
+	bne +
+	jsr incbasbz
++	dey
+	rts
+
+; ----------------------------------------- 
+; 9cbc
+scd2	jsr inc20
+	lda ($20),y
+	beq scd1
+	cmp #$22
+	bne scd2
+	beq scd0
+
+; ----------------------------------------- 
+; 9cc9
+scd4	ldx autoflag
+	beq +
+	jsr dec7a
++	jmp befcall
+
+; ----------------------------------------- part of DIR
+; 9cd4
+dirend	jsr sclose
+	cli
+	jmp endsmb
+
+; ----------------------------------------- 
+
+	!by 0
+
+; ----------------------------------------- 
+; 9cdc
+inc20	inc $20
+	bne +
+	inc $21
++	rts
+
+; ----------------------------------------- part of USE
+; 9ce3
+use1	jsr use3		; get USE parameters (b3e2)
+	jsr sclrch
+	jmp endsmb
+
+; ----------------------------------------- bef EXEC
+; 9cec			recoded
+befexec	lda progz
+	pha
+	lda progz+1
+	pha
+	jsr srem
+	ldy spexec
+	cpy #20
+	bcc +
+	jmp err29
+
++	lda progz
+	sta stackexec,y
+	iny
+	lda progz+1
+	sta stackexec,y
+	iny
+	sty spexec
+	pla
+	sta progz+1
+	pla
+	sta progz
+	jmp scd4
+
+; ----------------------------------------- 
+
+	!by $ea,$00
+
+; ----------------------------------------- bef END PROC
+; 9d19			original
+befendproc
+	ldy spexec
+	cpy #2
+	bcs +
+	ldx #$26		; error "end proc w/o exec"
+	jmp ($0300)
+
++	dey
+	lda stackexec,y
+	sta progz+1
+	dey
+	lda stackexec,y
+	sta progz
+	sty spexec
+-	jmp endsmb
+
+; ----------------------------------------- bef EXIT
+; 9d37			original
+befexit	jsr incbasbz
+	jsr chrgot
+	lda #$8b		; IF?
+	jsr schkzei
+	jsr sfrmevl
+	lda $61
+	bne +		; ### shorter!
+	beq -
+
++	ldy #0
+	lda #$36		; search for END LOOP
+	sta $22
+	lda progz
+	sta $20
+	lda progz+1
+	sta $21
+	jsr suchcode1
+	lda $20
+	sta progz
+	lda $21
+	sta progz+1
+	dec sploop
+	dec sploop
+-	jmp bef0
+
+; ----------------------------------------- bef ON KEY
+; 9d6d			recoded
+befonkey	jsr incbasbz
+	jsr sgetstr
+	sta okstring+1	; controlstring
+	stx okstring
+	ldy $69		; len
+	sty okstrlen
+	lda progz
+	ldy progz+1
+	sta onkeyzeig
+	sty onkeyzeig+1
+	lda #$5d		; "]" (emergency key)
+	sta keyon
+	jsr chkkey
+	bcs +
+
+	sty onkeypos
++	lda #10
+	sta onkeyflag
+	ldy #0
+	nop
+	jmp res2
+
+; ----------------------------------------- bef DISABLE
+; 9da0			original
+befdisable
+	lda #0
+	sta onkeyflag
+	beq -
+
+; ----------------------------------------- 
+; 9da7
+onkey1	lda onkeypos	; key pressed?
+	bne +
+	jsr $ffe4		; no, sys get key
+	beq oky0
+	sta keyon		; store key, is in ctrl string?
+	jsr chkonkey	; yes, if .c=0
+	bcs oky0
+
++	lda #0		; found
+	sta onkeyflag
+	lda progz
+	ldx progz+1
+	sta basbzk
+	stx basbzk+1
+	lda onkeyzeig
+	ldx onkeyzeig+1
+	sta progz
+	stx progz+1
+	jmp scd5		; continue elsewhere
+; 9db9
+chkkey	lda #0
+	sta onkeypos
+chkonkey	lda okstring	; get on key ctrl string
+	ldx okstring+1
+	sta $20
+	stx $21
+
+	ldy #0
+-	cpy okstrlen	; len
+	beq oky0
+	lda ($20),y	; is key in ctrl string?
+	iny
+	cmp keyon
+	bne -
+	clc		; yes: .c=0
+oky0	rts
+
+; ----------------------------------------- bef RESUME
+; 9df5			recoded
+befresume	lda errn		; from ON ERROR?
+	bpl res0		; yes, go there
+
+	lda basbzk+1	; direct mode?
+	cmp #8
+	bcc res3		; yes, leave
+
+	sta progz+1
+	lda basbzk
+	sta progz
+	jsr basromei
+	lda #10
+	sta onkeyflag
+	jmp sintprt0
+
+; ----------------------------------------- 
+; 9e13
+res0	jsr chrget	; parameters?
+	beq res4		; no
+
+	cmp #$82		; NEXT?
+	beq +
+	jmp cgoto0	; no, goto
+
++	lda errln		; RESUME NEXT
+	ldx errln+1
+	sta int
+	stx int+1
+	jsr sgoto1	; goto errln
+	ldy #5
+	jsr sbzply
+
+; ----------------------------------------- bef PROC
+; 9e31			enhanced
+befproc	jsr flinend	; find end of line
+	beq +
+
+; ----------------------------------------- 
+
+res4	ldy #0
+	lda $c529
+	ldx $c52a
+	sta progz
+	stx progz+1
+	lda (progz),y
+	bne res2
+	ldy #5
+	!by $24
+res2	iny
+	jsr sbzply
+	jsr srem
++	jmp endsmb
+
+; ----------------------------------------- 
+
+	!by 0
+
+; ----------------------------------------- bef LOOP
+; 9e54			original
+befloop	ldy sploop
+	cpy #20
+	bcc +
+	jmp err29		; error "stack too large"
+
++	lda progz
+	sta stackloop,y
+	iny
+	lda progz+1
+	sta stackloop,y
+	iny
+	sty sploop
+res3	jmp bef0
+
+; ----------------------------------------- bef ON ERROR
+; 9e70				enhanced
+befonerror
+	jsr incbasbz
+	lda progz
+	sta onerrzeig
+	lda progz+1
+	sta onerrzeig+1
+	lda #10
+	sta onerrorflag
+	jsr flinend
+	beq swm0
+
+swm1	lda $3d
+	ldy $3e
+	sta $c529
+	sty $c52a
+	rts
+
+; ----------------------------------------- bef NO ERROR
+; 9e92			original
+befnoerr	lda #0
+	sta onerrorflag
+	jmp bef0
+
+; ----------------------------------------- 
+; 9e9a			recoded
+swarm	ldx #$20		; bad mode
+	stx errn
+	jsr basromei
+	lda onerrorflag	; on error active?
+	cmp #10
+	beq +
+	jmp serrout	; no, error
+
++	lda onerrzeig+1
+	sta progz+1
+	lda onerrzeig
+	sta progz
+	lda $39
+	sta errln
+	lda $3a
+	sta errln+1
+	jsr swm1
+	ldx stack
+	txs
+swm0	jmp endsmb
+
+; ----------------------------------------- part of D!
+; 9eca
+delend	jsr basromei
+	jmp endmrge
+
+; ----------------------------------------- 
+
+	!by 0
+
+; ----------------------------------------- bef OUT
+; 9ed1			original
+befout	jsr basromei
+	ldx errn
+	jmp outx
+
+; ----------------------------------------- bef OLD
+; 9eda			original
+befold	lda #4
+	sta $20
+	lda $2c
+	sta $21
+	ldy #0
+-	jsr inc20
+	lda ($20),y
+	bne -
+	jsr inc20
+	lda $20
+	sta ($2b),y
+	iny
+	lda $21
+	sta ($2b),y
+	dey
+	lda #1
+	sta $2d
+-	ldx #3
+--	jsr inc20
+	lda ($20),y
+	bne -
+	dex
+	bne --
+	jsr inc20
+	lda $20
+	sta $31
+	lda $21
+	sta $32
+	ldx #3
+-	lda $2f,x
+	sta $2d,x
+	dex
+	bpl -
+	jmp bef0
+
+; ----------------------------------------- bef RCOMP
+; 9f1f			original
+befrcomp	jsr incbasbz
+	jsr basromei
+	jsr incbasbz
+	lda ifflag
+	sta $61
+	jmp inif
+
+; ----------------------------------------- bef PROC (Kopie)
+; 9f30
+befproc1	jsr flinend
+	beq swm0
+
+; ----------------------------------------- 
+; 9f35
+l9f35	ldx #1
+	jmp $ffc6		; sys chkin 1
+
+; ----------------------------------------- 
+; 9f3a
+;
+; End of part 3
+;
+
+
+
