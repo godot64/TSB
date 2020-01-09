@@ -45,7 +45,7 @@ dit0	lda ($20),y	; get 1st char of varname
 	ldy #6
 	bne dit5
 
-dit4	and #$7f		: 2nd is shifted, so integer
+dit4	and #$7f		; 2nd is shifted, so integer
 	jsr bsout
 	lda #$25		; %
 	jsr bsout
