@@ -31,21 +31,21 @@ dit1	jmp bef0		; yes, end of command
 
 ; ----------------------------------------- 
 
-dit0	lda ($20),y
+dit0	lda ($20),y	; get 1st char of varname
 	sta $a6
-	bpl dit3
+	bpl dit3		; check type
 	and #$7f
-	jsr bsout
+	jsr bsout		; first is shifted (FN or integer)
 	jsr inc20
-	lda ($20),y
+	lda ($20),y	; get 2nd char of shifted varname
 	bmi dit4
-	jsr bsout
+	jsr bsout		; not shifted, so FN function
 	lda #$21		; !
 	jsr bsout
 	ldy #6
 	bne dit5
 
-dit4	and #$7f
+dit4	and #$7f		: 2nd is shifted, so integer
 	jsr bsout
 	lda #$25		; %
 	jsr bsout
@@ -67,11 +67,11 @@ dit4	and #$7f
 dit3	and #$7f
 	jsr bsout
 	jsr inc20
-	lda ($20),y
+	lda ($20),y	; get 2nd char of unshifted varname
 	sta $a6
 	bpl dit7
 
-	and #$7f
+	and #$7f		; shifted, so string
 	jsr bsout
 	lda #$24		; $
 	jsr bsout
@@ -107,7 +107,7 @@ dit5	jsr inc20
 
 ; ----------------------------------------- 
 ; 9ffb
-dit7	and #$7f
+dit7	and #$7f		; 2nd char unshifted, so float
 	jsr bsout
 	jsr inc20
 	lda $20
