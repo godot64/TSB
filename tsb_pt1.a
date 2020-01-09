@@ -28,145 +28,145 @@ modultext	!tx "CBM80"
 sstart	jmp befcold
 
 ; ----------------------------------------- Calls to BASIC ROM
-
+; 800d
 sfrmnum	jsr pspeibe
 	jsr $ad8a		; get numerical expression
 	jmp prestor
-
+; 8016
 sfacadr	jsr pspeibe
 	jsr $b7f7		; FAC to word (.y=lo, .a=hi, :INT)
 	jmp prestor
-
+; 801f
 ssin	jsr pspeibe
 	jsr $e26b		; func SIN
 	jmp prestor
-
+; 802b
 scos	jsr pspeibe
 	jsr $e264		; func COS
 	jmp prestor
-
+; 8031
 schkcom	jsr pspeibe
 	jsr $aefd		; check for comma
 	jmp prestor
-
+; 803a
 sfrmevl	jsr pspeibe
 	jsr $ad9e		; retrieve expression
 	jmp prestor
-
+; 8043
 sfrestr	jsr pspeibe
 	jsr $b6a3		; retrieve string parameters
 	jmp prestor
-
+; 804c
 sintout	jsr pspeibe
 	jsr $bdd1		; out digits in .a (hi) and .x (lo)
 	jmp prestor
-
+; 8055
 sgoto1	jsr pspeibe
 	jsr $a8a3		; bef GOTO (to line in INT)
 	jmp prestor
-
+; 805e
 schkzei	jsr pspeibe
 	jsr $aeff		; check if char in .a is at pz
 	jmp prestor
-
+; 8067
 sxflppl	jsr pspeibe
 	jsr $bc44		; integer to float (hi: $62, lo: $63, .x:#$90)
 	jmp prestor
-
+; 8070
 sstrpz	jsr pspeibe
 	jsr $a613		; compute address of line start (number in INT)
 	jmp prestor
-
+; 8076
 sascflp	jmp $bcf3		; digits from basic to float
-
+; 8079
 sgetari1	jmp $ae92		; get arithmetical expression from basic
-
+; 807f
 schkklz	jsr pspeibe
 	jsr $aef7		; check for "Klammer zu"
 	jmp prestor
-
+; 8088
 sxflp	jsr pspeibe
 	jsr $bc49		; convert to FAC (.x=exponent)
 	jmp prestor
-
+; 8091
 sfacarg	jsr pspeibe
 	jsr $bc0c		; FAC to ARG
 	jmp prestor
-
+; 809a
 sfmult	jsr pspeibe
 	jsr $ba30		; FAC*ARG
 	jmp prestor
-
+; 80a3
 sfldfack	jsr pspeibe
 	jsr $bba2		; const (.a=lo, .y=hi) to FAC
 	jmp prestor
-
+; 80ac
 sfdiv	jsr pspeibe
 	jsr $bb14		; ARG/FAC
 	jmp prestor
-
+; 80b5
 sfacasc	jsr pspeibe
 	jsr $bddd		; FAC to ASCII (in $0100)
 	jmp prestor
-
+; 80be
 sgetvar	jsr pspeibe
 	jsr $b08b		; get var from basic
 	jmp prestor
-
+; 80c7
 stestdirm	jsr pspeibe
 	jsr $b3a6		; check for direct mode (error if yes)
 	jmp prestor
-
+; 80d0
 sclrch	jsr pspeibe
 	jsr $abb5		; clear open device channels
 	jmp prestor
-
+; 80d9
 srem	jsr pspeibe
 	jsr $a8f8		; find colon and add to progz
 	jmp prestor
-
+; 80e2
 snexttr	jsr pspeibe
 	jsr $a906		; find colon, offset in .y
 	jmp prestor
-
+; 80eb
 sinput1	jsr pspeibe
 	jsr $ac0d		; bef INPUT
 	jmp prestor
-
+; 80f4
 spuf0cr	jsr pspeibe
 	jsr $aaca		; write buffer $0200 and cr
 	jmp prestor
-
+; 80fd
 sbzply	jsr pspeibe
 	jsr $a8fb		; progz plus .y
 	jmp prestor
-
+; 8106
 sgetbyt1	jsr pspeibe
 	jsr $b79e		; getbyt from basic (to .x)
 	jmp prestor
-
+; 810f
 sbind	jsr pspeibe
 	jsr $a533		; bind basic lines
 	jmp prestor
-
+; 8118
 ssmni	lda pport
 	sta pspeinmi
 	jsr kerromein
 	jmp $fe43		; sys NMI
-
+; 8123
 sopen	jsr pspeibe
 	jsr $e1be		; bef OPEN
 	jmp prestor
 
 ; ----------------------------------------- 
-; 812c/813b
+; 812c
 pspeibe	sta zwspei1
 	lda pport
 	sta portspei
 	jsr basromei
 	lda zwspei1
 	rts
-
+; 813b
 prestor	sta zwspei1
 	lda portspei
 	sta pport
@@ -249,7 +249,7 @@ useready	pla
 -	jmp swarm		; bad mode	
 
 ; ----------------------------------------- 
-
+; 81e1
 +	lda #$3b		; ";"?
 use6	ldy #0		; compare to running code char
 	cmp (progz),y	; if not equal: error bad mode
