@@ -5,6 +5,7 @@
 ; by Arndt Dettke, 1986
 ;
 ; part 2
+; patched on 11.01.2020
 ;
 ; ----------------------------------------- 
 
@@ -553,21 +554,24 @@ fromat	bcs +		; 8c94
 
 ; ----------------------------------------- 
 ; 8cab
-chhexchr	cmp #$30		; kleiner "0"?
-	bcc +
-	cmp #$47		; größer "f"?
-	bcs +
-	cmp #$3a		; kleiner ":"?
-	bcc ++
-	cmp #$41		; größer "@"?
-	bcs ++
-+	pla
+chhexchr	jsr chrget	; get next char, is digit?
+	bcc ++		; yes, ok
+; 8cb0
+ishex	cmp #"g"		; no, beyond "f"?
+	bcs +		; yes, not hex
+	cmp #"a"		; below "a"?
+	bcs +		; no, ok (is a-f)
+
+	sec		; fail (is no hexdigit)
+	rts
++	clc		; ok (is hexdigit)
+++	rts
+; 8cbc
+err25	pla
 	pla
 	ldx #$25		; error "not hex char"
 	jmp ($0300)
--
-++	rts		; sonst: ok
-
+; (24)
 ; ----------------------------------------- func %
 ; 8cc3
 getbin	jsr getdouble
@@ -577,42 +581,46 @@ getbin	jsr getdouble
 ; ----------------------------------------- to Float
 ; 8ccb
 sxyflp3	ldx #0
-sxyflp	sty $63
-	stx $62
+sxyflp	sty $63		; lo
+	stx $62		; hi
 sxyflp2	ldx #$90
 	sec
 	jmp $bc49		; sys convert to float
 
 ; ----------------------------------------- func $
 ; 8cd7
-gethex	jsr getdouble
-	bne +		; uncond. branch
+gethex	ldx #0
+	stx $a5
+	jsr getdouble	; check wether $$, returns .y=1
+; 8cde
+hcon0	jsr dec7a
 
-hexcon	jsr chrget
-+	sty $a5
-hcon0	jsr chhexchr
-	tax
-	jsr chrget
-	jsr chhexchr
+hexcon	jsr onebyte	; first two digits of hex value
+	tay		; in .y (.x=0)
+	lda $a5		; max position?
+	jsr byte2		; has two digits?
+	bcs hcon1		; yes, out
+	tya		; has 4 digits, so first two are hibyte
+	tax		; 1st is now hibyte
+	jmp hcon0		; loop for 2nd two digits
+
+hcon1	jmp sxyflp
+; (29)
+; ----------------------------------------- 
+; 8cf1
+onebyte	jsr chhexchr	; hi nibble digit valid?
+	bcs err25		; no, error
 	tay
-	txa
-	jsr hex2w
-	ldy $a5
-	iny
-	cpy #3
-	bvs +
-	sta $0060,y
-	bcc hexcon
-
-+	jsr chrget
-	jmp sxyflp2
-
+	jsr chhexchr	; lo nibble digit valid?
+	bcs err25
+	jmp hex2w		; yes, convert to byte
+; (43)
 ; ----------------------------------------- 
 
 l8d02	jsr sbzply
 	ldy #2		; found prog end?
 	lda (progz),y
-	beq -		; yes, to RTS
+	beq +		; yes, to RTS
 	ldy #5
 --	jsr sbzply
 ; 8d10
@@ -629,30 +637,33 @@ sfordo	jsr schdo		; search for DO
 
 ; ----------------------------------------- 
 
-	!by $ea,$00
++	rts
+
+; ----------------------------------------- 
+
+	!by $ea
 
 ; ----------------------------------------- 
 ; 8d28
-hex2w	pha
+hex2w	inc $a5		; inc byte counter
+	jsr hexw		; convert .a und .y to byte...
+	sta zwisp2
 	tya
 	jsr hexw
-	sta zwisp2
-	pla
-	jsr hexw
 	asl
 	asl
 	asl
 	asl
-	ora zwisp2
+	ora zwisp2	; ...return in .a
 	rts
 
-hexw	sec
+hexw	sec		; make value from digit
 	sbc #$30
 	cmp #10
 	bcc +
 	sbc #7
 +	rts
-
+; (30)
 ; ----------------------------------------- func EXOR
 ; 8d46			original
 fnexor	jsr chrget
@@ -775,16 +786,16 @@ fnfrac	jsr chrget
 +	jmp $bc1b		; sys runden fac
 
 ; ----------------------------------------- 
-
+; 8e33
 getdouble	ldy #1
 	cmp (progz),y
 	beq +
 	jmp chrget
 
-+	pha
++	pha		; save current char
 	jsr chrget
 	jsr chrget
-	jmp $c750		; func %%/$$
+	jmp enhexbin	; func %%/$$
 
 ; ----------------------------------------- 
 

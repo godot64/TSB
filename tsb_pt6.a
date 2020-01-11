@@ -1176,7 +1176,7 @@ usel9	sta helpvec
 
 ; ----------------------------------------- part of $$/%%
 ; c750
-	jsr sgetadr
+enhexbin	jsr sgetadr
 	pla
 	tay
 	pla
@@ -1422,35 +1422,31 @@ ren4	ldy #0
 	ldy $23
 	stx progz
 	sty progz+1
-	jsr chrgot
+	jsr fromnrm	; patch 11.01.20
+; c900
 	ldx #0
-	ldy $69
-	cpy #8
+	ldy $69		; .y= len
+	cpy #8		; 8 (or 16) must be binary
 	bcc ++
-	cmp #$25		; "%"?
-	bne +
-	jsr chrget
+
+	cmp #$25		; 8: leading "%"?
+	bne +		; no
+	jsr chrget	; yes, skip
 +	jsr bincon
 	ldy $69
-	cpy #16
+	cpy #16		; 16?
 	bcc +
-	ldx $a8
+	ldx $a8		; yes
 	jsr bincon
 +	jmp nrm0
-
-++	cmp #$24		; "$"?
-	bne +
-	jsr chrget
-+	cpy #4
-	bcs +
-	stx $62
-	inx
-+	inx
-	stx $a5
-	jsr hcon0
-	nop
-	nop
-
+; c920
+	!fill 12,$ea	; patch 11.01.20
+; c92c
+++	cmp #$24		; leading "$" in string?
+	bne +		; no
+	jsr chrget	; yes, skip "$"
++	jsr hcon0		; and convert
+; (22)
 nrm0	lda $69
 	cmp #8
 	bcc +
@@ -1648,8 +1644,35 @@ befsoff	jsr repchrget
 ; ----------------------------------------- 
 ; ca7f
 	!by $f8,$38,$4e,$52
+
+; ----------------------------------------- 
 ; ca83
-	!fill 125
+byte2	cmp #2
+	bcc byte1		; max position? if not: continue
+	jmp $83db		; yes, out (incbasbz)
+; ca8a
+byte0	ldx #0		; formerly called from c8fd (nrm)
+	stx $a5		; now unsed
+	jmp chrgot
+; ca91
+fromnrm	ldx #1		; c8fd: jsr fromnrm
+	ldy $69		; len of digit string?
+	cpy #4		; less than 4?
+	bcc +
+	dex
++	stx $a5		; set byte counter accordingly
+	jsr dec7a
+; ca9f
+byte1	jsr chrget	; next char: decimal digit?
+	bcc ++		; yes, leave byte1 (so CLC)
+	pha		; no, is token? (so SEC)
+	pla
+	bmi +
+	jmp ishex		; no, is hex?
++	sec
+++	rts
+
+	!fill 83
 
 ; ----------------------------------------- 
 ; cb00
