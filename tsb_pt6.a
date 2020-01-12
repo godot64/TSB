@@ -5,6 +5,7 @@
 ; by Arndt Dettke, 1986
 ;
 ; part 6
+; patch #2, adding a new feature to COLOUR
 ;
 ; ----------------------------------------- 
 
@@ -447,27 +448,30 @@ grprntab	!by $08,$35,$31,$10,$0f,$0d
 
 ; ----------------------------------------- part of COLOUR
 ; babe
--	ldx #0		; black, wenn nichts folgt
-	txa
-	beq colc1
-docolor	jsr chrget	; folgt direkt:
-	beq -		; nichts? dann alles black
-	cmp #$2c		; oder ","?
-	beq colc0		; ja, dann nur crsr
+docolor2	beq colc0		; no, set paper and border to blk
 
-	jsr sgetbyt1	; sonst: bckgr
-	txa
-	pha
-	jsr sgetbytc	; und border
-	pla
-colc1	stx $d021		; setzen
-	sta $d020
-	jsr chrgot	; noch was?
-	beq $bae6
-colc0	jsr sgetbytc	; ja, crsr
-	stx $0286
-	rts
+	cmp #$2c		; comma?
+	beq colc1		; yes, only ink
 
+	jsr sgetbyt1	; get param1 (in .x)
+	stx helpvec
+	jsr chrgot	; no more?
+	beq +		; yes, only paper
+
+	jsr sgetbytc	; get param2 (in .x)
+	lda helpvec
+	!by $24
+colc0	txa
+	sta $d020		; border
++	stx $d021		; paper
+	jsr chrgot	; no more?
+	beq +		; yes, only border and paper
+
+colc1	jsr sgetbytc	; get param3
+	stx $0286		; ink
++	rts
+
+; (41)
 ; ----------------------------------------- part of DO
 ; bae7
 isnull	sty $c51c		; .y=0, clear DO flag
@@ -815,9 +819,15 @@ param6	jsr sgetbyt1	; CONT: get fix reu flag
 	sta $df0a
 ready	jmp endsmb
 
+; ----------------------------------------- part of COLOUR
+; bd9b
+docolor	ldx #0
+	jsr chrget	; anything following?
+	jmp docolor2
+
 ; ----------------------------------------- 
 
-	!fill 15,$ad
+	!fill 7,$ad
 
 ; ----------------------------------------- 
 ; bdaa
@@ -1409,7 +1419,7 @@ ren4	ldy #0
 
 ; ----------------------------------------- func NRM
 ; c8e0
-	jsr chrget
+fnnrm	jsr chrget
 	jsr $aefa		; sys check "("
 	jsr sgetstr1
 	lda #0

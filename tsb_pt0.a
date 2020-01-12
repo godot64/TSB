@@ -48,7 +48,6 @@
 
 	neustr	= $b47d
 	pushstr	= $b4ca
-	fnnrm	= $c8e0
 
 	!src "tsb_pt1.a"
 	!src "tsb_pt2.a"
