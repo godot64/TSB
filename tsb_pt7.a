@@ -4,7 +4,7 @@
 ;
 ; by Arndt Dettke, 1986
 ;
-; part 0, extension area
+; part 7, extension area
 ;
 ; ----------------------------------------- 
 
@@ -79,7 +79,7 @@ skiparr	ldy #$02
 ; cc5a
 outdigits	jsr $b395		; sys int to float
 	jsr $bddf		; sys fac to asc
-	jmp $ab1e		; out
+	jmp $ab1e		; sys string out
 
 ; ----------------------------------------- 
 ; cc63
@@ -269,7 +269,7 @@ outpos	lda $af		; show position in array
 ; cdc2
 fltarr	jsr $af2b		; get variable
 	jsr $bddd		; fac to asc
-	jsr $ab1e		; out
+	jsr $ab1e		; sys string out
 
 nextarr	jsr arrbreak
 	jsr retn
@@ -377,7 +377,7 @@ ren5	lda ($a8),y
 ; ----------------------------------------- 
 ; ce8a
 rbnb	jsr inca8a9
-	jsr inca8a9
+rbnc	jsr inca8a9
 	lda ($a8),y
 	beq rnb2
 	jsr inca8a9
@@ -438,8 +438,8 @@ rnb1	lda $a8
 	bcs rnb2
 	jsr $a96b		; sys linenumber to adr
 	jsr enternum
-	jsr $bc49		; int to float
-	jsr $bddf		; fac to asc (in linenum)
+	jsr $bc49		; sys int to float
+	jsr $bddf		; sys fac to asc (in linenum)
 	tax
 -	lda linenum,x
 	beq +		; end of digits

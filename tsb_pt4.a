@@ -1230,10 +1230,10 @@ kreis1	lda $a8
 	jsr sinmalkrx
 	sty $aa
 	sta $ab
-	jsr $aa1c
+	jsr cosmalkry
 	sty $ae
 	sta $af
-	jsr $aa71
+	jsr pkber
 	lda $ae
 	sta ay
 	lda $aa
@@ -1354,15 +1354,15 @@ a8a9bogm	lda $a8
 	ldy $70
 	jmp sfdiv
 
-; ----------------------------------------- 
+; ----------------------------------------- part of DIR
 ; aa5e
-	jsr $ffbd		; sys setnam
+fileopen	jsr $ffbd		; sys setnam
 	ldx $ba
 	lda #1
 	ldy #0
 	jsr $ffba		; sys setlfs
 	jsr $ffc0		; sys OPEN
-	jmp l9f35
+	jmp chkin1	; 9f35
 
 ; ----------------------------------------- 
 
@@ -1554,7 +1554,7 @@ zum1	iny
 	ldx #0
 	stx codezae
 tok3	cmp ($20,x)
-	beq $abee		; !!!
+	beq $abee		; !!! Trick
 	and #$7f
 	cmp ($20,x)
 	beq tok0

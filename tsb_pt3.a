@@ -23,8 +23,8 @@ sbasbef	tsx
 	beq sintprt0
 	jsr onkey1
 
-sintprt0	jsr chrget
-	jsr $c998
+sintprt0	jsr chrget	; get next char
+	jsr stateofdo	; what about DO..DONE and ELSE?
 	lda #0		; auto off
 	sta autoflag
 
@@ -59,9 +59,9 @@ ipr1	cmp #$64		; sb token?
 
 	cmp #$3a		; ":"?
 	beq ipr0
-	jsr $a906		; find next ":" (in .y)
+	jsr $a906		; sys find next ":" (in .y)
 	sty $22
-	ldx #$b2		; find "=" (in .y)
+	ldx #$b2		; sys find "=" (in .y)
 	jsr $a90b
 	cpy $22		; beyond ":"?
 	bcs ipr2
@@ -72,12 +72,12 @@ ipr4	jsr chrgot	; no, reget last char
 ipr0	jmp $a7ae		; sys interpreter
 
 ipr2	sty autoflag
-	jmp $9cec
+	jmp befexec	; 9cec
 
 ipr3	sty sprepeat	; clear stacks
 	sty spexec
 	sty sploop
-	beq ipr4
+	beq ipr4		; (uncond. branch)
 
 ipr5	jsr incbasbz	; process sb command
 	jsr basromau
@@ -104,7 +104,7 @@ befhires	lda #$01
 	sty lowcolflag
 	lda #$e0
 	sta $a7
-	jsr $ca73		; get2nyb (farben)
+	jsr g2nsafe	; ca73, get2nyb (farben), even after MEM
 	ldx $aa
 	stx $ac
 
@@ -166,7 +166,7 @@ l927f	lda $39		; basic line #
 
 dodone	bcs +		; DONE?
 	jmp befproc	; no, skip rest of line
-+	jmp $b56a
++	jmp docont	; b56a
 
 ; ----------------------------------------- 
 
@@ -259,7 +259,7 @@ sethires	lda $f7		; hires, get color source
 	cmp #2
 	beq hinvert
 
-	jmp $a261	
+	jmp ptest1	; a261	
 
 hset	lda ($a8),y
 	ora gbittabs,x
@@ -270,7 +270,7 @@ hset	lda ($a8),y
 gbittabs	!by $80,$40,$20,$10,$08,$04,$02,$01
 
 herase	lda ($a8),y
-	and $9340,x
+	and gbittabl,x
 	sta ($a8),y
 	rts
 
@@ -470,7 +470,7 @@ befcircle	jsr incbasbz
 
 ; ----------------------------------------- part of RENUMBER
 ; 94bd
-ren3	jsr $cf5d
+ren3	jsr enternum	; cf5d
 	cmp #250
 	bcs +
 	jsr basromei
@@ -574,7 +574,7 @@ dir0	ldy $af
 	sta $ba
 	jsr basromau
 	lda $69
-	jsr $aa5e		; open file
+	jsr fileopen	; aa5e open file
 	jsr basromei
 
 	ldx #5
@@ -1995,7 +1995,7 @@ befproc1	jsr flinend
 
 ; ----------------------------------------- 
 ; 9f35
-l9f35	ldx #1
+chkin1	ldx #1
 	jmp $ffc6		; sys chkin 1
 
 ; ----------------------------------------- 

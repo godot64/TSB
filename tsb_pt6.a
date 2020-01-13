@@ -16,7 +16,7 @@
 domerge	jsr sbind
 	ldy #1
 	lda ($2d),y
-	beq $b7b5
+	beq dom0
 	iny
 	lda ($2d),y
 	sta int
@@ -57,8 +57,9 @@ domerge	jsr sbind
 	sta ($5f),y
 	dey
 	bpl -
-	bmi $b75e
-	jmp basromei
+	bmi domerge
+
+dom0	jmp basromei
 
 ; ----------------------------------------- bef DUP
 ; b7b8			new
@@ -559,7 +560,7 @@ mblock	lda ex		; multi BLOCK
 	asl
 	tax
 	bne mbl0
-	jsr $bca5
+	jsr a8plus8
 ; bba7
 mbl0	lda $a4
 	and #7
@@ -831,7 +832,7 @@ docolor	ldx #0
 
 ; ----------------------------------------- 
 ; bdaa
-	jmp dscbmout
+rtrcout	jmp dscbmout
 
 ; ----------------------------------------- bef MEM
 ; bdad			; new/enhanced
@@ -893,7 +894,7 @@ textchr	!tx "chr$(13)",0
 ; be13			original
 befdisplay
 	jsr incbasbz
-	ldx #0
+dpl2	ldx #0
 	stx $a7
 	lda #1		; first number: 1
 	sta $a6
@@ -1009,7 +1010,7 @@ pge1	ldy pageflag	; page active?
 
 	ldy pagewert	; yes
 	cpy $d6		; max crsr line?
-	bcs $bf3d
+	bcs pge3
 	ldy #0		; no
 	pha		; save .a
 -	lda ($d1),y	; store screen line
@@ -1231,7 +1232,7 @@ mkhex	pha		; get upper nibble
 	bcc +
 	clc
 	adc #7
-+	sta $0100,x
++	sta linenum,x
 	inx
 	rts
 
@@ -1273,16 +1274,16 @@ bin0	asl
 
 ; ----------------------------------------- 
 ; c7e1
-	sta linenum+8,x	; garbage, unused
+	sta linenum+8,x	; this part is garbage, unused
 	tay
 	lda helpvec
 	cmp #8
-	beq $c77c
+	beq $c77c		; don't care!
 	tya
-	beq $c77c
+	beq $c77c		; 13 bytes
 
-	!by 0,0,0,0,0,0,0	; 20 bytes
-
+	!by 0,0,0,0,0,0,0
+; (20)
 ; ----------------------------------------- part of OUT
 ; c7f2
 outx	jsr chrget	; anything following?
@@ -1293,13 +1294,13 @@ outx	jsr chrget	; anything following?
 	bcc +
 	ldx #$80		; yes, indicate as wrong
 +	txa
-	bmi $c83a		; and skip
+	bmi outx0		; and skip
 
 	cmp #$20		; no, 32 or more?
 	bcs +
 	asl		; no, sys errors
 	tax
-	lda $a326,x	; sys addresses or errors
+	lda $a326,x	; sys addresses of sys errors
 	sta $22
 	lda $a327,x
 	sta $23
@@ -1324,8 +1325,8 @@ outx	jsr chrget	; anything following?
 	bpl -
 	lda #$69
 	ldy #$a3
-	jsr $ab1e		; sys out " error"
-	jmp endsmb
+	jsr $ab1e		; sys out string " error"
+outx0	jmp endsmb
 
 ; ----------------------------------------- bef LIN
 ; c83d			new
@@ -1415,7 +1416,7 @@ ren4	ldy #0
 	ldx $2c
 	sta $a8
 	stx $a9
-	jmp $ce8d
+	jmp rbnc		; ce8d
 
 ; ----------------------------------------- func NRM
 ; c8e0
@@ -1514,10 +1515,10 @@ err27	ldx #$27		; error "end loop w/o loop"
 
 ; ----------------------------------------- 
 ; c998
-	ldy doflag	; DO active?
+stateofdo	ldy doflag	; DO active?
 	beq do4		; no, leave
 ; c99d
-	ldy doflag
+stofdo2	ldy doflag
 	beq do5
 	cpy #$d0
 	beq do3
@@ -1565,7 +1566,7 @@ allnrm	lda vecrenum	; vector of bef RENUMBER
 ; c9ea
 	lda progz+2	; chrget changed?
 	cmp #$4c
-	beq $ca2e		; yes
+	beq nrm3		; yes, go to tsb.ext
 
 	ldx #<nammem	; load "tsb.mem"
 	ldy #>nammem
@@ -1600,14 +1601,14 @@ befinst	ldx #<nameext	; load "tsb.ext"
 
 	jsr basromau
 	ldy #0
-	jsr extension
+	jsr extension	; cc00
 	jmp setbmode
 
 ; ----------------------------------------- 
 ; ca2e
-	jsr kerromein
+nrm3	jsr kerromein
 	cli
-	jmp $ce6c
+	jmp $ce6c		; continue in tsb.ext
 
 ; ----------------------------------------- 
 ; ca35
@@ -1643,7 +1644,7 @@ repchrget	lda progz+2	; chrget changed?
 
 ; ----------------------------------------- 
 ; ca73
-	jsr repchrget	; repair chrget
+g2nsafe	jsr repchrget	; repair chrget
 	jmp get2nyb
 
 ; ----------------------------------------- 
@@ -1659,7 +1660,7 @@ befsoff	jsr repchrget
 ; ca83
 byte2	cmp #2
 	bcc byte1		; max position? if not: continue
-	jmp $83db		; yes, out (incbasbz)
+	jmp incbasbz	; yes, out
 ; ca8a
 byte0	ldx #0		; formerly called from c8fd (nrm)
 	stx $a5		; now unsed

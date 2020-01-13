@@ -1050,7 +1050,7 @@ befdisk	jsr sgetstrn
 	lda $9d		; direct mode?
 	beq +
 	jsr dec7a
-	jmp $bfc5		; yes, to bef ERROR
+	jmp flpmsg	; bfc5 yes, to bef ERROR
 +	jmp endsmb	; no, end command
 
 ; ----------------------------------------- 
@@ -1322,13 +1322,13 @@ quotetab	!by $80,$83,$80,$80,$83,$80,$08
 
 ; ----------------------------------------- part of DO
 ; b56a
--	jsr dec7a		; it was DONE
-	jmp $c99d
+docont	jsr dec7a		; it was DONE
+	jmp stofdo2
 
 ; ----------------------------------------- bef DO
 ; b570			new
 befdo	jsr chrget	; end of line?
-	beq -		; yes
+	beq docont	; yes
 	ldy #0		; no, check for "NULL"
 	jmp isnull
 
@@ -1342,11 +1342,12 @@ trc1	sta $22
 ; ----------------------------------------- Easteregg
 ; b583
 --	jsr schkcom
-	jmp $bdaa
--	jmp $be16
+	jmp rtrcout	; bdaa
 
 ; ----------------------------------------- bef KEY
-; b58c			enhanced
+; b589			enhanced
+-	jmp dpl2 		; be16 (befdisplay)
+; b58c
 befkey	jsr sgetbytn	; get key number
 	cpx #0
 	beq -

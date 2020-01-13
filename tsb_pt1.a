@@ -315,7 +315,7 @@ trace6	dex
 endsmb	jsr kerromein
 	cli
 	jsr basromei
-	jmp $a7ae		; sys Interpreterschleife
+	jmp $a7ae		; sys Interpreter
 
 ; ----------------------------------------- 
 ; 8234
@@ -716,133 +716,133 @@ sgetstr	jsr sfrmevl	; get string from basic
 
 ; ----------------------------------------- Table of BEFs
 ; 86c4
-sprtab	!wo befhires-1	;   1 $91ff 
-	!wo befplot-1	;   2 $9266
-	!wo befline-1	;   3 $934f
-	!wo befblock-1	;   4 $bbcb
-	!wo movebef-1	;   5 $ac5c fchr
-	!wo movebef-1	;   6 $ac5c fcol
-	!wo movebef-1	;   7 $ac5c fill
-	!wo befrec-1	;   8 $baf7
-	!wo befrot-1	;   9 $a15d
-	!wo befdraw-1	;  10 $a056
-	!wo befchar-1	;  11 $a185
-	!wo befhicol-1	;  12 $a26f
-	!wo movebef-1	;  13 $ac5c inv
-	!wo swarm-1	;     $9e99 bad mode (fn frac)
-	!wo movebef-1	;  15 $ac5c move
-vecplace	!wo befplace-1	;  16 $ccd6 (changed from 86e2)
-	!wo movebef-1	;  17 $ac5c upb
-	!wo movebef-1	;  18 $ac5c upw
-	!wo movebef-1	;  19 $ac5c leftw
-	!wo movebef-1	;  20 $ac5c leftb
-	!wo movebef-1	;  21 $ac5c downb
-	!wo movebef-1	;  22 $ac5c downw
-	!wo movebef-1	;  23 $ac5c rightb
-	!wo movebef-1	;  24 $ac5c rightw
-	!wo befmulti-1	;  25 $94e9
-	!wo befcolour-1	;  26 $952d
-	!wo befmmob-1	;  27 $95c7
-	!wo befbflash-1	;  28 $9668
-	!wo befmobset-1	;  29 $96d9
-	!wo befmusic-1	;  30 $9758
-	!wo befflash-1	;  31 $978f
-	!wo befrepeat-1	;  32 $9af6
-	!wo befplay-1	;  33 $9917
-	!wo befdo-1	;  34 $b56f
-	!wo befcentre-1	;  35 $9946
-	!wo befenvelope-1	;  36 $9978
-	!wo befcgoto-1	;  37 $99e7
-	!wo befwave-1	;  38 $99f6
-	!wo beffetch-1	;  39 $b003
-	!wo befat-1	;  40 $b8b3 (also fn at)
-	!wo befuntil-1	;  41 $9b14
+sprtab	!wo befhires-1	;   1 $9200 
+	!wo befplot-1	;   2 $9267
+	!wo befline-1	;   3 $9350
+	!wo befblock-1	;   4 $bbcc
+	!wo movebef-1	;   5 $ac5d fchr
+	!wo movebef-1	;   6 $ac5d fcol
+	!wo movebef-1	;   7 $ac5d fill
+	!wo befrec-1	;   8 $baf8
+	!wo befrot-1	;   9 $a15e
+	!wo befdraw-1	;  10 $a057
+	!wo befchar-1	;  11 $a186
+	!wo befhicol-1	;  12 $a270
+	!wo movebef-1	;  13 $ac5d inv
+	!wo swarm-1	;     $9e9a bad mode (fn frac)
+	!wo movebef-1	;  15 $ac5d move
+vecplace	!wo befplace-1	;  16 $ccd7 (changed from 86e2)
+	!wo movebef-1	;  17 $ac5d upb
+	!wo movebef-1	;  18 $ac5d upw
+	!wo movebef-1	;  19 $ac5d leftw
+	!wo movebef-1	;  20 $ac5d leftb
+	!wo movebef-1	;  21 $ac5d downb
+	!wo movebef-1	;  22 $ac5d downw
+	!wo movebef-1	;  23 $ac5d rightb
+	!wo movebef-1	;  24 $ac5d rightw
+	!wo befmulti-1	;  25 $94ea
+	!wo befcolour-1	;  26 $952e
+	!wo befmmob-1	;  27 $95c8
+	!wo befbflash-1	;  28 $9669
+	!wo befmobset-1	;  29 $96da
+	!wo befmusic-1	;  30 $9759
+	!wo befflash-1	;  31 $9790
+	!wo befrepeat-1	;  32 $9af7
+	!wo befplay-1	;  33 $9918
+	!wo befdo-1	;  34 $b570
+	!wo befcentre-1	;  35 $9947
+	!wo befenvelope-1	;  36 $9979
+	!wo befcgoto-1	;  37 $99e8
+	!wo befwave-1	;  38 $99f7
+	!wo beffetch-1	;  39 $b004
+	!wo befat-1	;  40 $b8b4 (also fn at)
+	!wo befuntil-1	;  41 $9b15
 	!wo $a33b		;     (*)
 	!wo $a33b		;     (+)
-	!wo befuse-1	;  44 $820a
+	!wo befuse-1	;  44 $820b
 	!wo $b392		;     (-)
-	!wo befglobal-1	;  46 $a33b
+	!wo befglobal-1	;  46 $a33c
 	!wo $9c04		;     reset
-	!wo befreset-1	;  48 $9c04
-	!wo befproc-1	;  49 $9e30
-	!wo befcall-1	;  50 $9c29
-	!wo befexec-1	;  51 $9ceb
-	!wo befendproc-1	;  52 $9d18
-	!wo befexit-1	;  53 $9d36
-	!wo befendloop-1	;  54 $c97d
-	!wo befonkey-1	;  55 $9d6c
-	!wo befdisable-1	;  56 $9d9f
-	!wo befresume-1	;  57 $9df4
-	!wo befloop-1	;  58 $9e53
-	!wo befdelay-1	;  59 $c946
+	!wo befreset-1	;  48 $9c05
+	!wo befproc-1	;  49 $9e31
+	!wo befcall-1	;  50 $9c2a
+	!wo befexec-1	;  51 $9cec
+	!wo befendproc-1	;  52 $9d19
+	!wo befexit-1	;  53 $9d37
+	!wo befendloop-1	;  54 $c97e
+	!wo befonkey-1	;  55 $9d6d
+	!wo befdisable-1	;  56 $9da0
+	!wo befresume-1	;  57 $9df5
+	!wo befloop-1	;  58 $9e54
+	!wo befdelay-1	;  59 $c947
 	!wo $9e4a		;     (<)
 	!wo $9e4a		;     (=)
 	!wo $9e4a		;     (>)
 	!wo $9e4a		;     (?)
-	!wo befsecure-1	;  64 $c94f
-	!wo bef0-1	;  65 $9173 (disapa)
-	!wo befcircle-1	;  66 $9488
-	!wo befonerror-1	;  67 $9e6f
-	!wo befnoerr-1	;  68 $9e91 (no error)
-	!wo beflocal-1	;  69 $a2f3
-	!wo befrcomp-1	;  70 $9f1e
-	!wo befelse-1	;  71 $a2c0
-	!wo befretrace-1	;  72 $9b47
-	!wo beftrace-1	;  73 $9b59
-	!wo befdir-1	;  74 $9545
-	!wo befpage-1	;  75 $9835
-	!wo befdump-1	;  76 $9f39
-	!wo beffind-1	;  77 $a593
-	!wo befoption-1	;  78 $9b62
-	!wo befauto-1	;  79 $9bd5
-	!wo befold-1	;  80 $9ed9
-	!wo swarm-1	;     $9e99 bad mode (fn joy)
-	!wo befmod-1	;  82 $bfe2 (also fn mod)
-	!wo swarm-1	;     $9e99 bad mode (fn div)
-	!wo befdelete-1	;  84 $b8e9 d!
-	!wo befdup-1	;  85 $b7b7 (also fn dup)
-	!wo swarm-1	;     $9e99 bad mode (fn inkey)
-	!wo befinst-1	;  87 $ca19 (also fn inst)
-	!wo swarm-1	;     $9e99 bad mode (fn test)
-	!wo beflin-1	;  89 $c83c (also fn lin)
-	!wo swarm-1	;     $9e99 bad mode (fn exor)
-	!wo befinsert-1	;  91 $af41 (also fn insert)
-	!wo swarm-1	;     $9e99 bad mode (fn pot)
-	!wo swarm-1	;     $9e99 bad mode (fn penx)
+	!wo befsecure-1	;  64 $c950
+	!wo bef0-1	;  65 $9174 (disapa)
+	!wo befcircle-1	;  66 $9489
+	!wo befonerror-1	;  67 $9e70
+	!wo befnoerr-1	;  68 $9e92 (no error)
+	!wo beflocal-1	;  69 $a2f4
+	!wo befrcomp-1	;  70 $9f1f
+	!wo befelse-1	;  71 $a2c1
+	!wo befretrace-1	;  72 $9b48
+	!wo beftrace-1	;  73 $9b5a
+	!wo befdir-1	;  74 $9546
+	!wo befpage-1	;  75 $9836
+	!wo befdump-1	;  76 $9f3a
+	!wo beffind-1	;  77 $a594
+	!wo befoption-1	;  78 $9b63
+	!wo befauto-1	;  79 $9bd6
+	!wo befold-1	;  80 $9eda
+	!wo swarm-1	;     $9e9a bad mode (fn joy)
+	!wo befmod-1	;  82 $bfe3 (also fn mod)
+	!wo swarm-1	;     $9e9a bad mode (fn div)
+	!wo befdelete-1	;  84 $b8ea d!
+	!wo befdup-1	;  85 $b7b8 (also fn dup)
+	!wo swarm-1	;     $9e9a bad mode (fn inkey)
+	!wo befinst-1	;  87 $ca1a (also fn inst)
+	!wo swarm-1	;     $9e9a bad mode (fn test)
+	!wo beflin-1	;  89 $c83d (also fn lin)
+	!wo swarm-1	;     $9e9a bad mode (fn exor)
+	!wo befinsert-1	;  91 $af42 (also fn insert)
+	!wo swarm-1	;     $9e9a bad mode (fn pot)
+	!wo swarm-1	;     $9e9a bad mode (fn penx)
 vecbmode	!wo $9e99		;     (^)
-	!wo swarm-1	;     $9e99 bad mode (fn peny)
-	!wo swarm-1	;     $9e99 bad mode (fn sound)
-	!wo befgraphics-1	;  97 $8be9 (also fn graphics)
-	!wo befdesign-1	;  98 $a62d
-	!wo befrlocm-1	;  99 $a767
-	!wo befcmob-1	; 100 $a7a5
-	!wo befbckgnds-1	; 101 $a7b4
-	!wo befpause-1	; 102 $a7e1
-	!wo befnrm-1	; 103 $a830 (also fn nrm, 90df)
-	!wo befmoboff-1	; 104 $a855
-	!wo befoff-1	; 105 $a864
-	!wo befangl-1	; 106 $ab0f
-	!wo befarc-1	; 107 $a875
-	!wo befcold-1	; 108 $8146
-	!wo befscrsv-1	; 109 $b18e
-	!wo befscrld-1	; 110 $b1db
-	!wo beftext-1	; 111 $b228
-	!wo befcset-1	; 112 $b30c
-	!wo befvol-1	; 113 $b339
-	!wo befdisk-1	; 114 $b357
-	!wo befhrdcpy-1	; 115 $b4b7
-	!wo befkey-1	; 116 $b58b
-	!wo befpaint-1	; 117 $b5e7
-	!wo beflowcol-1	; 118 $93db
-	!wo befcopy-1	; 119 $b9f0
-	!wo befmerge-1	; 120 $8343
-vecrenum	!wo befrenum-1	; 121 $837e (changed from 87b4)
-	!wo befmem-1	; 122 $bdac
-	!wo befdetect-1	; 123 $bdf6
+	!wo swarm-1	;     $9e9a bad mode (fn peny)
+	!wo swarm-1	;     $9e9a bad mode (fn sound)
+	!wo befgraphics-1	;  97 $8bea (also fn graphics)
+	!wo befdesign-1	;  98 $a62e
+	!wo befrlocm-1	;  99 $a768
+	!wo befcmob-1	; 100 $a7a6
+	!wo befbckgnds-1	; 101 $a7b5
+	!wo befpause-1	; 102 $a7e2
+	!wo befnrm-1	; 103 $a831 (also fn nrm, 90df)
+	!wo befmoboff-1	; 104 $a856
+	!wo befoff-1	; 105 $a865
+	!wo befangl-1	; 106 $ab10
+	!wo befarc-1	; 107 $a876
+	!wo befcold-1	; 108 $8147
+	!wo befscrsv-1	; 109 $b18f
+	!wo befscrld-1	; 110 $b1dc
+	!wo beftext-1	; 111 $b229
+	!wo befcset-1	; 112 $b30d
+	!wo befvol-1	; 113 $b33a
+	!wo befdisk-1	; 114 $b358
+	!wo befhrdcpy-1	; 115 $b4b8
+	!wo befkey-1	; 116 $b58c
+	!wo befpaint-1	; 117 $b5e8
+	!wo beflowcol-1	; 118 $93dc
+	!wo befcopy-1	; 119 $b9f1
+	!wo befmerge-1	; 120 $8344
+vecrenum	!wo befrenum-1	; 121 $837f (changed from 87b4)
+	!wo befmem-1	; 122 $bdad
+	!wo befdetect-1	; 123 $bdf7
 	!wo $bdf6		; 124 fn check
-	!wo befdisplay-1	; 125 $be12
-	!wo beferror-1	; 126 $bfba (also fn err)
-	!wo befout-1	; 127 $9ed0
+	!wo befdisplay-1	; 125 $be13
+	!wo beferror-1	; 126 $bfbb (also fn err)
+	!wo befout-1	; 127 $9ed1
 
 ; ----------------------------------------- 
 
