@@ -16,6 +16,6 @@ leave TSB compatible to any extra software possibly written for Simons' BASIC in
 completely new TSB that only uses the known commands and their parameters but internally works on its
 own which hopefully will provide faster performance.
 
-Download TSB (on a zipped D64 file) from here: [TSB on a disk] (https://www.godot64.de/download/tsbdemo.zip)
+Download TSB (on a zipped D64 file) from here: [TSB on a disk, about 100 KB] (https://www.godot64.de/download/tsbdemo.zip)
 
 Arndt Dettke
