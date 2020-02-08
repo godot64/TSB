@@ -82,8 +82,8 @@ mve1	and #4
 	jsr mveb
 	beq mve4
 
-; ----------------------------------------- 
-; acd9
+; ----------------------------------------- bef INV
+; acd9			enhanced
 mve7	jsr befinv
 	beq mve4
 
@@ -136,30 +136,30 @@ mdistrb	and #$0f		; reduce token nums
 	beq befleftb
 
 ; ----------------------------------------- bef LEFTW
-; ad34
+; ad34			enhanced
 befleftw	lda #1
 	sta helpvec
 	bne mdb0
 ; ----------------------------------------- bef UPW
-; ad3a
+; ad3a			enhanced
 befupw	lda #1
 	sta helpvec
 	bne befupb
 ; ----------------------------------------- bef LEFTB
-; ad40
+; ad40			enhanced
 befleftb	lda #1
 	bne mdb0
 ; ----------------------------------------- bef DOWNB
-; ad44
+; ad44			enhanced
 befdownb	lda #2
 	bne mdb1
 ; ----------------------------------------- bef DOWNW
-; ad48
+; ad48			enhanced
 befdownw	lda #3
 mdb1	sta helpvec
 
 ; ----------------------------------------- bef UPB
-; ad4c
+; ad4c			enhanced
 befupb	lda #40
 
 ; ----------------------------------------- 

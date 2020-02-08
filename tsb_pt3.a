@@ -1194,7 +1194,7 @@ cgoto0	jsr sfrmnum
 	jmp endsmb
 
 ; ----------------------------------------- bef WAVE
-; 99f7
+; 99f7			original
 befwave	jsr sgetbytn
 	jsr x123
 	dex
@@ -1411,7 +1411,7 @@ sadr2int	jsr pspeibe
 	jmp prestor
 
 ; ----------------------------------------- bef TRACE
-; 9b5a
+; 9b5a			recoded
 beftrace	jsr sgetbytn
 	stx traceflag
 	jmp endsmb
@@ -1864,7 +1864,7 @@ res2	iny
 	!by 0
 
 ; ----------------------------------------- bef LOOP
-; 9e54			original
+; 9e54			enhanced
 befloop	ldy sploop
 	cpy #20
 	bcc +
@@ -1880,7 +1880,7 @@ befloop	ldy sploop
 res3	jmp bef0
 
 ; ----------------------------------------- bef ON ERROR
-; 9e70				enhanced
+; 9e70			enhanced
 befonerror
 	jsr incbasbz
 	lda progz
@@ -1904,10 +1904,11 @@ befnoerr	lda #0
 	sta onerrorflag
 	jmp bef0
 
-; ----------------------------------------- 
+; ----------------------------------------- Warmstart
 ; 9e9a			recoded
 swarm	ldx #$20		; bad mode
 	stx errn
+
 	jsr basromei
 	lda onerrorflag	; on error active?
 	cmp #10
@@ -1937,7 +1938,7 @@ delend	jsr basromei
 	!by 0
 
 ; ----------------------------------------- bef OUT
-; 9ed1			original
+; 9ed1			recoded
 befout	jsr basromei
 	ldx errn
 	jmp outx
