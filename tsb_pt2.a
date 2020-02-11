@@ -63,7 +63,7 @@ fnjoy	ldy #$00		; set $dc00
 
 tabjoy	!by $6e,$66,$67,$65,$6d,$69,$6b,$6a
 
-; ----------------------------------------- 
+; ----------------------------------------- func POT
 ; 891a			original
 fnpot	jsr chrget
 	jsr $aefa		; sys "("?
@@ -78,11 +78,17 @@ fnpot	jsr chrget
 	ldx #0
 	jmp sxyflp	; convert to float
 
+; ----------------------------------------- func PENX
+; 893a			original
+
 fnpenx	jsr penabfr
 	ldy lpx		; lightpen x
 	jmp +
 
-fnpeny	ldy lpy		; lightpen y
+; ----------------------------------------- func PENY
+; 8943			original
+
+fnpeny	ldy lpy		; lightpen y (do first: PENX!)
 +	ldx #0
 	jsr incbasbz
 	jmp sxyflp
@@ -857,70 +863,74 @@ csgetari3	cmp #$5b		; INSERT?
 	jmp csgetari4
 
 ; ----------------------------------------- func INSERT
-; 8eb3			enhanced
+; 8eb3			recoded
 fninsert	jsr chrget
 	jsr $aefa		; sys "("?
 	jsr sgetstr1
-	sta $a8
+	sta $a8		; 1st string
 	stx $a7
 	lda $69
 	sta strlen1
 	jsr $aefd		; sys chkcom
 	jsr sgetstr1
-	sta $aa
+	sta $aa		; 2nd string
 	stx $a9
 	lda $69
 	sta strlen2
-	jsr getbytc
+	jsr getbytc	; position of insert
 	stx pos
 	jsr $aef7		; sys ")"?
 	clc
-	lda strlen2
+	lda strlen2	; len of result string
 	adc strlen1
 	bcc +
+
+err22	ldx #$22		; error "insert too large"
+	!by $2c
 err23	ldx #$23		; error "string too large"
 	jmp ($0300)
--	ldx #$22		; error "insert too large"
-	jmp ($0300)
 
-+	jsr neustr
-	ldy #0
---	cpy pos
++	jsr neustr	; neuen String einrichten
+	ldy #0		; Zähler auf Null
+	sty $bf		; auch für den zweiten Durchgang
 	beq +
-	lda ($a9),y
+-	cpy pos		; Position erreicht?
+	bcs ++
+	lda ($a9),y	; nein, übertragen
 	sta ($62),y
 	iny
-	cpy strlen2
-	beq -
-	bne --
++	cpy strlen2	; Länge erreicht?
+	bne -		; nein, loop (ja: weiter)
 
-+	sty pos1
-	sty dwert
-	ldy #0
-	sty $bf
--	ldy $bf
-	cpy strlen1
+++	sty helpvec	; Position merken
+	sty dwert		; auch für dritten Durchgang
+-	ldy $bf 		; startet mit Null
+	cpy strlen1	; Einfügelänge erreicht?
 	beq +
-	lda ($a7),y
+	lda ($a7),y	; nein, holen
 	inc $bf
-	ldy pos1
+	ldy helpvec	; einfügen
 	sta ($62),y
-	inc pos1
-	bne -
-	nop
+	inc helpvec
+	bne -		; loop
 
-+	ldy dwert
--	lda ($a9),y
++	ldy dwert		; kein Rest?
+	bne +		; nein, neuen String erzeugen
+
+-	lda ($a9),y	; sonst: Rest übertragen
 	inc dwert
-	ldy pos1
+	ldy helpvec
 	sta ($62),y
-	inc pos1
+	inc helpvec
 	ldy dwert
-	cpy strlen2
-	bne -
-	lda #$ff
++	cpy strlen2
+	bcc -
+
+	lda #$ff		; create result string
 	sta $0d
 	jmp pushstr
+
+	!fill 8
 
 ; ----------------------------------------- 
 ; 8f45
@@ -1076,6 +1086,7 @@ fninst	jsr chrget
 
 +	lda strlen2
 ++	jsr neustr
+
 	ldy #0
 -	cpy strlen2
 	beq +
@@ -1083,6 +1094,7 @@ fninst	jsr chrget
 	sta ($62),y
 	iny
 	bne -
+
 +	ldy #$00
 	sty $bf
 -	ldy $bf
@@ -1094,6 +1106,7 @@ fninst	jsr chrget
 	sta ($62),y
 	inc pos
 	bne -
+
 +	lda #$ff
 	sta $0d
 	jmp pushstr
@@ -1103,6 +1116,8 @@ fninst	jsr chrget
 csgetari9	cmp #$56		; INKEY?
 	bne csgetaria
 
+; ----------------------------------------- func INKEY
+; 90a8			original
 	jsr incbasbz
 	ldy inkey
 	jmp sxyflp3
@@ -1166,7 +1181,7 @@ csgetarig	cmp #$28		; AT?
 csgetarih	cmp #$7c		; CHECK?
 	bne fnerr
 
-; ----------------------------------------- 
+; ----------------------------------------- func CHECK
 ; 90f1			original
 fncheck	jsr incbasbz
 	jsr $aefa		; sys "("?
