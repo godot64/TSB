@@ -6,6 +6,8 @@
 ;
 ; part 5
 ;
+; patched on 07.03.2020 (command INSERT)
+; 
 ; ----------------------------------------- 
 
 	!ct pet
@@ -480,8 +482,13 @@ befinsert	jsr sgetstrn	; get box definition
 	tay
 	dey		; .y= len
 	sty helpvec
+	lda $c7		; save RVS flag
+	sta helpvec+1
 -	lda ($20),y	; read box string
-	cmp #$60		; convert chars to bcode
+	cmp #$e0		; RVS intended?
+	bcc +		; no
+	inc $c7		; yes, set flag for RVS
++	cmp #$60		; convert chars to bcode
 	bcc +
 	and #$7f
 	ora #$40
@@ -491,7 +498,8 @@ befinsert	jsr sgetstrn	; get box definition
 	bmi +
 	ora #$80		; yes
 +	sta $02c0,x	; store converted box chars
-	inc $c7
+	lda helpvec+1	; restore RVS flag
+	sta $c7
 	inx
 	dey
 	bpl -
@@ -500,7 +508,12 @@ befinsert	jsr sgetstrn	; get box definition
 	jmp mve3		; out box
 
 ; ----------------------------------------- 
-; af85
+; af91
+err14	ldx #$0e		; error "illegal quantity"
+	jmp ($0300)
+
+; ----------------------------------------- 
+; af96
 mkbox	jsr mkrow
 	jsr mkline	; top row
 	jsr l20pl40
@@ -513,7 +526,7 @@ mkbox	jsr mkrow
 +	jsr fillbox	; middle rows
 ++	jsr mkrow
 	jmp mkline	; bottom row
-; afa5
+; afb6
 mkrow	ldy helpvec	; one row
 	lda $02c0,y
 	tax
@@ -535,13 +548,11 @@ mkrow	ldy helpvec	; one row
 	jsr fillmt
 	stx movetab
 	rts
-; afcd
-err14	ldx #$0e		; error "illegal quantity"
-	jmp ($0300)
 
 ; ----------------------------------------- 
+; afde
 
-	!fill 50,$ad
+	!fill 38,$ad
 
 ; ----------------------------------------- bef FETCH
 ; b004			recoded
