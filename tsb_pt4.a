@@ -425,9 +425,19 @@ befelse	lda doflag
 	sta doflag
 +	jmp befproc
 
-; ----------------------------------------- 
+; ----------------------------------------- Part of DIR
 ; a2ce
-	!fill 38,$ad
+fromdir	jsr chrgot	; anything following?
+	bne +
+	ldx #1		; length of filename ("$"): 1
+	stx $69
+	ldx #<dollars	; address of name ($9558)
+	inx
+	lda #>dollars
+	rts		; return to DIR
++	jmp sgetstr	; return to regular DIR (18b)
+
+	!fill 20,$ad
 
 ; ----------------------------------------- bef LOCAL
 ; a2f4			original

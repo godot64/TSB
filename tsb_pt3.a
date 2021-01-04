@@ -560,12 +560,12 @@ slp1	jsr nrm		; process NRM
 ; 9546			enhanced
 befdir	jsr incbasbz
 	jsr sclose	; first: close file
-	jsr sgetstr
-	stx $ae
+	jsr fromdir	; check if anything follows ($a2ce)
+retfd	stx $ae
 	sta $af
 	ldy #0
 	lda ($ae),y
-	cmp #$24		; "$"?
+dollars	cmp #$24		; "$"?
 	beq dir0
 	jmp swarm		; error "Bad Mode"?
 
