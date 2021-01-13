@@ -5,7 +5,9 @@
 ; by Arndt Dettke, 1986
 ;
 ; part 6
-; patch #2, adding a new feature to COLOUR
+;
+; patched, adding a new feature to COLOUR
+; patched on 13.01.2021 (commands DELAY & SECURE)
 ;
 ; ----------------------------------------- 
 
@@ -1467,15 +1469,15 @@ nrm0	lda $69
 	jmp schkklz	; ")"?
 
 ; ----------------------------------------- bef DELAY
-; c947			original
-befdelay 	jsr sgetbytn
+; c947			enhanced
+befdelay 	jsr chkonoff
 	stx delay
 	jmp endsmb
 
 ; ----------------------------------------- bef SECURE
-; c950			original
-befsecure	jsr sgetbytn
-	lda #$41		; search for DISAPA
+; c950			enhanced
+befsecure	jsr chkonoff
+	lda #$41		; search code for DISAPA
 	sta $22
 	clc
 	lda $2b
@@ -1654,18 +1656,14 @@ befsoff	jsr repchrget
 
 ; ----------------------------------------- 
 ; ca7f
-	!by $f8,$38,$4e,$52
-
-; ----------------------------------------- 
-; ca83
 byte2	cmp #2
 	bcc byte1		; max position? if not: continue
 	jmp incbasbz	; yes, out
-; ca8a
+; ca86
 byte0	ldx #0		; formerly called from c8fd (nrm)
 	stx $a5		; now unsed
 	jmp chrgot
-; ca91
+; ca8d
 fromnrm	ldx #1		; c8fd: jsr fromnrm
 	ldy $69		; len of digit string?
 	cpy #4		; less than 4?
@@ -1673,7 +1671,7 @@ fromnrm	ldx #1		; c8fd: jsr fromnrm
 	dex
 +	stx $a5		; set byte counter accordingly
 	jsr dec7a
-; ca9f
+; ca9b
 byte1	jsr chrget	; next char: decimal digit?
 	bcc ++		; yes, leave byte1 (so CLC)
 	pha		; no, is token? (so SEC)
@@ -1683,7 +1681,11 @@ byte1	jsr chrget	; next char: decimal digit?
 +	sec
 ++	rts
 
-	!fill 83
+; ----------------------------------------- Part of bef LOCAL
+; caa9 (former address ca7f)
+;	!by $f8,$38,$4e,$52 (former content)
+
+localtab	!fill 87
 
 ; ----------------------------------------- 
 ; cb00
