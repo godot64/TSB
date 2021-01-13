@@ -6,6 +6,9 @@
 ;
 ; part 3
 ;
+; patched on 13.01.2021
+;   (commands BFLASH, FLASH, DIR, OPTION, PAGE, PLAY & TRACE)
+;
 ; ----------------------------------------- 
 
 	!ct pet
@@ -558,10 +561,10 @@ slp1	jsr nrm		; process NRM
 
 ; ----------------------------------------- bef DIR
 ; 9546			enhanced
-befdir	jsr incbasbz
-	jsr sclose	; first: close file
+befdir	jsr sclose	; first: close file
+	jsr chrget	; get next byte
 	jsr fromdir	; check if anything follows ($a2ce)
-retfd	stx $ae
+	stx $ae
 	sta $af
 	ldy #0
 	lda ($ae),y
@@ -716,24 +719,28 @@ mmb8	ldy mobnr
 	jmp mmb9
 
 ; ----------------------------------------- bef BFLASH
-; 9669			original
-befbflash	lda #10
-	sta bflashjn
-	jsr sgetbytn
-	cpx #0
-	bne +
-	lda #0
-	sta bflashjn
-	jmp endsmb
+; 9669			enhanced
+befbflash	lda #0
+	sta bflzae	; reset speed compare
+	jsr chkonoff	; get first parameter
+	txa		; OFF?
+	beq ++		; yes, switch flag off
+	jsr chrgot	; ON?
+	beq +		; yes, switch flag on
 
-+	stx bflashsp
+	stx bflashsp	; set speed
 	jsr sgetbytc
-	stx bflashf1
+	stx bflashf1	; set color 1
 	jsr sgetbytc
-	stx bflashf2
-	lda #0
-	sta bflzae
+	stx bflashf2	; set color 2
+
++	ldx #10		; switch flag on
+++	stx bflashjn
 mmb4	jmp endsmb
+
+; ----------------------------------------- 
+
+	!by 0,0,0,0
 
 ; ----------------------------------------- 
 ; 9694			enhanced
@@ -841,7 +848,7 @@ befmusic	jsr sgetbytn
 	sty musicz1
 	lda $69
 	sta musiclen
-	jmp endsmb
+bms0	jmp endsmb
 
 ; ----------------------------------------- 
 ; 9778
@@ -852,23 +859,27 @@ mbittabl	!by $fe,$fd,$fb,$f7,$ef,$df,$bf,$7f
 bitwtab	!by $80,$40,$20,$10,$08,$04,$02,$01
 
 ; ----------------------------------------- bef FLASH
-; 9790			original
-befflash	lda #10
-	sta flashfl
-	jsr sgetbytn
-	cpx #16
-	bcs +
-	lda #10
-	sta flashfls,x
-	ldy #0
-	lda (progz),y
-	cmp #$2c
-	bne +
-	jsr sgetbytn
+; 9790			recoded
+befflash	jsr flashinit	; color (or ON/OFF) in .x
+	jsr chrgot	; end of statement?
+	bne +		; no, cont
+	txa
+	bne +		; OFF?
+	jmp befoff	; yes, clear 
+
++	tay		
+	cpx #16		; Farbe über 15?
+	bcs +		; ja, übergehen
+	jsr flashactv	; Farbe u. Default-Speed setzen
+
++	cpy #$2c		; folgt Speed?
+	bne ++
+	jsr sgetbytn	; ja, holen
 	stx flashsp
-	lda #0
-	sta flashzae
-+	jmp endsmb
+
+++	lda #10		; FLASH aktivieren
+	sta flashfl
+	bne bms0
 
 ; ----------------------------------------- func AT
 ; 97b7			original
@@ -942,17 +953,19 @@ sirq2	lda $ff
 	jmp sirq3
 
 ; ----------------------------------------- bef PAGE
-; 9836			original
-befpage	jsr sgetbytn
-	cpx #0
-	bne +
-	lda #1
-	sta pageflag
-	jmp endsmb
+; 9836			enhanced
+befpage	jsr chkonoff
+	txa		; OFF?
+	beq +++		; yes, set flag
+	cpx #10		; no, ON?
+	bne +		; no, set flag and new value
 
-+	lda #10
-	sta pageflag
-	stx pagewert
+	lda pagewert	; was ON, get last value
+	bne ++
++	stx pagewert	; was 0: set as new one
+
+++	ldx #10		; set flag
++++	stx pageflag
 	jmp endsmb
 
 ; ----------------------------------------- 
@@ -1062,27 +1075,38 @@ sirq5	lda playflag
 	jmp $ea31		; sys IRQ
 
 ; ----------------------------------------- bef PLAY
-; 9918			original
-befplay	jsr sgetbytn
-	cpx #2
-	bne +
-	lda #0
-	sta musicz4
-	lda #10
-	sta playflag
-	jmp endsmb
+; 9918			recoded
+befplay	jsr chkonoff
+	txa		; OFF? (or PLAY 0?)
+	beq +		; yes, end music
 
-+	cpx #1
-	bne +
-	lda #0
-	sta musicz4
-	lda #10
+	lda #10		; set ON
 	sta playflag
--	lda playflag
-	cmp #10
+	lda #0		; init music counter
+	sta musicz4
+	cpx #2		; PLAY 2?
+	beq ++		; yes
+	cpx #10		; PLAY ON?
+	beq ++		; yes
+
+			; no, PLAY 1 (PRG waits)
+-	lda playflag	; gets cleared in IRQ
+	cmp #10		; wait until cleared
 	beq -
-+	jsr playend
---	jmp endsmb
+
++	jsr playend	; PLAY 0: clear
+++
+--	jmp endsmb	; PLAY 2 or PLAY ON (PRG continues)
+
+; ----------------------------------------- Part of FLASH
+
+flashactv	lda #10
+	sta flashsp	; Default-Speed: 10
+	sta flashfls,x	; Farbe aktivieren
+	rts
+
+; ----------------------------------------- 
+	!by 0
 
 ; ----------------------------------------- bef CENTRE
 ; 9947			enhanced
@@ -1411,14 +1435,14 @@ sadr2int	jsr pspeibe
 	jmp prestor
 
 ; ----------------------------------------- bef TRACE
-; 9b5a			recoded
-beftrace	jsr sgetbytn
+; 9b5a			enhanced
+beftrace	jsr chkonoff
 	stx traceflag
 	jmp endsmb
 
 ; ----------------------------------------- bef OPTION
-; 9b63			original
-befoption	jsr sgetbytn
+; 9b63			enhanced
+befoption	jsr chkonoff
 	stx optflag
 	jmp endsmb
 
@@ -1499,13 +1523,13 @@ ren1	lda $2b
 befauto	jsr incbasbz
 	jsr sfrmnum
 	jsr sfacadr
-	sta autozi+1
+	sta autozi+1	; Startwert
 	sty autozi
 	jsr sgetbytc
-	stx autoinc
+	stx autoinc	; Stepwert
 	lda #10
 	sta autoflag
-	sec
+	sec		; ersten Wert initialisieren
 	lda autozi
 	sbc autoinc
 	sta autozi
