@@ -7,6 +7,7 @@
 ; part 5
 ;
 ; patched on 07.03.2020 (command INSERT)
+; patched on 13.01.2021 (commands KEY & VOL)
 ; 
 ; ----------------------------------------- 
 
@@ -1018,8 +1019,8 @@ befcset	jsr sgetbytn
 +	jmp endsmb
 
 ; ----------------------------------------- bef VOL
-; b33a			original
-befvol	jsr sgetbytn
+; b33a			enhanced
+befvol	jsr chkonoff
 	stx $d418
 	jmp endsmb
 
@@ -1350,25 +1351,20 @@ trc1	sta $22
 	sty $69
 	jmp rtc1
 
-; ----------------------------------------- Easteregg
-; b583
---	jsr schkcom
-	jmp rtrcout	; bdaa
-
 ; ----------------------------------------- bef KEY
-; b589			enhanced
--	jmp dpl2 		; be16 (befdisplay)
-; b58c
-befkey	jsr sgetbytn	; get key number
-	cpx #0
-	beq -
-	cpx #128		; 128? (=easteregg)
-	beq --		; yes
-
-	cpx #$11		; more than 16?
+; b583			enhanced
+befkey	jsr chkonoff
+	jsr chrgot	; get last byte
+	bne +
+	txa
+	eor #10
+	sta keyflag	; set accordingly
+--	jmp endsmb	; (21)
+; b597
++	cpx #$11		; more than 16?
 	bcc +
-	jmp swarm		; yes, error bad mode
-
+	jmp swarm		; yes, bad mode error
+; b59e
 +	dex
 	stx $aa		; times 16
 	lda #0
@@ -1405,12 +1401,17 @@ befkey	jsr sgetbytn	; get key number
 	bcc -
 +	lda #0
 	sta ($aa),y
-	jmp endsmb
+	beq --
+
+; ----------------------------------------- Part of FLASH
+
+flashinit	lda #0
+	sta flashzae
+	jmp chkonoff	; Parameter holen
 
 ; ----------------------------------------- bef PAINT
-; b5e8			recoded
-befpaint	jsr incbasbz
-	jsr sgetadr
+; b5ec			recoded
+befpaint	jsr sgetadrn
 	sta ax+1
 	sta $0a
 	sty ax
@@ -1419,12 +1420,12 @@ befpaint	jsr incbasbz
 	stx ay
 	stx $a4
 	jsr getpktf
-	txa
-	sta $66
+	stx $66
+
 	lda #11		; test
 	sta $f7
 	jsr punkt
-	lda $90
+	lda $90		; result (1=set,0=unset)
 	sta $6a
 	cmp $66
 	beq +
