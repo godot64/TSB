@@ -6,6 +6,8 @@
 ;
 ; part 4
 ;
+; patched on 13.01.2021 (commands GLOBAL & LOCAL)
+;
 ; ----------------------------------------- 
 
 	!ct pet
@@ -279,8 +281,6 @@ befrot	jsr sgetbytn
 	cpx #8
 	bcc +
 	jmp swarm		; error bad mode
-	nop
-	nop
 +	txa
 	asl
 	asl
@@ -298,9 +298,8 @@ befrot	jsr sgetbytn
 	jmp endsmb
 
 ; ----------------------------------------- bef CHAR
-; a186			original
-befchar	jsr incbasbz
-	jsr sgetadr
+; a184			original
+befchar	jsr sgetadrn
 	sty $09
 	sta $0a
 	jsr sgetbytc
@@ -311,12 +310,17 @@ befchar	jsr incbasbz
 	sta $ad
 	jsr getpktf
 	jsr sgetbytc
-	cpx #0
+	txa
 	bne +
 	ldx #1
 +	stx chgr
 	jsr charzei
 	jmp endsmb
+
+; ----------------------------------------- 
+; a1ae
+sgetadrn	jsr incbasbz
+	jmp sgetadr
 
 ; ----------------------------------------- 
 ; a1b4
@@ -427,59 +431,74 @@ befelse	lda doflag
 
 ; ----------------------------------------- Part of DIR
 ; a2ce
-fromdir	jsr chrgot	; anything following?
-	bne +
-	ldx #1		; length of filename ("$"): 1
+fromdir	bne +		; anything following?
+	ldx #1		; no, set length of filename ("$"): 1
 	stx $69
-	ldx #<dollars	; address of name ($9558)
-	inx
-	lda #>dollars
+	ldx #<dollars+1	; address of name ($9558)
+	lda #>dollars+1
 	rts		; return to DIR
-+	jmp sgetstr	; return to regular DIR (18b)
++	jmp sgetstr	; return to regular DIR
 
-	!fill 20,$ad
+; ----------------------------------------- Check if ON or OFF follow
+; a2dc			enhanced
+chkonoff 	ldx #10		; if yes: .x=10
+-	jsr chrget	; read next byte
+	cmp #$91		; ON?
+	beq setonoff
+	cmp #$64		; TSB token?
+	beq -
+	cmp #$69		; OFF?
+	beq setoff
+	jmp sgetbyt1	; no, get parameter (to .x)
+setoff	ldx #0
+setonoff	jmp incbasbz	; (25)
 
 ; ----------------------------------------- bef LOCAL
-; a2f4			original
-beflocal	ldx #0
-	jsr incbasbz
+; a2f6			recoded
+beflocal	jsr setoff	; set .x to 0
 --	txa
 	pha
-	jsr sgetvar
+	jsr sgetvar	; search variable
 	pla
 	tax
-	lda $5f
-	sta localtab,x
+	lda $5f		; get address
+	sta localtab,x	; and store in LOCALTAB
 	inx
 	lda $60
 	sta localtab,x
-	inx
-	ldy #0
+
+	inx		; transfer name of variable to LOCALTAB
+	ldy #0		; so, each entry has 4 bytes
 -	lda ($5f),y
 	sta localtab,x
 	inx
 	iny
 	cpy #2
 	bne -
-	ldy #0
+
+	ldy #0		; hide variable in system table
 	lda #$ff
 	sta ($5f),y
-	lda (progz),y
-	beq +
--	jsr incbasbz
-	lda (progz),y
+
+	jsr chrgot	; anything following?
+	beq lcf0		; no, finish LOCALTAB
+
+	cpx #22		; buffer filled?
+	bcs lcf0		; yes, finish LOCALTAB
+
++	jsr chrget	; proceed after LOCAL
+	beq lcf0
 	cmp #$2c		; comma?
-	bne --
-	cmp #$20		; space?
-	beq -
-+	lda #0
+	beq --		; yes, next variable
+
+lcf0	lda #0		; no, set terminator ($0000)
 	sta localtab,x
 	inx
 	sta localtab,x
 	jmp endsmb
 
 ; ----------------------------------------- bef GLOBAL
-; a33c			original
+; a33d			original
 befglobal	ldx #0
 --	lda localtab,x
 	sta $5f
