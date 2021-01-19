@@ -350,9 +350,9 @@ onearray	sta $45		; store first char
 
 ; ----------------------------------------- 
 
-err2c	ldx #$2c		; error "array nor found"
+err2c	ldx #$2d		; error "array nor found"
 	jmp ($0300)
-tsbfc	!tx "array not founD"
+tsbfd	!tx "array not founD"
 
 ; ----------------------------------------- part of RENUMBER
 ; ce70
