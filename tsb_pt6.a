@@ -237,12 +237,12 @@ del3	ldy #0
 
 ; ----------------------------------------- 
 ; b932
-del1	lda $2b
+del1	lda $2b		; from basic start
 	ldx $2c
 	sta $58
 	stx $59
 	sec
-	lda $2d
+	lda $2d		; up to var start
 	sbc #2
 	sta $5a
 	lda $2e
@@ -1292,7 +1292,7 @@ outx	jsr chrget	; anything following?
 	beq +		; no
 
 	jsr sgetbyt1	; yes, number of error
-	cpx #$2d		; wrong number?
+	cpx #$2e		; wrong number?
 	bcc +
 	ldx #$80		; yes, indicate as wrong
 +	txa
@@ -1520,8 +1520,8 @@ err27	ldx #$27		; error "end loop w/o loop"
 stateofdo	ldy doflag	; DO active?
 	beq do4		; no, leave
 ; c99d
-stofdo2	ldy doflag
-	beq do5
+stofdo2	ldy doflag	; DO active?
+	beq do5		; no
 	cpy #$d0
 	beq do3
 	cpy #$47		; ELSE?
