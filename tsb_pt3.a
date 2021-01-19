@@ -60,21 +60,22 @@ ipr1	cmp #$64		; sb token?
 	lda (progz),y	; reget char:
 	bmi ipr4		; standard token?
 
-	cmp #$3a		; ":"?
-	beq ipr0
-	jsr $a906		; sys find next ":" (in .y)
+	cmp #$3a		; no, ":"? (end of command)
+	beq ipr0		; yes
+
+	jsr $a906		; sys find next ":" (offset in .y)
 	sty $22
-	ldx #$b2		; sys find "=" (in .y)
+	ldx #$b2		; sys find "=" (offset in .y)
 	jsr $a90b
 	cpy $22		; beyond ":"?
-	bcs ipr2
+	bcs ipr2		; yes, so this is EXEC w/o EXEC
 
 ipr4	jsr chrgot	; no, reget last char
 	jmp $a7e7		; and process
 
 ipr0	jmp $a7ae		; sys interpreter
 
-ipr2	sty autoflag
+ipr2	sty autoflag	; abuse autoflag for EXEC w/o EXEC
 	jmp befexec	; 9cec
 
 ipr3	sty sprepeat	; clear stacks
@@ -481,10 +482,6 @@ ren3	jsr enternum	; cf5d
 +	jmp towarm
 
 ; ----------------------------------------- 
-
-	!by 0
-
-; ----------------------------------------- 
 ; 94ce
 l20pl40	clc
 	lda $20
@@ -555,12 +552,8 @@ slp1	jsr nrm		; process NRM
 	stx $d018
 	rts
 
-; ----------------------------------------- 
-
-	!by 0
-
 ; ----------------------------------------- bef DIR
-; 9546			enhanced
+; 9545			enhanced
 befdir	jsr sclose	; first: close file
 	jsr chrget	; get next byte
 	jsr fromdir	; check if anything follows ($a2ce)
@@ -613,32 +606,26 @@ dir6	dec helpvec
 	lda #$3a		; out ":" after 2nd quote
 	bne dir4
 
-dir5	jmp dirend	; then close
+dir5	jsr sclose
+	cli
+	jmp endsmb
 
 ; ----------------------------------------- 
-
-	!by 0
-
-; ----------------------------------------- 
-; 95b3
+; 95b1
 getkey	jsr $ffe4		; get char
 	beq +
-; 95b8
+; 95b6
 -	jsr $ffe4		; warten
 	beq -
 +	rts
 
 ; ----------------------------------------- 
-; 95be
+; 95bc
 dec7a	lda $7a
 	bne +
 	dec $7b
 +	dec $7a
 	rts
-
-; ----------------------------------------- 
-
-	!by 0
 
 ; ----------------------------------------- bef MMOB
 ; 95c8			original
@@ -1383,7 +1370,7 @@ inca8a9	inc $a8
 befrepeat	ldy sprepeat
 	cpy #20
 	bcc +
-err29	ldx #$29		; error "stack too large"
+err29	ldx #$2a		; error "stack too large"
 	jmp ($0300)
 
 +	lda $7a
@@ -1401,7 +1388,7 @@ befuntil	jsr incbasbz
 	lda sprepeat
 	cmp #2
 	bcs +
-	ldx #$28		; error "until w/o repeat"
+	ldx #$29		; error "until w/o repeat"
 	jmp ($0300)
 
 +	jsr sfrmevl
@@ -1490,7 +1477,7 @@ fndelse	jsr sbzply
 
 ; ----------------------------------------- 
 ; 9bb0
-schdo	lda #$22		; search for DO
+schdo	lda #$22		; search for DO(ne)
 	!by $2c
 schelse	lda #$47		; search for ELSE
 	sta $22
@@ -1558,163 +1545,160 @@ befreset	jsr incbasbz
 	sty $42
 	jmp endsmb
 
+; ----------------------------------------- bef EXEC
+; 9c2a (was 9cec)			recoded
+befexec	lda progz		; save basic pz to stack
+	pha
+	lda progz+1
+	pha
+	jsr srem		; now skip to next command
+
+	ldy spexec	; EXEC stack full?
+	cpy #20
+	bcc +
+	jmp err29		; yes, STACK TOO LARGE ERROR
+
++	lda progz		; no, save new basic pz to EXEC stack
+	sta stackexec,y	; (return address after END PROC)
+	iny
+	lda progz+1
+	sta stackexec,y
+	iny		; and update stackpointer
+	sty spexec
+
+	pla		; restore basic pz (EXEC position)
+	sta progz+1
+	pla
+	sta progz
+	ldx autoflag	; is an EXEC w/o EXEC?
+	beq befcall
+	jsr dec7a		; yes, basic pz minus 1, then:
+
 ; ----------------------------------------- bef CALL
-; 9c2a			recoded
-befcall	clc
+; 9c5a			recoded
+befcall	clc		; start search at basic start
 	lda $2b
-	adc #3
+	adc #3		; skip line header
 	sta $20
 	lda $2c
 	adc #0
 	sta $21
 
-	lda #$31		; search for PROC
+	lda #$31		; search for PROC (code $31)
 	sta $22
-	lda #10
+	lda #10		; identify caller routine
 	sta procnffl
--	jsr suchcode
+-	jsr suchcode	; now search (doesn't return if fail)
 
---	iny
-	lda ($20),y
+--	iny		; found, now compare:
+	lda ($20),y	; position found
 	beq +
-	cmp (progz),y
+	cmp (progz),y	; with bytes from call
 	bne -
-+	lda (progz),y
++	lda (progz),y	; line end at call?
 	beq +
-	cmp #$3a		; ":"?
+	cmp #$3a		; or ":"? (end of command)
 	bne --
 
-+	ldy #0
++	ldy #0		; yes, branch to found position
 	lda $20
 	sta progz
 	lda $21
 	sta progz+1
-	jmp befproc	; skip rest of line
+	jmp befproc	; and process PROC (skip rest of that line)
 
-; 9c61
+; ----------------------------------------- 
+; 9c91
 suchcode	ldy #0
 scd0	jsr inc20
 suchcode1	lda ($20),y	; end of line?
 	beq scd1
+
 	cmp #$64		; sb token?
 	beq scd3
-	cmp #$22
-	beq scd2
-	bne scd0
+	cmp #$22		; no, string to follow?
+	bne scd0		; no, continue search
 
-scd1	ldy #2
-	ora ($20),y
+; ----------------------------------------- 
+; 9ca2
+scd2	jsr inc20		; skip bytes
+	lda ($20),y
+	beq scd1
+	cmp #$22		; until next quote
+	bne scd2
+	beq scd0		; then continue search
+
+; ----------------------------------------- 
+; 9caf
+			; SB token found, .y=0
+scd3	jsr inc20		; next byte:
+	lda ($20),y
+	cmp $22		; byte to search for?
+	bne scd0		; no, continue search
+
+; ----------------------------------------- SEARCH CODE FOUND!
+
+	iny		; yes, next byte:
+	lda ($20),y	; is space?
+	cmp #$20
+	bne +
+	jsr inc20		; yes, skip
++	lda ($7a),y	; next byte at caller position: 
+	cmp #$20		; is space?
+	bne +
+	jsr incbasbz	; yes, skip
++	dey		; .y=0 again
+	rts		; return to calling command
+			; (CALL, EXIT, SECURE)
+
+; ----------------------------------------- 
+; 9ccd
+scd1	ldy #2		; if end of line:
+	ora ($20),y	; is end of program?
 	beq +
-	ldx #4
+
+	ldx #4		; no, just skip next line header
 -	jsr inc20
 	dex
 	bne -
 	beq suchcode
 
-+	lda procnffl
-	cmp #10
-	bne scd5
+; ----------------------------------------- 
+; 9cdd
++	ldy procnffl	; if end of program:
+	cpy #10		; is call from CALL (or EXEC)?
+	bne +
 
-	ldx #$21		; error "proc not found"
+	ldx #$21		; yes, PROC NOT FOUND ERROR
 	stx procnffl
 	dec spexec
 	dec spexec
 	jmp ($0300)
 
++	cpy #11		; is call from EXIT?
+	beq +		; yes, continue there
+
 ; ----------------------------------------- 
-; 9c99
-scd5	pla
-	pla
+; 9cf6
+scd5	pla		; otherwise: just finish command
+	pla		; (SECURE)
 	jmp endsmb
 
 ; ----------------------------------------- 
-; 9c9e
-scd3	jsr inc20
-	lda ($20),y
-	cmp $22
-	bne scd0
-	iny
-	lda ($20),y
-	cmp #$20
-	bne +
-	jsr inc20
-+	lda ($7a),y
-	cmp #$20
-	bne +
-	jsr incbasbz
-+	dey
-	rts
-
-; ----------------------------------------- 
-; 9cbc
-scd2	jsr inc20
-	lda ($20),y
-	beq scd1
-	cmp #$22
-	bne scd2
-	beq scd0
-
-; ----------------------------------------- 
-; 9cc9
-scd4	ldx autoflag
-	beq +
-	jsr dec7a
-+	jmp befcall
-
-; ----------------------------------------- part of DIR
-; 9cd4
-dirend	jsr sclose
-	cli
-	jmp endsmb
-
-; ----------------------------------------- 
-
-	!by 0
-
-; ----------------------------------------- 
-; 9cdc
+; 9cfb
 inc20	inc $20
 	bne +
 	inc $21
 +	rts
 
 ; ----------------------------------------- part of USE
-; 9ce3
+; 9d02
 use1	jsr use3		; get USE parameters (b3e2)
 	jsr sclrch
 	jmp endsmb
 
-; ----------------------------------------- bef EXEC
-; 9cec			recoded
-befexec	lda progz
-	pha
-	lda progz+1
-	pha
-	jsr srem
-	ldy spexec
-	cpy #20
-	bcc +
-	jmp err29
-
-+	lda progz
-	sta stackexec,y
-	iny
-	lda progz+1
-	sta stackexec,y
-	iny
-	sty spexec
-	pla
-	sta progz+1
-	pla
-	sta progz
-	jmp scd4
-
-; ----------------------------------------- 
-
-	!by $ea,$00
-
 ; ----------------------------------------- bef END PROC
-; 9d19			original
+; 9d0b			original
 befendproc
 	ldy spexec
 	cpy #2
@@ -1732,31 +1716,42 @@ befendproc
 -	jmp endsmb
 
 ; ----------------------------------------- bef EXIT
-; 9d37			original
+; 9d29			enhanced
 befexit	jsr incbasbz
 	jsr chrgot
 	lda #$8b		; IF?
-	jsr schkzei
-	jsr sfrmevl
-	lda $61
-	bne +		; ### shorter!
+	jsr schkzei	; (if not: SYNTAX ERROR)
+	jsr sfrmevl	; evaluate
+	lda $61		; true?
 	beq -
 
-+	ldy #0
-	lda #$36		; search for END LOOP
-	sta $22
-	lda progz
++	lda progz		; yes, store basic pz
 	sta $20
 	lda progz+1
 	sta $21
+	lda #$36		; now search for END LOOP
+	sta $22
+	lda #11		; set flag for "not found"
+	sta procnffl
+	ldy #0
 	jsr suchcode1
-	lda $20
+
+	lda $20		; branch to found position
 	sta progz
 	lda $21
 	sta progz+1
+	dec sploop	; clear LOOP stack
 	dec sploop
-	dec sploop
--	jmp bef0
+	tya
+	beq +
+	ldx #$28 		; LOOP ERROR (if not found)
+	jmp ($0300)
++
+-	jmp bef0		; finish command
+
+; ----------------------------------------- 
+; 9d6c
+	!by 0,0,0
 
 ; ----------------------------------------- bef ON KEY
 ; 9d6d			recoded
