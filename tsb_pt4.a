@@ -904,7 +904,7 @@ des0	ldy #0
 	lda (progz),y
 	ora ax+1
 	bne +
-	ldx #$2a		; error "too few lines"
+	ldx #$2b		; error "too few lines"
 	jmp ($0300)
 
 +	jsr incbasbz
@@ -931,7 +931,7 @@ indes	cmp #$2e		; "."?
 	beq descont
 	cmp #$41		; "a"?
 	beq descont
-	ldx #$2b		; error "bad char f. a mob"
+	ldx #$2c		; error "bad char f. a mob"
 	jmp ($0300)
 ; a6aa
 +	lda $a8
@@ -1029,7 +1029,7 @@ whichdo	bcs waitkey	; "null"? (if .c=1)
 	ldy #$ff		; no, DONE?
 -	iny
 	lda (progz),y
-	cmp $86a6,y	; "ne"?
+	cmp tuned+3,y	; "ne"?
 	beq -
 	cpy #2
 	jmp dodone
