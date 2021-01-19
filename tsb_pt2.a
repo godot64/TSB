@@ -634,9 +634,9 @@ l8d02	jsr sbzply
 sfordo	jsr schdo		; search for DO
 	cmp #0		; found line end?
 	beq l8d02		; continue search
--	iny
+-	iny		; .y=2
 	lda (progz),y
-	cmp tuned+1,y
+	cmp tuned+1,y	; compare against "ne" (is "done"?)
 	beq -
 	cpy #4
 	bcc --
