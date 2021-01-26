@@ -8,6 +8,7 @@
 ;
 ; patched on 07.03.2020 (command INSERT)
 ; patched on 13.01.2021 (commands KEY & VOL)
+; patched on 25.01.2021 (added parts of FASTCALL)
 ; 
 ; ----------------------------------------- 
 
@@ -550,10 +551,27 @@ mkrow	ldy helpvec	; one row
 	stx movetab
 	rts
 
-; ----------------------------------------- 
+; ----------------------------------------- part of CALL
 ; afde
+fillfast	ldx prstack	; stack voll?
+	inx
+	beq ++		; ja, keine einträge mehr annehmen
 
-	!fill 38,$ad
++	dex		; sonst: eintragen in stack
+	lda $20
+	sta procstack,x
+	inx
+	lda $21
+	sta procstack,x
+	cpx #$ff		; letzter eintrag?
+	beq +
+	inx		; sonst: zeiger erhöhen
++	stx prstack
+++	rts
+
+; -----------------------------------------
+
+	!by 0,0,0,0,0,0,0,0,0,0,0
 
 ; ----------------------------------------- bef FETCH
 ; b004			recoded
@@ -752,7 +770,7 @@ crsrdel	lda $d4
 	pla
 	sta $d4
 	lda #1
-	rts
+back2call	rts
 
 ; ----------------------------------------- 
 ; b142
@@ -765,12 +783,42 @@ fetchtab	!by $05,$11,$12,$13,$1c,$1d,$1e,$1f	; all these get skipped
 	!by $90,$91,$92,$93,$94,$9c,$9d,$9e
 	!by $9f
 
-; ----------------------------------------- 
+; ----------------------------------------- part of CALL
 ; b15b
-	!fill 52,$ad
+fastcall	ldx prstack	; einträge im labelstack?
+	beq back2call	; nein
+	inx		; voll?
+	beq back2call	; ja
+
+fast	dex		; nein
+	jsr incbasbz	; pz auf 1. zeichen
+
+m8	dex
+	lda procstack,x	; vektor auf label setzen
+	sta $21
+	dex
+	lda procstack,x
+	sta $20
+	ldy #$ff		; .y=$ff wg. labelvergleich
+	jsr space		; führendes blank überlesen
+	jsr compare	; vergleichen von aufruf und label
+	beq +
+	txa		; alle labels durch?
+	bne m8		; nein, weiter
+	jmp dec7a		; sonst: pz eins zurück, normale suche:
+
++	pla
+	pla
+	jmp found
+
+; ----------------------------------------- part of USE
+; b188
+use1a	jsr use3		; get USE parameters (b3e2)
+	jsr sclrch
+	jmp endsmb
 
 ; ----------------------------------------- bef SCRSV
-; b18f			recoded
+; b191			recoded
 befscrsv	jsr intro
 	ldx $b8		; file#
 	jsr $ffc9
@@ -779,13 +827,13 @@ befscrsv	jsr intro
 	lda $fc
 	jsr bsout
 	lda #$d2		; set (ff)d2= bsout to distributor
-; b1a2
+; b1a4
 ss1	sta $f8
 	ldx #32		; 32 pages (bitmap)
 	bit $fa
 	bmi ss0
 	ldx #4		; 4 pages (video/colors)
-; b1ac
+; b1ae
 ss0	bit $fa
 	bmi ss4
 
@@ -795,17 +843,17 @@ ss0	bit $fa
 	lda ($fb),y
 	sec
 	bcs ss2		; and color bytes too
-; b1bc
+; b1be
 ss4	sei
 	lda #$34
-	sta $01		; pixel aus bitmap holen
+	sta pport		; pixel aus bitmap holen
 	lda ($fb),y	; wird bei scrld verworfen
 	pha
 	lda #$36
-	sta $01
+	sta pport
 	cli
 	pla
-; b1ca
+; b1cc
 ss2	jsr distr
 	sta ($fb),y	; wird bei scrsv verworfen
 	iny
@@ -816,12 +864,8 @@ ss2	jsr distr
 	bne ss3
 	beq ss5
 
-; ----------------------------------------- 
-
-	nop
-
 ; ----------------------------------------- bef SCRLD
-; b1dc			recoded
+; b1dd			recoded
 befscrld	jsr intro
 	ldx $b8		; file#
 	jsr $ffc6		; open
@@ -829,10 +873,6 @@ befscrld	jsr intro
 	jsr $ffcf
 	lda #$cf		; (ff)cf= basin
 	bne ss1
-
-; ----------------------------------------- 
-
-	nop
 
 ; ----------------------------------------- 
 ; b1ef
@@ -1084,7 +1124,7 @@ use7	ldx #0		; clear current
 	bne usel1
 ++	inx		; yes, skip
 	iny
-++	bne -
+	bne -
 
 usel1	stx $66		; save index
 	ldy #0
@@ -1123,7 +1163,7 @@ usel3	ldy $bd
 ; ----------------------------------------- 
 ; b3dd
 err11	ldx #$0b		; error "syntax"
-	jmp swarm+2
+	jmp ($0300)
 
 ; ----------------------------------------- 
 ; b3e2
@@ -1131,7 +1171,10 @@ use3	jsr sgetstr	; get ctrl string
 	lda $69		; len=0?
 	beq err11		; yes, syntax error
 	jsr use4		; set string parms (ac46)
-	!by $ea,$ea,$ea
+
+	nop
+	nop
+	nop
 
 ; ----------------------------------------- 
 ; b3ef
@@ -1167,6 +1210,7 @@ usel4	ldy $44
 	beq +
 	cmp #$2e		; period?
 	bne usel5
+
 +	jsr gno0
 	jsr use7
 	ldx $66
@@ -1188,6 +1232,7 @@ usel4	ldy $44
 	bcc usel5
 	ldx $44
 	inc $02a6,x
+
 usel5	jsr usel6
 	jmp useloop
 
@@ -1197,11 +1242,11 @@ userdy	jmp useready
 
 ; ----------------------------------------- 
 ; b46e
-mkoutstr	ldy $44		; current char
+mkoutstr	ldy $44		; index to current char
 	cpy $43		; = len?
 	beq userdy	; yes, ready
 
-	lda ($49),y	; compare with defs
+	lda ($49),y	; compare to control chars
 	ldx #6
 -	cmp tsbpudef,x
 	beq usea		; found!
@@ -1210,6 +1255,7 @@ mkoutstr	ldy $44		; current char
 	sta $02a7,y	; store unchanged
 	inc $44		; inc current
 	bne mkoutstr	; and loop
+
 usea	sty $bd		; store index of found
 	lda #$2c		; running char: comma?
 	jsr use6		; bad mode if not
@@ -1360,11 +1406,11 @@ befkey	jsr chkonoff
 	eor #10
 	sta keyflag	; set accordingly
 --	jmp endsmb	; (21)
-; b597
+; b594
 +	cpx #$11		; more than 16?
 	bcc +
 	jmp swarm		; yes, bad mode error
-; b59e
+; b59b
 +	dex
 	stx $aa		; times 16
 	lda #0
