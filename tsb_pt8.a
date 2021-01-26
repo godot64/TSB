@@ -28,11 +28,13 @@
 	pos		= $c51f
 	pos1		= $c520
 	vgla		= $c523
+	savecont		= $c529
 	hilffl1		= $c52b
 	hilfflag		= $c52c
 	xmaxlow		= $c52d
 	xmaxhigh		= $c52e
 	ueberdreh		= $c52f
+	prstack		= $c530
 	tracetab		= $c531
 	drehsinn		= $c57c
 	zwspei1		= $c57d
@@ -95,11 +97,12 @@
 	doflag		= $c602
 	stackrepeat	= $c603
 	sprepeat		= $c617
-	stackexec		= $c618
+	execstack		= $c618
 	spexec		= $c62c
 	stackloop		= $c62d
 	sploop		= $c641
 	lastkey		= $c642
+	execflag		= $c643
 	keyflag		= $c646
 	wavetab		= $c64a
 	keytab		= $c64d
