@@ -7,6 +7,7 @@
 ; part 4
 ;
 ; patched on 13.01.2021 (commands GLOBAL & LOCAL)
+; patched on 25.01.2021 (added command CHECK)
 ;
 ; ----------------------------------------- 
 
@@ -417,12 +418,55 @@ befhicol	lda #0
 	sta lowcolflag
 	jmp bef0
 
-; ----------------------------------------- 
+; ----------------------------------------- bef CHECK
 ; a278
-	!fill 73,$ad
+befcheck	lda #>procstack	; set procstack address
+	ldy #<procstack
+	sta $21
+	sty $20
+	tya		; clear stack
+-	sta ($20),y
+	iny
+	bne -
+
+	ldx #$ff
+	jsr setsstart	; von programmstart 13
+--	ldy #0
+-	jsr inc20
+	lda $21		; bis variablenstart
+	cmp $2e
+	bne +
+	lda $20		; ende erreicht?
+	cmp $2d
+	beq fsende
++	lda ($20),y	; nein, ist laufendes byte ein tsb token?
+	cmp #$64
+	bne -
+	iny
+	lda ($20),y	; ja, nämlich PROC? 
+	cmp #$31
+	bne --		; 30
+
+	inx		; ja, adresse in liste eintragen
+	lda $20
+	clc
+	adc #2
+	sta procstack,x
+	lda $21
+	adc #0
+	inx
+	sta procstack,x
+	cpx #$ff		; liste voll?
+	bne --		; 21
+
+	dex		; ja, flag setzen ($ff)
+
+fsende	inx		; programmende erreicht:
+	stx prstack	; neues prstack setzen
+	jmp bef0		; 8
 
 ; ----------------------------------------- bef ELSE
-; a2c1			recoded
+; a2c6			recoded
 befelse	lda doflag
 	beq +
 	lda #$47
@@ -430,7 +474,7 @@ befelse	lda doflag
 +	jmp befproc
 
 ; ----------------------------------------- Part of DIR
-; a2ce
+; a2d3
 fromdir	bne +		; anything following?
 	ldx #1		; no, set length of filename ("$"): 1
 	stx $69
@@ -440,7 +484,7 @@ fromdir	bne +		; anything following?
 +	jmp sgetstr	; return to regular DIR
 
 ; ----------------------------------------- Check if ON or OFF follow
-; a2dc			enhanced
+; a2e1			enhanced
 chkonoff 	ldx #10		; if yes: .x=10
 -	jsr chrget	; read next byte
 	cmp #$91		; ON?
@@ -454,7 +498,7 @@ setoff	ldx #0
 setonoff	jmp incbasbz	; (25)
 
 ; ----------------------------------------- bef LOCAL
-; a2f6			recoded
+; a2fa			recoded
 beflocal	jsr setoff	; set .x to 0
 --	txa
 	pha
@@ -498,7 +542,7 @@ lcf0	lda #0		; no, set terminator ($0000)
 	jmp endsmb
 
 ; ----------------------------------------- bef GLOBAL
-; a33d			original
+; a341			original
 befglobal	ldx #0
 --	lda localtab,x
 	sta $5f
@@ -519,7 +563,7 @@ befglobal	ldx #0
 	beq --
 
 ; ----------------------------------------- 
-; a35e
+; a363
 linzei	clc
 	lda ax
 	sbc xmaxlow
@@ -552,7 +596,7 @@ linzei	clc
 	sta ey
 
 ; ----------------------------------------- 
-; a3ac
+; a3b1
 mobbeweg	lda #0
 	sta ydiff
 	sta ay+1
@@ -560,7 +604,7 @@ mobbeweg	lda #0
 	sta ydiff+1
 	sta diffv
 	sta diffv+1
-; a3c0
+; a3c5
 vloop	lda ax
 	sta $09
 	lda ax+1
@@ -575,11 +619,11 @@ vloop	lda ax
 	jsr mobposs
 	jmp vergl
 +	jsr punkt
-; a3e4
+; a3e9
 vergl	lda diffv
 	ora diffv+1
 	beq +
-; a3ec
+; a3f1
 vergl1	jsr ynext
 	jmp vloop
 
@@ -608,7 +652,7 @@ vergl1	jsr ynext
 +	rts
 
 ; ----------------------------------------- 
-; a433
+; a438
 diff	sec
 	lda ey
 	sbc ay
@@ -664,7 +708,7 @@ diff	sec
 	sta xdiff+1
 	lda #0
 	sta diffv+1
-; a49b
+; a4a0
 -	sta diffv
 	sec
 	lda ydiff
@@ -685,7 +729,7 @@ diff	sec
 	inc diffv+1
 +	lda diffv
 	jmp -
-; a4c7
+; a4cc
 ++	pla
 	pla
 	lda ax+1
@@ -714,7 +758,7 @@ diff	sec
 +	jmp vergl1
 
 ; ----------------------------------------- 
-; a50c
+; a511
 ynext	lda diffv
 	ora diffv+1
 	beq ++
@@ -745,7 +789,7 @@ ynext	lda diffv
 +++	rts
 
 ; ----------------------------------------- 
-; a553
+; a558
 tofind	lda $a6
 	cmp $a8
 	bne +
@@ -781,7 +825,7 @@ tofind	lda $a6
 	jmp -
 
 ; ----------------------------------------- bef FIND
-; a594			original
+; a599			original
 beffind	jsr incbasbz
 	lda #$ff
 	sta $a8
@@ -792,7 +836,7 @@ beffind	jsr incbasbz
 	lda $2c
 	sta $21
 	bne infind
-; a5a9
+; a5ae
 fnd0	lda (progz),y
 	beq tofind
 	lda ($20),y
@@ -802,7 +846,7 @@ fnd0	lda (progz),y
 	bne fcont
 	iny
 	bne fnd0
-; a5ba
+; a5bf
 fcont	jsr inc20
 	ldy #0
 	lda ($20),y
@@ -832,7 +876,7 @@ infind	jsr inc20
 	bne fnd0		; uncond. branch
 
 ; ----------------------------------------- part of use
-; a5f8
+; a5fd
 	tax
 use8	lda $63
 	cmp #$2a		; "*"?
@@ -846,18 +890,14 @@ use9a	tax
 	dex
 	bne -
 	rts
-; a60d
+; a612
 genout	ldy $44
 gno0	sta $02a7,y
 	inc $44
 	rts
 
 ; ----------------------------------------- 
-
-	!by $ea
-
-; ----------------------------------------- 
-; a616
+; a61a
 vglae	lda vgla
 	cmp vgle
 	beq +
@@ -871,7 +911,7 @@ vglae	lda vgla
 	rts
 
 ; ----------------------------------------- bef DESIGN
-; a62e			original
+; a632			original
 befdesign	jsr sgetbytn
 	stx $aa
 	cpx #4
@@ -888,7 +928,7 @@ befdesign	jsr sgetbytn
 	jsr sgetadr
 	sty $ae
 	sta $af
-; a650
+; a654
 des0	ldy #0
 	sty $a8
 	ldx #0
@@ -896,7 +936,7 @@ des0	ldy #0
 	beq +
 	jsr incbasbz
 	jmp -
-; a660
+; a664
 +	jsr incbasbz
 	lda (progz),y
 	sta ax+1
@@ -924,7 +964,7 @@ des0	ldy #0
 +	lda ($7a),y
 	cmp #$42		; "b"?
 	beq +
-; a699
+; a69d
 indes	cmp #$2e		; "."?
 	beq descont
 	cmp #$20		; " "?
@@ -933,11 +973,11 @@ indes	cmp #$2e		; "."?
 	beq descont
 	ldx #$2c		; error "bad char f. a mob"
 	jmp ($0300)
-; a6aa
+; a6ae
 +	lda $a8
 	ora gbittabs,x
 	sta $a8
-; a6b1
+; a6b5
 descont	inx
 	cpx #8
 	bne -
@@ -977,13 +1017,13 @@ descont	inx
 +	jmp endsmb
 
 ; ----------------------------------------- part of DO
-; a6fe
+; a702
 waitkey	jsr getkey+5
 	jmp befproc	; skip rest of line
 
 ; ----------------------------------------- 
 
-	!by $ea,$ea,$ea,$ea,$ea,$00
+	!by 0,0
 
 ; ----------------------------------------- 
 ; a70a
