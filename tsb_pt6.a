@@ -8,6 +8,7 @@
 ;
 ; patched, adding a new feature to COLOUR
 ; patched on 13.01.2021 (commands DELAY & SECURE)
+; patched on 25.01.2021
 ;
 ; ----------------------------------------- 
 
@@ -1158,7 +1159,7 @@ usel9	sta helpvec
 
 ; ----------------------------------------- 
 ; c400
-	!fill 256		; unused area
+procstack	!fill 256		; unused area
 
 ; ----------------------------------------- 
 ; c500
@@ -1275,7 +1276,7 @@ bin0	asl
 	beq mkstrng	; uncond. branch
 
 ; ----------------------------------------- 
-; c7e1
+; c7de
 	sta linenum+8,x	; this part is garbage, unused
 	tay
 	lda helpvec
@@ -1494,7 +1495,7 @@ befsecure	jsr chkonoff
 +	dec $20
 	lda #0
 	sta ($20),y
-	jsr scd3		; 9c9e
+	jsr simtok
 	lda #$3a		; ":"
 	sta ($20),y
 	bne -
@@ -1549,11 +1550,12 @@ do6	jsr flinend	; find line end
 	jmp endsmb
 
 do1	jmp dodo		; b99f
-do2	jmp do7
+do2	jsr basromau
+	jmp do8
 
 ; ----------------------------------------- 
-; c9d7
-	!by $ea,$ea,$ea,$ea,$ea,$00
+; c9da
+	!by 0,0,0
 
 ; ----------------------------------------- 
 ; c9dd
