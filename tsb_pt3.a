@@ -8,6 +8,8 @@
 ;
 ; patched on 13.01.2021
 ;   (commands BFLASH, FLASH, DIR, OPTION, PAGE, PLAY & TRACE)
+; patched on 25.01.2021
+;   (interpreter, commands EXEC, CALL, EXIT & PROC)
 ;
 ; ----------------------------------------- 
 
@@ -28,8 +30,6 @@ sbasbef	tsx
 
 sintprt0	jsr chrget	; get next char
 	jsr stateofdo	; what about DO..DONE and ELSE?
-	lda #0		; auto off
-	sta autoflag
 
 	lda traceflag	; trace active?
 	beq +
@@ -40,6 +40,8 @@ sintprt0	jsr chrget	; get next char
 	jsr trace1
 
 +	ldy #0
+	sty autoflag	; auto off
+
 	lda (progz),y	; current char:
 	beq ipr0		; line end?
 
@@ -61,7 +63,7 @@ ipr1	cmp #$64		; sb token?
 	bmi ipr4		; standard token?
 
 	cmp #$3a		; no, ":"? (end of command)
-	beq ipr0		; yes
+	beq ipr0		; yes, continue with next 
 
 	jsr $a906		; sys find next ":" (offset in .y)
 	sty $22
@@ -70,17 +72,18 @@ ipr1	cmp #$64		; sb token?
 	cpy $22		; beyond ":"?
 	bcs ipr2		; yes, so this is EXEC w/o EXEC
 
-ipr4	jsr chrgot	; no, reget last char
+ipr4	jsr chrgot	; reget standard token
 	jmp $a7e7		; and process
 
 ipr0	jmp $a7ae		; sys interpreter
 
-ipr2	sty autoflag	; abuse autoflag for EXEC w/o EXEC
-	jmp befexec	; 9cec
+ipr2	sty execflag	; flag for EXEC w/o EXEC
+	jmp befexec	; 9c2a
 
 ipr3	sty sprepeat	; clear stacks
 	sty spexec
 	sty sploop
+	sty prstack
 	beq ipr4		; (uncond. branch)
 
 ipr5	jsr incbasbz	; process sb command
@@ -96,15 +99,18 @@ ipr5	jsr incbasbz	; process sb command
 	pha
 	rts
 
+; ----------------------------------------- 
+
+	!by 0
+
 ; ----------------------------------------- bef HIRES
-; 9200			original
-befhires	lda #$01
-	sta xmaxhigh
+; 9202			original (almost)
+befhires	ldy #$01
+	sty xmaxhigh
 	lda #$3f
 	sta xmaxlow
-	lda #0
-	sta $a6
-	tay
+	dey
+	sty $a6
 	sty lowcolflag
 	lda #$e0
 	sta $a7
@@ -482,7 +488,7 @@ ren3	jsr enternum	; cf5d
 +	jmp towarm
 
 ; ----------------------------------------- 
-; 94ce
+; 94cd
 l20pl40	clc
 	lda $20
 	adc #40
@@ -493,7 +499,7 @@ l20pl40	clc
 	rts
 
 ; ----------------------------------------- 
-; 94dc
+; 94db
 l23pl40	clc
 	lda $23
 	adc #40
@@ -504,7 +510,7 @@ l23pl40	clc
 	rts
 
 ; ----------------------------------------- bef MULTI
-; 94ea			enhanced
+; 94e9			enhanced
 befmulti	lda #$2c
 	sta multijn
 	lda #$9f
@@ -535,25 +541,25 @@ befmulti	lda #$2c
 	jmp endsmb
 
 ; ----------------------------------------- bef COLOUR
-; 952e			recoded
+; 952d			recoded
 befcolour	jsr docolor
 	jmp endsmb
 
 ; ----------------------------------------- part of USE
-; 9534
+; 9533
 usedrv	jsr sgetbyt1	; get drive# (constant)
 	stx drive		; and set
 	jmp endsmb
 
 ; ----------------------------------------- 
-; 953c
+; 953b
 slp1	jsr nrm		; process NRM
 	ldx #$17		; set lower chars
 	stx $d018
 	rts
 
 ; ----------------------------------------- bef DIR
-; 9545			enhanced
+; 9544			enhanced
 befdir	jsr sclose	; first: close file
 	jsr chrget	; get next byte
 	jsr fromdir	; check if anything follows ($a2ce)
@@ -611,16 +617,16 @@ dir5	jsr sclose
 	jmp endsmb
 
 ; ----------------------------------------- 
-; 95b1
+; 95b4
 getkey	jsr $ffe4		; get char
 	beq +
-; 95b6
+; 95b9
 -	jsr $ffe4		; warten
 	beq -
 +	rts
 
 ; ----------------------------------------- 
-; 95bc
+; 95bf
 dec7a	lda $7a
 	bne +
 	dec $7b
@@ -665,12 +671,18 @@ mmb1	jsr sgetbytc
 	sta mobbew
 	jsr mobbeweg
 	sta mobbew
-	beq mmb4
+	beq mmb4		; uncond. branch
 
-; ----------------------------------------- part of DO
+; ----------------------------------------- part of USE
 ; 9620
-do7	jsr basromau
-	jmp do8
+use1	jsr basromau
+	jsr use3		; analyse USE parameters (b3e2)
+	jsr sclrch
+	jmp endsmb
+
+; ----------------------------------------- 
+
+	!by 0
 
 ; ----------------------------------------- 
 
@@ -693,8 +705,8 @@ mmb5	ldy mobnr2
 	ldy mobnr
 	lda $d010
 	ora mbittabs,y
-	sta $d010
-mmb9	lda $a4
+mmb9	sta $d010
+	lda $a4
 	ldy mobnr2
 	sta $d001,y
 	rts
@@ -702,11 +714,10 @@ mmb9	lda $a4
 mmb8	ldy mobnr
 	lda $d010
 	and mbittabl,y
-	sta $d010		; ### shorter!
 	jmp mmb9
 
 ; ----------------------------------------- bef BFLASH
-; 9669			enhanced
+; 966d			enhanced
 befbflash	lda #0
 	sta bflzae	; reset speed compare
 	jsr chkonoff	; get first parameter
@@ -724,10 +735,6 @@ befbflash	lda #0
 +	ldx #10		; switch flag on
 ++	stx bflashjn
 mmb4	jmp endsmb
-
-; ----------------------------------------- 
-
-	!by 0,0,0,0
 
 ; ----------------------------------------- 
 ; 9694			enhanced
@@ -1130,12 +1137,8 @@ cold1	lda #8
 	sta drive
 	jmp cold2
 
-; ----------------------------------------- 
-
-	!by 0
-
 ; ----------------------------------------- bef ENVELOPE
-; 9979			original
+; 9978			original
 befenvelope
 	jsr sgetbytn
 	jsr x123
@@ -1170,18 +1173,14 @@ befenvelope
 	jmp endsmb
 
 ; ----------------------------------------- 
-; 99c2
+; 99c1
 flinend	jsr chrget
 	cmp #0
 	bne flinend
 	rts
 
 ; ----------------------------------------- 
-
-	!by $ea,$00
-
-; ----------------------------------------- 
-; 99cc
+; 99c9
 get2nyb	jsr sgetbytn
 	jsr xnyb
 	stx $aa
@@ -1197,7 +1196,7 @@ get2nyb	jsr sgetbytn
 	rts
 
 ; ----------------------------------------- bef CGOTO
-; 99e8			original
+; 99e5			original
 befcgoto	jsr incbasbz
 cgoto0	jsr sfrmnum
 	jsr sfacadr
@@ -1205,7 +1204,7 @@ cgoto0	jsr sfrmnum
 	jmp endsmb
 
 ; ----------------------------------------- bef WAVE
-; 99f7			original
+; 99f4			original
 befwave	jsr sgetbytn
 	jsr x123
 	dex
@@ -1215,7 +1214,7 @@ befwave	jsr sgetbytn
 	jmp bwv0
 
 ; ----------------------------------------- 
-; 9a09
+; 9a06
 bincon	lda #0
 	sta $a6
 	sta $a8
@@ -1240,7 +1239,7 @@ bincon	lda #0
 	rts
 
 ; ----------------------------------------- 
-; 9a35
+; 9a32
 bwv0	asl $aa
 	ldy $aa
 	lda sidtab,y
@@ -1257,11 +1256,11 @@ bwv0	asl $aa
 	jmp endsmb
 
 ; ----------------------------------------- 
-; 9a54
+; 9a51
 sidtab	!wo $d400,$d407,$d40e
 
 ; ----------------------------------------- part of RETRACE
-; 9a5a
+; 9a57
 dscbmout	ldy #0
 -	lda tuned,y
 	beq +
@@ -1271,7 +1270,7 @@ dscbmout	ldy #0
 +	jmp endsmb
 
 ; ----------------------------------------- 
-; 9a6a
+; 9a67
 xnyb	cpx #16
 	bcs towarm
 	rts
@@ -1287,7 +1286,7 @@ towarm	pla
 	jmp swarm		; error
 
 ; ----------------------------------------- part of BLOCK
-; 9a7d
+; 9a7a
 setmulti	lda $f7		; color?
 	cmp #11		; test?
 	beq testdot
@@ -1312,14 +1311,14 @@ setmulti	lda $f7		; color?
 	jsr gbitset
 	jmp gbitset
 
-; 9aab
+; 9aa8
 gbitset	lda ($a8),y
 	ora gbittabs,x
 	sta ($a8),y
 	inx
 	rts
 
-; 9ab4
+; 9ab1
 gbitclr	lda ($a8),y
 	and gbittabl,x
 	sta ($a8),y
@@ -1336,7 +1335,7 @@ gbitclr	lda ($a8),y
 	sta ($a8),y
 	rts
 
-; 9acf
+; 9acc
 testdot	lda ($a8),y
 	and gbittabs,x
 	beq +
@@ -1352,21 +1351,21 @@ testdot	lda ($a8),y
 +	rts
 
 ; ----------------------------------------- 
-; 9ae9
+; 9ae6
 inca6a7	inc $a6
 	bne +
 	inc $a7
 +	rts
 
 ; ----------------------------------------- 
-; 9af0
+; 9aed
 inca8a9	inc $a8
 	bne +
 	inc $a9
 +	rts
 
 ; ----------------------------------------- bef REPEAT
-; 9af7			enhanced
+; 9af4			enhanced
 befrepeat	ldy sprepeat
 	cpy #20
 	bcc +
@@ -1383,7 +1382,7 @@ err29	ldx #$2a		; error "stack too large"
 	jmp bef0
 
 ; ----------------------------------------- bef UNTIL
-; 9b15			original
+; 9b12			original
 befuntil	jsr incbasbz
 	lda sprepeat
 	cmp #2
@@ -1408,7 +1407,7 @@ befuntil	jsr incbasbz
 	jmp bef0
 
 ; ----------------------------------------- bef RETRACE
-; 9b48			new
+; 9b45			new
 befretrace
 	lda #<signature	; out "ad'86"
 	ldx #>signature
@@ -1416,25 +1415,25 @@ befretrace
 	jmp trc1		; retc0 
 
 ; ----------------------------------------- 
-; 9b51
+; 9b4e
 sadr2int	jsr pspeibe
 	jsr $a96b		; sys line# to int
 	jmp prestor
 
 ; ----------------------------------------- bef TRACE
-; 9b5a			enhanced
+; 9b57			enhanced
 beftrace	jsr chkonoff
 	stx traceflag
 	jmp endsmb
 
 ; ----------------------------------------- bef OPTION
-; 9b63			enhanced
+; 9b60			enhanced
 befoption	jsr chkonoff
 	stx optflag
 	jmp endsmb
 
 ; ----------------------------------------- bef IF
-; 9b6c			recoded
+; 9b69			recoded
 befif	jsr incbasbz
 	jsr sfrmevl
 	jsr chrgot
@@ -1443,7 +1442,7 @@ befif	jsr incbasbz
 
 	lda #$a7		; no, check for THEN
 	jsr schkzei
-; 9b7e
+; 9b7b
 inif	jsr schdo		; then search for DO
 	cmp $22
 	beq fnddo
@@ -1462,7 +1461,7 @@ inif	jsr schdo		; then search for DO
 	jmp endsmb
 
 ; ----------------------------------------- 
-; 9b9b
+; 9b98
 iftrue	jsr chrgot	; process THEN
 	bcs +
 	jmp cgoto0	; sb goto
@@ -1476,7 +1475,7 @@ fndelse	jsr sbzply
 	jmp ($0308)	; sys get bef address
 
 ; ----------------------------------------- 
-; 9bb0
+; 9bad
 schdo	lda #$22		; search for DO(ne)
 	!by $2c
 schelse	lda #$47		; search for ELSE
@@ -1494,19 +1493,15 @@ schelse	lda #$47		; search for ELSE
 +	rts		; equal if yes
 
 ; ----------------------------------------- part of RENUMBER
-; 9bca
+; 9bc7
 ren1	lda $2b
 	ldx $2c
 	sta $a8
 	stx $a9
 	jmp ren2		; b9df
 
-; ----------------------------------------- 
-
-	!by 0
-
 ; ----------------------------------------- bef AUTO
-; 9bd6			original
+; 9bd2			original
 befauto	jsr incbasbz
 	jsr sfrmnum
 	jsr sfacadr
@@ -1526,7 +1521,7 @@ befauto	jsr incbasbz
 	jmp endsmb
 
 ; ----------------------------------------- bef RESET
-; 9c05			original
+; 9c01			original
 befreset	jsr incbasbz
 	jsr sfrmnum
 	jsr sfacadr
@@ -1545,13 +1540,25 @@ befreset	jsr incbasbz
 	sty $42
 	jmp endsmb
 
+; ----------------------------------------- 
+; 9c26
+setsstart	clc		; start search at basic start
+	lda $2b
+	adc #3		; skip line header
+	sta $20
+	lda $2c
+	adc #0
+	sta $21
+	rts
+
 ; ----------------------------------------- bef EXEC
-; 9c2a (was 9cec)			recoded
+; 9c34 (was 9cec)			recoded
 befexec	lda progz		; save basic pz to stack
 	pha
 	lda progz+1
 	pha
 	jsr srem		; now skip to next command
+			; (to find the return address for END PROC)
 
 	ldy spexec	; EXEC stack full?
 	cpy #20
@@ -1559,10 +1566,10 @@ befexec	lda progz		; save basic pz to stack
 	jmp err29		; yes, STACK TOO LARGE ERROR
 
 +	lda progz		; no, save new basic pz to EXEC stack
-	sta stackexec,y	; (return address after END PROC)
+	sta execstack,y	; (return address after END PROC)
 	iny
 	lda progz+1
-	sta stackexec,y
+	sta execstack,y
 	iny		; and update stackpointer
 	sty spexec
 
@@ -1570,37 +1577,29 @@ befexec	lda progz		; save basic pz to stack
 	sta progz+1
 	pla
 	sta progz
-	ldx autoflag	; is an EXEC w/o EXEC?
+
+	ldx execflag	; is an EXEC w/o EXEC?
 	beq befcall
 	jsr dec7a		; yes, basic pz minus 1, then:
 
 ; ----------------------------------------- bef CALL
-; 9c5a			recoded
-befcall	clc		; start search at basic start
-	lda $2b
-	adc #3		; skip line header
-	sta $20
-	lda $2c
-	adc #0
-	sta $21
+; 9c64			recoded
+befcall	jsr basromau	; switch basic rom off
+	jsr fastcall	; check exec stack (doesn't return if successful)
 
+	jsr setsstart	; set start address for search
 	lda #$31		; search for PROC (code $31)
 	sta $22
 	lda #10		; identify caller routine
 	sta procnffl
--	jsr suchcode	; now search (doesn't return if fail)
 
---	iny		; found, now compare:
-	lda ($20),y	; position found
-	beq +
-	cmp (progz),y	; with bytes from call
-	bne -
-+	lda (progz),y	; line end at call?
-	beq +
-	cmp #$3a		; or ":"? (end of command)
-	bne --
+search	jsr suchcode	; now search (doesn't return if fail)
+	jsr compare
+	bne search
 
-+	ldy #0		; yes, branch to found position
+	jsr fillfast	; successful, now fill fast stack
+
+found	ldy #0		; branch to found position
 	lda $20
 	sta progz
 	lda $21
@@ -1608,37 +1607,35 @@ befcall	clc		; start search at basic start
 	jmp befproc	; and process PROC (skip rest of that line)
 
 ; ----------------------------------------- 
-; 9c91
+; 9c8e
 suchcode	ldy #0
-scd0	jsr inc20
+weiter	jsr inc20
 suchcode1	lda ($20),y	; end of line?
-	beq scd1
+	beq through
 
 	cmp #$64		; sb token?
-	beq scd3
+	beq simtok	; yes, check if searchcode
 	cmp #$22		; no, string to follow?
-	bne scd0		; no, continue search
+	bne weiter	; no, continue search
 
-; ----------------------------------------- 
-; 9ca2
-scd2	jsr inc20		; skip bytes
-	lda ($20),y
-	beq scd1
+-	jsr inc20		; skip string bytes
+	lda ($20),y	; (next byte: line end?)
+	beq through
 	cmp #$22		; until next quote
-	bne scd2
-	beq scd0		; then continue search
+	bne -
+	beq weiter	; then continue search
 
 ; ----------------------------------------- 
-; 9caf
+; 9cac
 			; SB token found, .y=0
-scd3	jsr inc20		; next byte:
+simtok	jsr inc20		; next byte:
 	lda ($20),y
 	cmp $22		; byte to search for?
-	bne scd0		; no, continue search
+	bne weiter	; no, continue search
 
 ; ----------------------------------------- SEARCH CODE FOUND!
-
-	iny		; yes, next byte:
+; 9cb5
+space	iny		; yes, next byte:
 	lda ($20),y	; is space?
 	cmp #$20
 	bne +
@@ -1649,11 +1646,11 @@ scd3	jsr inc20		; next byte:
 	jsr incbasbz	; yes, skip
 +	dey		; .y=0 again
 	rts		; return to calling command
-			; (CALL, EXIT, SECURE)
+			; (CALL, EXIT, SECURE or fastcall)
 
 ; ----------------------------------------- 
-; 9ccd
-scd1	ldy #2		; if end of line:
+; 9cca
+through	ldy #2		; if end of line:
 	ora ($20),y	; is end of program?
 	beq +
 
@@ -1664,7 +1661,7 @@ scd1	ldy #2		; if end of line:
 	beq suchcode
 
 ; ----------------------------------------- 
-; 9cdd
+; 9cda
 +	ldy procnffl	; if end of program:
 	cpy #10		; is call from CALL (or EXEC)?
 	bne +
@@ -1675,30 +1672,38 @@ scd1	ldy #2		; if end of line:
 	dec spexec
 	jmp ($0300)
 
-+	cpy #11		; is call from EXIT?
-	beq +		; yes, continue there
++	cpy #11		; or is call from EXIT?
+	beq ++		; yes, continue there (RTS)
 
 ; ----------------------------------------- 
-; 9cf6
+; 9cf3
 scd5	pla		; otherwise: just finish command
 	pla		; (SECURE)
 	jmp endsmb
 
 ; ----------------------------------------- 
-; 9cfb
+; 9cf8
+compare	iny		; found, now compare:
+	lda ($20),y	; position found
+	beq +
+	cmp (progz),y	; with bytes from call
+	bne ++		; not equal if different
+
++	lda (progz),y	; line end at call?
+	beq ++
+	cmp #$3a		; or ":"? (end of command)
+	bne compare	; eqal if yes
+++	rts		; returns equal/not equal
+
+; ----------------------------------------- 
+; 9d0a
 inc20	inc $20
 	bne +
 	inc $21
 +	rts
 
-; ----------------------------------------- part of USE
-; 9d02
-use1	jsr use3		; get USE parameters (b3e2)
-	jsr sclrch
-	jmp endsmb
-
 ; ----------------------------------------- bef END PROC
-; 9d0b			original
+; 9d11			original
 befendproc
 	ldy spexec
 	cpy #2
@@ -1707,16 +1712,16 @@ befendproc
 	jmp ($0300)
 
 +	dey
-	lda stackexec,y
+	lda execstack,y
 	sta progz+1
 	dey
-	lda stackexec,y
+	lda execstack,y
 	sta progz
 	sty spexec
 -	jmp endsmb
 
 ; ----------------------------------------- bef EXIT
-; 9d29			enhanced
+; 9d2f			enhanced
 befexit	jsr incbasbz
 	jsr chrgot
 	lda #$8b		; IF?
@@ -1749,12 +1754,8 @@ befexit	jsr incbasbz
 +
 -	jmp bef0		; finish command
 
-; ----------------------------------------- 
-; 9d6c
-	!by 0,0,0
-
 ; ----------------------------------------- bef ON KEY
-; 9d6d			recoded
+; 9d70			recoded
 befonkey	jsr incbasbz
 	jsr sgetstr
 	sta okstring+1	; controlstring
@@ -1774,18 +1775,17 @@ befonkey	jsr incbasbz
 +	lda #10
 	sta onkeyflag
 	ldy #0
-	nop
 	jmp res2
 
 ; ----------------------------------------- bef DISABLE
-; 9da0			original
+; 9da2			original
 befdisable
 	lda #0
 	sta onkeyflag
 	beq -
 
 ; ----------------------------------------- 
-; 9da7
+; 9da9
 onkey1	lda onkeypos	; key pressed?
 	bne +
 	jsr $ffe4		; no, sys get key
@@ -1805,7 +1805,7 @@ onkey1	lda onkeypos	; key pressed?
 	sta progz
 	stx progz+1
 	jmp scd5		; continue elsewhere
-; 9db9
+; 9dd7
 chkkey	lda #0
 	sta onkeypos
 chkonkey	lda okstring	; get on key ctrl string
@@ -1824,7 +1824,7 @@ chkonkey	lda okstring	; get on key ctrl string
 oky0	rts
 
 ; ----------------------------------------- bef RESUME
-; 9df5			recoded
+; 9df7			recoded
 befresume	lda errn		; from ON ERROR?
 	bpl res0		; yes, go there
 
@@ -1841,7 +1841,7 @@ befresume	lda errn		; from ON ERROR?
 	jmp sintprt0
 
 ; ----------------------------------------- 
-; 9e13
+; 9e15
 res0	jsr chrget	; parameters?
 	beq res4		; no
 
@@ -1858,15 +1858,15 @@ res0	jsr chrget	; parameters?
 	jsr sbzply
 
 ; ----------------------------------------- bef PROC
-; 9e31			enhanced
+; 9e33			enhanced
 befproc	jsr flinend	; find end of line
 	beq +
 
 ; ----------------------------------------- 
 
 res4	ldy #0
-	lda $c529
-	ldx $c52a
+	lda savecont
+	ldx savecont+1
 	sta progz
 	stx progz+1
 	lda (progz),y
@@ -1878,12 +1878,8 @@ res2	iny
 	jsr srem
 +	jmp endsmb
 
-; ----------------------------------------- 
-
-	!by 0
-
 ; ----------------------------------------- bef LOOP
-; 9e54			enhanced
+; 9e55			enhanced
 befloop	ldy sploop
 	cpy #20
 	bcc +
@@ -1899,7 +1895,7 @@ befloop	ldy sploop
 res3	jmp bef0
 
 ; ----------------------------------------- bef ON ERROR
-; 9e70			enhanced
+; 9e71			enhanced
 befonerror
 	jsr incbasbz
 	lda progz
@@ -1913,20 +1909,20 @@ befonerror
 
 swm1	lda $3d
 	ldy $3e
-	sta $c529
-	sty $c52a
+	sta savecont
+	sty savecont+1
 	rts
 
 ; ----------------------------------------- bef NO ERROR
-; 9e92			original
+; 9e93			original
 befnoerr	lda #0
 	sta onerrorflag
 	jmp bef0
 
 ; ----------------------------------------- Warmstart
-; 9e9a			recoded
+; 9e9b			recoded
 swarm	ldx #$20		; bad mode
-	stx errn
+warmstart	stx errn
 
 	jsr basromei
 	lda onerrorflag	; on error active?
@@ -1948,13 +1944,9 @@ swarm	ldx #$20		; bad mode
 swm0	jmp endsmb
 
 ; ----------------------------------------- part of D!
-; 9eca
+; 9ecb
 delend	jsr basromei
 	jmp endmrge
-
-; ----------------------------------------- 
-
-	!by 0
 
 ; ----------------------------------------- bef OUT
 ; 9ed1			recoded
@@ -2008,7 +2000,7 @@ befrcomp	jsr incbasbz
 	sta $61
 	jmp inif
 
-; ----------------------------------------- bef PROC (Kopie)
+; ----------------------------------------- bef PROC (!!!Kopie!!!)
 ; 9f30
 befproc1	jsr flinend
 	beq swm0
