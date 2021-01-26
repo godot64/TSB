@@ -452,17 +452,17 @@ befgraphics
 
 ; ----------------------------------------- 
 ; 8bfc
-	ldy drive
+sysload	ldy drive
 	sty $ba
 	jmp $f4a5		; sys LOAD
 ; 8c03
-	ldy drive
+syssave	ldy drive
 	sty $ba
 	jmp $f5ed		; sys SAVE
 
 ; ----------------------------------------- 
 ; 8c0a
-loadsave	!wo $8bfc,$8c03
+loadsave	!wo sysload,syssave
 
 ; ----------------------------------------- 
 ; 8c0e
@@ -474,7 +474,7 @@ cold2	ldy #3
 	rts
 
 ; ----------------------------------------- Old copy of stimmein
-; 			unused
+; 			!!!unused!!!
 l8c1a	ldy stimmenr
 	lda adtab,y
 	ldy #5
@@ -491,7 +491,7 @@ l8c1a	ldy stimmenr
 	ldy #4
 	ora #1
 	sta ($fe),y
-	rts		; 39 bytes
+	rts		; 39 bytes!
 
 ; ----------------------------------------- 
 ; 8c41
