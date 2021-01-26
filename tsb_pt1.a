@@ -7,6 +7,7 @@
 ; part 1
 ;
 ; patched on 13.01.2021
+; patched on 25.01.2021 (tables)
 ;
 ; ----------------------------------------- 
 
@@ -207,7 +208,7 @@ befcold	jsr basromei
 	stx nmivec+1
 	inx
 	stx brkvec+1
-	lda #$14
+	lda #<sbrk	; SBRK = $8314!
 	sta brkvec
 	lda #$18
 	sta $fffa		; sys nmi vector lo
@@ -223,7 +224,7 @@ befcold	jsr basromei
 
 ; ----------------------------------------- 
 ; 81ab
-tsbvecs	!wo $9e9c,$825c,$8234,$8240,$917a,$8c8d
+tsbvecs	!wo warmstart,sloop,zeiumw,slist,sbasbef,sgetari
 
 ; ----------------------------------------- 
 ; 81b7
@@ -247,22 +248,23 @@ useready	pla
 	jsr $ab1e		; sys string out
 	jsr chrgot
 	bne +
-	jmp $aad7		; sys cr/lf out
--	jmp swarm		; bad mode	
+	jmp $aad7		; sys cr/lf out if end of command
 
 ; ----------------------------------------- 
-; 81e1
+; 81de
 +	lda #$3b		; ";"?
 use6	ldy #0		; compare to running code char
 	cmp (progz),y	; if not equal: error bad mode
-	bne -
+	bne +
 	jmp chrget	; and get next if equal
+
++	jmp swarm		; otherwise: bad mode
 
 ; ----------------------------------------- part of USE
 ; 81ec			recoded
 use0	jsr sgetbytn	; USE #n
 	stx $13		; .x= device #
-	jsr $e4ad		; sys basic ckout
+	jsr $e4ad		; sys: basic ckout
 	bcs use2		; on error: continue anyway
 	jsr schkcom	; comma?
 	bne use2		; uncond. branch
@@ -317,14 +319,14 @@ trace6	dex
 endsmb	jsr kerromein
 	cli
 	jsr basromei
-	jmp $a7ae		; sys Interpreter
+	jmp $a7ae		; sys: Interpreter
 
 ; ----------------------------------------- 
 ; 8234
 zeiumw	jsr basromau
 	jsr zeiumw1
 	jsr basromei
-	jmp $a57c		; sys tokenizer
+	jmp $a57c		; sys: tokenizer
 
 ; ----------------------------------------- 
 ; 8240
@@ -341,7 +343,7 @@ slist1	pha
 	jsr basromei
 	pla
 	plp
-	jmp $a71a		; sys detokenizer
+	jmp $a71a		; sys: detokenizer
 
 ; ----------------------------------------- 
 ; 8253
@@ -349,7 +351,7 @@ slist2	pha
 	jsr basromei
 	pla
 	plp
-	jmp $a6f6		; sys part of LIST
+	jmp $a6f6		; sys: part of LIST
 
 ; ----------------------------------------- Eingabewarteschleife
 ; 825c			recoded
@@ -718,7 +720,7 @@ sgetstr	jsr sfrmevl	; get string from basic
 
 ; ----------------------------------------- Table of BEFs
 ; 86c2
-sprtab	!wo befhires-1	;   1 $9200 hires
+sprtab	!wo befhires-1	;   1 $9202 hires
 	!wo befplot-1	;   2 $9267 plot
 	!wo befline-1	;   3 $9350 line
 	!wo befblock-1	;   4 $bbcc block
@@ -742,10 +744,10 @@ vecplace	!wo befplace-1	;  16 $ccd7 place    (changed from 86e2)
 	!wo movebef-1	;  22 $ac5d downw
 	!wo movebef-1	;  23 $ac5d rightb
 	!wo movebef-1	;  24 $ac5d rightw
-	!wo befmulti-1	;  25 $94ea multi
-	!wo befcolour-1	;  26 $952e colour
+	!wo befmulti-1	;  25 $94e9 multi
+	!wo befcolour-1	;  26 $952d colour
 	!wo befmmob-1	;  27 $95c8 mmob
-	!wo befbflash-1	;  28 $9669 bflash
+	!wo befbflash-1	;  28 $966d bflash
 	!wo befmobset-1	;  29 $96da mob set
 	!wo befmusic-1	;  30 $9759 music
 	!wo befflash-1	;  31 $9790 flash
@@ -759,39 +761,39 @@ vecplace	!wo befplace-1	;  16 $ccd7 place    (changed from 86e2)
 	!wo beffetch-1	;  39 $b004 fetch
 	!wo befat-1	;  40 $b8b4 at       (fn at)
 	!wo befuntil-1	;  41 $9b15 until
-	!wo $a33b		;     (*)
-	!wo $a33b		;     (+)
+	!wo swarm-1	;     (*)
+	!wo swarm-1	;     (+)
 	!wo befuse-1	;  44 $820b use
-	!wo $b392		;     (-)
-	!wo befglobal-1	;  46 $a33d global
-	!wo $9c04		;     (/)
+	!wo swarm-1	;     (-)
+	!wo befglobal-1	;  46 $a341 global
+	!wo swarm-1	;     (/)
 	!wo befreset-1	;  48 $9c05 reset
-	!wo befproc-1	;  49 $9e31 proc
-	!wo befcall-1	;  50 $9c2a call
-	!wo befexec-1	;  51 $9cec exec
-	!wo befendproc-1	;  52 $9d19 end proc
-	!wo befexit-1	;  53 $9d37 exit
+	!wo befproc-1	;  49 $9e33 proc
+	!wo befcall-1	;  50 $9c64 call
+	!wo befexec-1	;  51 $9ce4 exec
+	!wo befendproc-1	;  52 $9d11 end proc
+	!wo befexit-1	;  53 $9d2f exit
 	!wo befendloop-1	;  54 $c97e end loop
-	!wo befonkey-1	;  55 $9d6d on key
-	!wo befdisable-1	;  56 $9da0 disable
-	!wo befresume-1	;  57 $9df5 resume
-	!wo befloop-1	;  58 $9e54 loop
+	!wo befonkey-1	;  55 $9d70 on key
+	!wo befdisable-1	;  56 $9da2 disable
+	!wo befresume-1	;  57 $9df7 resume
+	!wo befloop-1	;  58 $9e55 loop
 	!wo befdelay-1	;  59 $c947 delay
-	!wo $9e4a		;     (<)
-	!wo $9e4a		;     (=)
-	!wo $9e4a		;     (>)
-	!wo $9e4a		;     (?)
+	!wo swarm-1	;     (<)
+	!wo swarm-1	;     (=)
+	!wo swarm-1	;     (>)
+	!wo swarm-1	;     (?)
 	!wo befsecure-1	;  64 $c950 secure
 	!wo bef0-1	;  65 $9174 disapa
 	!wo befcircle-1	;  66 $9489 circle
-	!wo befonerror-1	;  67 $9e70 on error
-	!wo befnoerr-1	;  68 $9e92 no error
-	!wo beflocal-1	;  69 $a2f6 local
+	!wo befonerror-1	;  67 $9e71 on error
+	!wo befnoerr-1	;  68 $9e93 no error
+	!wo beflocal-1	;  69 $a2fa local
 	!wo befrcomp-1	;  70 $9f1f rcomp
-	!wo befelse-1	;  71 $a2c1 else
+	!wo befelse-1	;  71 $a2c6 else
 	!wo befretrace-1	;  72 $9b48 retrace
 	!wo beftrace-1	;  73 $9b5a trace
-	!wo befdir-1	;  74 $9546 dir
+	!wo befdir-1	;  74 $9544 dir
 	!wo befpage-1	;  75 $9836 page
 	!wo befdump-1	;  76 $9f3a dump
 	!wo beffind-1	;  77 $a594 find
@@ -811,7 +813,7 @@ vecplace	!wo befplace-1	;  16 $ccd7 place    (changed from 86e2)
 	!wo befinsert-1	;  91 $af42 insert   (fn insert)
 	!wo swarm-1	;     $9e9a bad mode (fn pot)
 	!wo swarm-1	;     $9e9a bad mode (fn penx)
-vecbmode	!wo $9e99		;     (^)
+vecbmode	!wo swarm-1	;     (^)
 	!wo swarm-1	;     $9e9a bad mode (fn peny)
 	!wo swarm-1	;     $9e9a bad mode (fn sound)
 	!wo befgraphics-1	;  97 $8bea graphics (fn graphics)
@@ -826,8 +828,8 @@ vecbmode	!wo $9e99		;     (^)
 	!wo befangl-1	; 106 $ab10 angl
 	!wo befarc-1	; 107 $a876 arc
 	!wo befcold-1	; 108 $8147 cold
-	!wo befscrsv-1	; 109 $b18f scrsv
-	!wo befscrld-1	; 110 $b1dc scrld
+	!wo befscrsv-1	; 109 $b191 scrsv
+	!wo befscrld-1	; 110 $b1dd scrld
 	!wo beftext-1	; 111 $b229 text
 	!wo befcset-1	; 112 $b30d cset
 	!wo befvol-1	; 113 $b33a vol
@@ -841,7 +843,7 @@ vecbmode	!wo $9e99		;     (^)
 vecrenum	!wo befrenum-1	; 121 $837f renumber (changed from 87b4)
 	!wo befmem-1	; 122 $bdad mem
 	!wo befdetect-1	; 123 $bdf7 detect
-	!wo $bdf6		; 124 $bdf7          (fn check)
+veccheck	!wo befcheck-1	; 124 $a278 check    (fn check)
 	!wo befdisplay-1	; 125 $be13 display
 	!wo beferror-1	; 126 $bfbb error    (fn err)
 	!wo befout-1	; 127 $9ed1 out
@@ -860,7 +862,7 @@ tsbf9	!tx "until without repeaT"	; 41 / $29
 tsbfa	!tx "stack too largE"	; 42 / $2a
 tsbfb	!tx "too few lineS"		; 43 / $2b
 tsbfc	!tx "bad char for a moB"	; 44 / $2c
-	;   "array not found	; 45 / $2d (pt 7)
+;	    "array not found	; 45 / $2d (pt 7)
 tsbf0	!tx "bad modE"		; 32 / $20
 
 ; ----------------------------------------- 
