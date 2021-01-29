@@ -1565,125 +1565,136 @@ kreis2	jsr vglae
 
 ; ----------------------------------------- tokenizer
 ; ab69
-zum2	jmp tok5
+zum2	jmp tok5		; continue with next char
 
 ; ----------------------------------------- 
 ; ab6c
-zeiumw1	ldy #5		; entry point
-zum0	lda $01fb,y
+zeiumw1	ldy #5		; entry point, .y=index in basic line
+zum0	lda $01fb,y	; read from $0200 (up to $00)
 	bne +
 --	rts
 ; ab74
-+	cmp #$22
++	cmp #$22		; string?
 	bne +
--	iny
-	lda $01fb,y
+-	iny		; yes, skip string
+	lda $01fb,y	; up to line end
 	beq --
-	cmp #$22
+	cmp #$22		; or next quote
 	bne -
-	beq zum2
+	beq zum2		; then continue
 ; ab84
-+	cmp #$40		; "@"?
++	cmp #$40		; "@"? (precedes DESIGN lines)
 	bne +
-zum1	iny
+zum1	iny		; yes, skip this line
 	lda $01fb,y
 	bne zum1
-	beq zum0
+	beq zum0		; and leave
 
-+	cmp #$44		; "d"?
++	cmp #$44		; "d"? (could be DATA)
 	bne ++
-	pha
+	pha		; yes, "d", store to stack
 	tya
 	pha
 	ldx #$ff
--	inx
+-	inx		; is it DATA?
 	iny
 	lda $01fb,y
 	cmp ata,x		; "ata"?
 	bne +
 	cpx #2
 	bne -
-	pla
+	pla		; yes, restore
 	tay
 	pla
-	bne zum1
-
-+	pla
+	bne zum1		; and skip this line
++	pla		; no, restore
 	tay
 	pla
-++	cmp #$41
+++	cmp #$41		; Buchstabe?
 	bcc zum2
 	cmp #$db
 	bcs zum2
-	sty zwisp2
-	ldx #>tabbef
+
+	sty zwisp2	; wenn nicht: weiterscannen, store .y
+	ldx #>tabbef	; Liste der Befehlsworte ansteuern
 	stx $21
 	ldx #<tabbef
 	stx $20
+
 	ldx #0
-	stx codezae
-tok3	cmp ($20,x)
-	beq $abee		; !!! Trick
-	and #$7f
-	cmp ($20,x)
-	beq tok0
+	stx codezae	; Tokenzähler auf null setzen
+tok3	cmp ($20,x)	; Zeichen in Befehlswort enthalten?
+	beq $abee		; ja (!!! Trick: springt auf INY)
+
+	and #$7f		; nein, Bit 7 aus (geshiftet?)
+	cmp ($20,x)	; jetzt im Befehlswort?
+	beq tok0		; ja, Befehl gefunden
+
 	lda ($20,x)
-	cmp #$40		; "@"?
+	cmp #$40		; "@"? (Ende des Befehlswortes?)
 	beq tok1
+
 -	lda ($20,x)	; end of line?
-	beq tok5
-	cmp #$40		; "@"?
-	beq tok2
-	inc $20
+	beq tok5		; ja, fertig, Zeile tokenisiert
+	cmp #$40		; "@"? (Ende des Befehlswortes?)
+	beq tok2		; ja, Tokenzähler erhöhen
+	inc $20		; weiterscannen (in Befehlsliste)
 	bne -
 	inc $21
 	bne -
 ; abe7
-tok2	inc codezae
-	ldy zwisp2
-	lda #$c8		; $abee: $c8=INY!
+tok2	inc codezae	; Vergleich negativ, Tokenzähler plus 1
+	ldy zwisp2	; Index in Basiczeile holen, nicht erhöhen!
+
+	!by $a9		; LDA #$c8 ($abee: $c8=INY!)
+abee	iny		; (nächstes) Zeichen ansteuern
 	lda $01fb,y
-	inc $20
-	bne tok3
+	inc $20		; Zeiger in Befehlsliste erhöhen
+	bne tok3		; nächstes Zeichen vergleichen
 	inc $21
 	bne tok3
-tok0	cpy zwisp2
-	beq tok5
+
+tok0	cpy zwisp2	; Buchstabe ist geshiftet:
+	beq tok5		; nein, falsche Stelle im Befehlswort
 	iny
 tok1	ldx zwisp2
-	lda #$64		; write token prefix
+	lda #$64		; yes, write token prefix ($64)
 	sta $01fb,x
 	inx
-	lda codezae	; write token number
+	lda codezae	; and write token counter
 	sta $01fb,x
-	inc $01fb,x
-	cmp #$40		; bef SECURE?
+	inc $01fb,x	; and increase by one
+
+	cmp #$40		; bef DISAPA? (Token 65)
 	bne tok4
-	lda #$3a		; yes, write 4 ":"
-	ldy #0
--	inx
+
+	lda #$3a		; yes, write 4 colons to DISAPA
+	ldy #0		; (results in 5 colons if one followed DISAPA
+-	inx		; and in 4 if DISAPA was shifted)
 	iny
-	sta $01fb,x
+	sta $01fb,x	; (SECURE 0 writes $00 $3a to token position)
 	cpy #4
 	bmi -
 	txa
 	tay
-	jmp zum0
+	jmp zum0		; continue scan
 
-tok4	dey		; move rest of line
+tok4	dey		; and move rest of line to earlier position
 -	iny
 	inx
-	lda $01fb,y
+	lda $01fb,y	; until end of line
 	sta $01fb,x
 	bne -
--	inx
+
+-	inx		; then set new end of line
 	lda #0
 	sta $01fb,x
-	lda $01fc,x
+	lda $01fc,x	; until old end of line
 	bne -
-	ldy zwisp2
+	ldy zwisp2	; get index in moved line
 	iny
-tok5	iny
+
+tok5	iny		; continue with next char in basic line
 	jmp zum0
 
 ; ----------------------------------------- part of USE
