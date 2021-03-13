@@ -8,6 +8,7 @@
 ;
 ; patched on 13.01.2021
 ; patched on 25.01.2021 (tables)
+; patched on 13.03.2021 (befcold)
 ;
 ; ----------------------------------------- 
 
@@ -183,12 +184,11 @@ befcold	jsr basromei
 	stx ramstart
 	ldy #$80
 	jsr $fd8c		; sys set memory top
-	jsr $e453		; sys load basic vectors
+	jsr $e453		; sys load basic vectors ($0300..$030b)
 	jsr $e3bf		; sys init ram
 	sei
 	jsr $fda3		; sys init cias
-	jsr $ff5b		; sys init VIC
-	cli
+	jsr $ff5b		; sys init VIC and keyboard
 	lda #0
 	tax
 -	sta faststack,x
@@ -196,16 +196,16 @@ befcold	jsr basromei
 	sta settings2,x
 	inx
 	bne -
-	jsr cold1		; set drive 8 and vectors
+into	jsr cold1		; set drive 8 and LOAD/SAVE vectors
 	ldx #11
 -	lda tsbvecs,x
 	sta basvecs,x
 	dex
 	bpl -
 	ldx #$81
-	stx $fffa+1	; sys nmi vector hi
+	stx $fffa+1	; sys nmi vector hi ($8118)
 	inx
-	stx nmivec+1
+	stx nmivec+1	; NMI = $82fa
 	inx
 	stx brkvec+1
 	lda #<sbrk	; SBRK = $8314!
@@ -214,6 +214,7 @@ befcold	jsr basromei
 	sta $fffa		; sys nmi vector lo
 	lda #$fa
 	sta nmivec
+	cli
 	lda $2b		; get start of basic program
 	ldy $2c
 	jsr $a408		; sys free memory
@@ -228,7 +229,7 @@ tsbvecs	!wo warmstart,sloop,zeiumw,slist,sbasbef,sgetari
 
 ; ----------------------------------------- 
 ; 81b7
-tsbpudef	!by $00,$23,$2a,$2c,$2e,$2b,$2d	; #*,.+-
+tsbpudef	!by $00,$23,$2a,$2c,$2e,$2b,$2d	; #*,.+- (index 0 is free to use)
 
 ; ----------------------------------------- 
 ; 81be
@@ -799,7 +800,7 @@ vecplace	!wo befplace-1	;  16 $ccd7 place    (changed from 86e2)
 	!wo beffind-1	;  77 $a594 find
 	!wo befoption-1	;  78 $9b63 option
 	!wo befauto-1	;  79 $9bd6 auto
-	!wo befold-1	;  80 $9edaold
+	!wo befold-1	;  80 $9eda old
 	!wo swarm-1	;     $9e9a bad mode (fn joy)
 	!wo befmod-1	;  82 $bfe3 mod      (fn mod)
 	!wo swarm-1	;     $9e9a bad mode (fn div)
@@ -843,7 +844,7 @@ vecbmode	!wo swarm-1	;     (^)
 vecrenum	!wo befrenum-1	; 121 $837f renumber (changed from 87b4)
 	!wo befmem-1	; 122 $bdad mem
 	!wo befdetect-1	; 123 $bdf7 detect
-veccheck	!wo befcheck-1	; 124 $a278 check    (fn check)
+	!wo befcheck-1	; 124 $a278 check    (fn check)
 	!wo befdisplay-1	; 125 $be13 display
 	!wo beferror-1	; 126 $bfbb error    (fn err)
 	!wo befout-1	; 127 $9ed1 out
