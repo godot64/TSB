@@ -24,6 +24,6 @@ Arndt Dettke
 
 ---
 [TSB]: https://www.godot64.de/download/tsbdemo.zip "file about 100 KB"
-[tsbcrt]; https://www.godot64.de/download/TSB.crt "file has 65 KB"
+[tsbcrt]: https://www.godot64.de/download/TSB.crt "file has 65 KB"
 [SB Docs]: https://www.c64-wiki.de/wiki/Simons_Basic
 [TSB Docs]: https://www.c64-wiki.de/wiki/TSB
