@@ -10,6 +10,8 @@
 ;   (commands BFLASH, FLASH, DIR, OPTION, PAGE, PLAY & TRACE)
 ; patched on 25.01.2021
 ;   (interpreter, commands EXEC, CALL, EXIT & PROC)
+; patched on 24.03.2021
+;   (commands DIR, CALL, added FastCall)
 ;
 ; ----------------------------------------- 
 
@@ -114,7 +116,7 @@ befhires	ldy #$01
 	sty lowcolflag
 	lda #$e0
 	sta $a7
-	jsr g2nsafe	; ca73, get2nyb (farben), even after MEM
+	jsr g2nsafe	; ca79, get2nyb (farben), even after MEM
 	ldx $aa
 	stx $ac
 
@@ -130,7 +132,7 @@ befhires	ldy #$01
 
 	lda #0
 	sta multijn
-	jsr nrm
+	jsr nrm00
 	lda #10
 	sta gmemflag
 	lda #$3b
@@ -551,7 +553,7 @@ usedrv	jsr sgetbyt1	; get drive# (constant)
 	stx drive		; and set
 	jmp endsmb
 
-; ----------------------------------------- 
+; ----------------------------------------- !!! not needed anymore !!!
 ; 953b
 slp1	jsr nrm		; process NRM
 	ldx #$17		; set lower chars
@@ -576,7 +578,7 @@ dir0	ldy $af
 	sta $ba
 	jsr basromau
 	lda $69
-	jsr fileopen	; aa5e open file
+	jsr fileopen	; aa5a open file
 	jsr basromei
 
 	ldx #5

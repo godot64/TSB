@@ -864,7 +864,7 @@ infind	jsr inc20
 	lda pendflag
 	cmp #1
 	bne +
-	jmp $e386		; sys warmstart
+	jmp $e386		; sys Ready (.x=$80)
 
 +	jsr inc20
 	lda ($20),y
@@ -1175,14 +1175,14 @@ befpause	jsr chrget
 
 ; ----------------------------------------- bef NRM
 ; a831			enhanced
-befnrm	jsr nrm
+befnrm	jsr nrm00
 nrm1	jmp nrm2
 
 ; a837
-nrm	lda #$1b
+nrm00	lda #$17		; lower case chars
+nrm	sta $d018
+	lda #$1b
 	sta $d011
-	lda #$15		; upper case chars
-	sta $d018
 	lda #$c8
 	sta $d016
 	lda #$c7
@@ -1413,34 +1413,34 @@ a8a9bogm	lda $a8
 	ldy #$ae
 	jsr sfldfack
 	jsr sfmult
-	jsr sfacarg
-	lda #$b4		; 180
+	jsr sfacarg	; returns .x=0
+	stx $62
+	lda #$b4		; 180 to 62/63
 	sta $63
-	lda #$00
-	sta $62
 	jsr scflp
 	lda $61
-	ldy $70
-	jmp sfdiv
+	jmp jsfdiv
 
 ; ----------------------------------------- part of DIR
-; aa5e
+; aa5a
 fileopen	jsr $ffbd		; sys setnam
 	ldx $ba
 	lda #1
 	ldy #0
 	jsr $ffba		; sys setlfs
 	jsr $ffc0		; sys OPEN
-	jmp chkin1	; 9f35
+	bcc +
+	tax		; .x=Error# (f.i.: 5)
+	jmp ($0300)
++	jmp chkin1	; 9f35
 
 ; ----------------------------------------- 
 
 	!by 0
 
 ; ----------------------------------------- 
-; aa71
+; aa73
 pkber	lda $20
-	cmp #0
 	bne +
 	jsr kmyminus
 	jmp kmxplus
@@ -1710,7 +1710,12 @@ use4	sta $43		; len of ctrl string
 
 ; ----------------------------------------- 
 ; ac54
-	!by $ea,$ea,$ea,$ea,$ea,$00
+jsfdiv	ldy $70
+	jmp sfdiv
+
+; ----------------------------------------- 
+
+	!by 0
 
 ; ----------------------------------------- 
 ; ac5a

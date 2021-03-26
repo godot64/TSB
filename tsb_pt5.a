@@ -9,6 +9,7 @@
 ; patched on 07.03.2020 (command INSERT)
 ; patched on 13.01.2021 (commands KEY & VOL)
 ; patched on 25.01.2021 (added parts of FASTCALL)
+; patched on 19.03.2021 (bugfix in EXEC)
 ; 
 ; ----------------------------------------- 
 
@@ -571,7 +572,13 @@ fillfast	ldx prstack	; stack voll?
 
 ; -----------------------------------------
 
-	!by 0,0,0,0,0,0,0,0,0,0,0
+cfreset	lda #0
+	sta execflag
+	jmp fastcall
+
+; -----------------------------------------
+
+	!by 0,0,0
 
 ; ----------------------------------------- bef FETCH
 ; b004			recoded
@@ -877,7 +884,7 @@ befscrld	jsr intro
 ; ----------------------------------------- 
 ; b1ef
 ss3	lda #$c3		; (ff)c3= close (vorsichtshalber)
-	bit $90
+	bit status
 	beq ss0
 ss5	jsr $ffcc		; clrch
 	lda $b8		; file#
@@ -891,7 +898,7 @@ distr	jmp ($00f8)
 ; ----------------------------------------- 
 ; b203
 intro	jsr incbasbz
-	jsr sopen
+	jsr safeopen
 	ldy #$00
 	sty $fb		; fb: 0400/e000
 	sty $fd		; fd: d800
@@ -1049,14 +1056,19 @@ befcset	jsr sgetbytn
 	sta $dd00
 	lda #10
 	sta gmemflag
-	jmp endsmb
+	jmp endsmb	; 2a
 
-+	jsr nrm		; reset vic
-	cpx #1
++	dex
 	bne +
 	lda #$17		; lower case chars
-	sta $d018
-+	jmp endsmb
+	!by $2c
++	lda #$15		; upper case chars
+	jsr nrm		; reset vic
+	jmp endsmb
+
+; ----------------------------------------- 
+
+	!by 0
 
 ; ----------------------------------------- bef VOL
 ; b33a			enhanced
@@ -1471,7 +1483,7 @@ befpaint	jsr sgetadrn
 	lda #11		; test
 	sta $f7
 	jsr punkt
-	lda $90		; result (1=set,0=unset)
+	lda status	; result (1=set,0=unset)
 	sta $6a
 	cmp $66
 	beq +
@@ -1648,7 +1660,7 @@ testfrei	lda $5c
 	jsr kerromein
 	lda $66
 	sta $f7
-	lda $90
+	lda status
 	cmp $6a
 	beq +
 	lda #1

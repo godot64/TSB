@@ -46,7 +46,7 @@ arrbreak	jsr $ffe1		; sys STOP?
 ; cc31
 stopped	pla
 	pla
-	jmp nrm1		; back to all normal
+	jmp nrm2		; back to all normal
 
 ; ----------------------------------------- 
 ; cc36
@@ -352,6 +352,7 @@ onearray	sta $45		; store first char
 
 err2c	ldx #$2d		; error "array nor found"
 	jmp ($0300)
+
 tsbfd	!tx "array not founD"
 
 ; ----------------------------------------- part of RENUMBER

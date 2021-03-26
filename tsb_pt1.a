@@ -374,7 +374,7 @@ sloop	sei
 	beq +
 	inx		; (.x not needed anymore)
 	jsr basromau
-	jsr slp1		; do NRM
+	jsr nrm00		; do NRM
 +	jsr basromei
 	lda autoflag
 	cmp #10
@@ -662,7 +662,7 @@ tabbef	!tx "hires@"	; 1
 	!tx "insert@"
 	!tx "pot@"
 	!tx "penx@"
-	!tx ">>@"
+	!tx ">@"
 	!tx "peny@"
 	!tx "sound@"
 	!tx "graphics@"	; 97
@@ -700,7 +700,7 @@ tabbef	!tx "hires@"	; 1
 
 ; ----------------------------------------- 
 ; 86a1
-tuned	!tx " tuned", $0d	; tsb start message 
+tuned	!tx $0e," tuned", $0d	; tsb start message 
 	!by 0
 
 ; ----------------------------------------- 

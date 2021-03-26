@@ -9,6 +9,7 @@
 ; patched, adding a new feature to COLOUR
 ; patched on 13.01.2021 (commands DELAY & SECURE)
 ; patched on 25.01.2021
+; patched on 24.03.2021 (command ERROR plus LIST & MOD)
 ;
 ; ----------------------------------------- 
 
@@ -119,7 +120,7 @@ dup1	ldy $f7
 	jsr punkt
 	lda $ab
 	sta $f7
-	lda $90
+	lda status
 	beq dup2
 	lda ex
 	sta $09
@@ -404,7 +405,7 @@ cploop1	lda #160
 	sta $f7
 	jsr punkt
 	jsr kerromein
-	lda $90
+	lda status
 	beq +
 	cmp #8
 	beq +
@@ -612,8 +613,8 @@ blockzei	ldx ay
 	jsr punkt
 	lda #0
 	sta gflag
-	lda $90
-	cmp #$08
+	lda status
+	cmp #8
 	bne +
 	jmp swarm		; error bad mode
 
@@ -830,26 +831,18 @@ docolor	ldx #0
 	jmp docolor2
 
 ; ----------------------------------------- 
-
-	!fill 7,$ad
-
-; ----------------------------------------- 
-; bdaa
+; bda3
 rtrcout	jmp dscbmout
 
 ; ----------------------------------------- bef MEM
-; bdad			; new/enhanced
+; bda6			; new/enhanced
 befmem	ldy #1		; commands following?
 	lda (progz),y
 	bpl memnrml
 	jmp memplus	; yes, process
 
 ; ----------------------------------------- 
-
-	!by $ea,$ea
-
-; ----------------------------------------- 
-; bdb8
+; bdaf
 memnrml	lda #$cc		; video now at $cc00
 	sta $0288
 	lda #$93		; clr/home
@@ -878,7 +871,12 @@ memnrml	lda #$cc		; video now at $cc00
 	sta $dd00
 	lda #$39		; video at $cc00
 	sta $d018
-	jmp befsoff	; save bef vectors and leave
+	jsr repchrget	; save bef vectors and leave
+	jmp setbmode	; at a035: bad mode to PLACE & RENUMBER
+
+; ----------------------------------------- 
+; bdf1
+	!by 0,0,0,0,0,0	; 6 bytes
 
 ; ----------------------------------------- bef DETECT
 ; bdf7			original
@@ -986,7 +984,7 @@ crtxout	lda ay
 	bne -
 +	jmp dpl0		; back to loop
 
-; ----------------------------------------- part of PAGE
+; ----------------------------------------- part of LIST/PAGE
 ; becb
 slist3	php
 	sty $c5fe		; save .y
@@ -1025,7 +1023,6 @@ pge1	ldy pageflag	; page active?
 
 pge0	jsr $ffe1		; STOP?
 	beq ++		; yes, break
-	nop
 	jsr $ffe4		; get key
 	cmp #$0d		; cr?
 	bne pge0		; no, hold
@@ -1057,7 +1054,7 @@ pge3	ldx #>tabbef
 -	ldy $c5fe		; no, .y back
 	ldx $c5ff		; .x back
 	jmp slist1	; to sys LIST
-; bf52
+; bf51
 pge4	ldx $d4		; crsr off?
 	cpx #0
 	bne -		; yes
@@ -1114,14 +1111,14 @@ pge6	lda ($20),y	; out command word
 	jmp slist2	; to sys LIST
 
 ; ----------------------------------------- bef ERROR
-; bfbb			new
+; bfba			new
 beferror	jsr chrget
 	cmp #$b0		; next char is token of OR?
 	beq flpmsg
 	jmp swarm		; no, error bad mode
 
-flpmsg	lda $be		; get drive
-	sta $ba		; and set
+flpmsg	jsr chkdrv	; is drive there? 
+flpmsg2	lda $ba		; and set
 	jsr $ffb4		; sys talk
 	lda #$6f
 	sta $b9
@@ -1555,25 +1552,20 @@ do2	jsr basromau
 
 ; ----------------------------------------- 
 ; c9da
-	!by 0,0,0
-
-; ----------------------------------------- 
-; c9dd
-nrm2	jsr allnrm
+nrm2	jsr allnrm	; here: returned from TSB.MEM
 -	jmp bef0
 
 ; ----------------------------------------- 
-; c9e3
+; c9e0
 allnrm	lda vecrenum	; vector of bef RENUMBER
 	cmp #<befrenum-1	; unchanged? (after MEM)
 	beq -		; yes, leave
-; c9ea
+; c9e7
 	lda progz+2	; chrget changed?
 	cmp #$4c
 	beq nrm3		; yes, go to tsb.ext
 
 	ldx #<nammem	; load "tsb.mem"
-	ldy #>nammem
 	jsr loadext
 	bcs iffail	; leave if fail
 
@@ -1588,37 +1580,45 @@ allnrm	lda vecrenum	; vector of bef RENUMBER
 	rts
 
 ; ----------------------------------------- 
-; ca0e
+; ca09
 iffail	pla
 	pla
 iffail1	ldx #24		; row 24
 	lda #0		; column 0 (bottom)
 	jsr $e570		; sys set cursor
-	jmp flpmsg
+	jsr basromau
+	jmp flpmsg2
+
+; ----------------------------------------- 
+; ca18
+	!by 0,0
 
 ; ----------------------------------------- bef INST
 ; ca1a			new
 befinst	ldx #<nameext	; load "tsb.ext"
-	ldy #>nameext
 	jsr loadext
 	bcs iffail1	; leave if fail
 
 	jsr basromau
 	ldy #0
-	jsr extension	; cc00
-	jmp setbmode
+	jsr extension	; cc00: init DOS Wedge
+	jmp setbmode	; unlink vectors: PLACE/RENUMBER
 
 ; ----------------------------------------- 
-; ca2e
+; ca2c
 nrm3	jsr kerromein
 	cli
-	jmp $ce6c		; continue in tsb.ext
+	jmp $ce6c		; repair CHRGET
 
 ; ----------------------------------------- 
-; ca35
-loadext	lda #7		; 7 chars
+; ca33
+loadext	stx helpvec
+	jsr chkdrv	; drive ready?
+	ldx helpvec
+	ldy #>names
+	lda #7		; yes, set 7 chars
 	jsr $ffbd		; sys setnam
-	lda #$0f
+	lda #1		; LOAD "name",dr,1
 	ldx $be		; drive
 	tay
 	jsr $ffba		; sys setlfs
@@ -1627,14 +1627,15 @@ loadext	lda #7		; 7 chars
 	jmp load		; sys LOAD
 
 ; ----------------------------------------- 
-; ca49
+; ca50
+names
 nammem	!tx "tsb.mem"
 nameext	!tx "tsb.ext"
-namehsg	!tx "tsb.hsg",0
+namehsg	!tx "tsb.hsg"
 
 ; ----------------------------------------- 
-; ca5f
-repchrget	lda progz+2	; chrget changed?
+; ca65
+repchrget	lda progz+2	; chrget changed (by INST)?
 	cmp #$4c
 	bne +		; no, leave
 
@@ -1647,14 +1648,9 @@ repchrget	lda progz+2	; chrget changed?
 +	rts
 
 ; ----------------------------------------- 
-; ca73
+; ca79
 g2nsafe	jsr repchrget	; repair chrget
 	jmp get2nyb
-
-; ----------------------------------------- 
-; ca79
-befsoff	jsr repchrget
-	jmp setbmode	; a035
 
 ; ----------------------------------------- 
 ; ca7f
