@@ -631,7 +631,7 @@ tabbef	!tx "hires@"	; 1
 	!tx ">>@"
 	!tx ">>@"
 	!tx ">>@"
-	!tx ">>@"
+	!tx ">@"
 	!tx "secure@"
 	!tx "disapa@"	; 65
 	!tx "circle@"
@@ -700,7 +700,7 @@ tabbef	!tx "hires@"	; 1
 
 ; ----------------------------------------- 
 ; 86a1
-tuned	!tx $0e," tuned", $0d	; tsb start message 
+tuned	!tx $0e,$08," tuned", $0d	; tsb start message 
 	!by 0
 
 ; ----------------------------------------- 

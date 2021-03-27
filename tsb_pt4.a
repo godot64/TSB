@@ -1069,7 +1069,7 @@ whichdo	bcs waitkey	; "null"? (if .c=1)
 	ldy #$ff		; no, DONE?
 -	iny
 	lda (progz),y
-	cmp tuned+3,y	; "ne"?
+	cmp tuned+5,y	; "ne"?
 	beq -
 	cpy #2
 	jmp dodone
