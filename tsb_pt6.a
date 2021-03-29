@@ -1282,10 +1282,12 @@ bin0	asl
 	tya
 	beq $c77c		; 13 bytes
 
-	!by 0,0,0,0,0,0,0
-; (20)
+; ----------------------------------------- 
+
+	!by 0,0,0,0
+
 ; ----------------------------------------- part of OUT
-; c7f2
+; c7ef
 outx	jsr chrget	; anything following?
 	beq +		; no
 
@@ -1329,8 +1331,9 @@ outx	jsr chrget	; anything following?
 outx0	jmp endsmb
 
 ; ----------------------------------------- bef LIN
-; c83d			new
-beflin	jsr incbasbz
+; c83a			new
+beflin	jsr chkdrv	; is drive present?
+	jsr incbasbz	; yes, you can save
 	jsr del1
 	beq +
 	jsr del5

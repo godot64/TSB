@@ -178,6 +178,7 @@ l927f	lda $39		; basic line #
 
 dodone	bcs +		; DONE?
 	jmp befproc	; no, skip rest of line
+
 +	jmp docont	; b56a
 
 ; ----------------------------------------- 

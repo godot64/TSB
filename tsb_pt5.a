@@ -1066,18 +1066,14 @@ befcset	jsr sgetbytn
 	jsr nrm		; reset vic
 	jmp endsmb
 
-; ----------------------------------------- 
-
-	!by 0
-
 ; ----------------------------------------- bef VOL
-; b33a			enhanced
+; b339			enhanced
 befvol	jsr chkonoff
 	stx $d418
 	jmp endsmb
 
 ; ----------------------------------------- 
-; b343
+; b342
 txcont	pla
 	sta chgr
 	pla
@@ -1089,16 +1085,17 @@ txcont	pla
 	iny
 	cpy helpvec
 	bne txl2
-	jmp endsmb
+	beq +
 
 ; ----------------------------------------- bef DISK
-; b358			recoded
-befdisk	jsr sgetstrn
+; b356			recoded
+befdisk	jsr chkdrv	; is drive there? 
+	jsr sgetstrn	; yes, get string
 	lda $69
 	sta $b7
 	stx $bb
 	sty $bc
-	lda $be		; drive
+	lda $be		; set TSB drive
 	sta $ba
 	jsr $ffb1		; sys send listen
 	lda #$6f
@@ -1114,12 +1111,8 @@ befdisk	jsr sgetstrn
 	lda $9d		; direct mode?
 	beq +
 	jsr dec7a
-	jmp flpmsg	; bfc5 yes, to bef ERROR
+	jmp flpmsg2	; bfc5 yes, to bef ERROR
 +	jmp endsmb	; no, end command
-
-; ----------------------------------------- 
-
-	!by 0
 
 ; ----------------------------------------- main part of USE
 ; b38e			recoded

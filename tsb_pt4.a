@@ -1064,7 +1064,7 @@ desmulti	ldy #0
 
 ; ----------------------------------------- part of DO
 ; a757
-whichdo	bcs waitkey	; "null"? (if .c=1)
+whichdo	bne waitkey	; "null"? (yes, if not .e)
 
 	ldy #$ff		; no, DONE?
 -	iny
