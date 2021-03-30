@@ -16,6 +16,7 @@
 	pport	= $01
 	int	= $14
 	progz	= $7a
+	status	= $90
 	helpvec	= $b0
 	drive	= $be
 	numkeys	= $c6
