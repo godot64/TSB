@@ -8,7 +8,7 @@
 ;
 ; patched on 13.01.2021
 ; patched on 25.01.2021 (tables)
-; patched on 13.03.2021 (befcold)
+; patched on 13.03.2021 (command COLD, Reset, Stop/Restore)
 ;
 ; ----------------------------------------- 
 
@@ -188,7 +188,7 @@ befcold	jsr basromei
 	jsr $e3bf		; sys init ram
 	sei
 	jsr $fda3		; sys init cias
-	jsr $ff5b		; sys init VIC and keyboard
+	jsr colsout	; sys init VIC and keyboard, set TSB colors
 	lda #0
 	tax
 -	sta faststack,x
@@ -221,7 +221,7 @@ into	jsr cold1		; set drive 8 and LOAD/SAVE vectors
 	jsr $e422		; sys out start message of sb
 	ldx #$fb
 	txs
-	jmp dscbmout	; show "tuned"
+	jmp dscbmout	; set colors, show "tuned"
 
 ; ----------------------------------------- 
 ; 81ab
@@ -374,7 +374,7 @@ sloop	sei
 	beq +
 	inx		; (.x not needed anymore)
 	jsr basromau
-	jsr nrm00		; do NRM
+	jsr nrm01		; do NRM
 +	jsr basromei
 	lda autoflag
 	cmp #10
@@ -457,14 +457,9 @@ snmi	pha
 ; 8314
 sbrk	lda #$04
 	sta video		; video at $0400
-	jsr $fda3
+	jsr $fda3		; set CIAs
 	jsr $e518		; sys init screen
-	lda #12		; backgr: mgr
-	sta $d021
-	lda #11		; border: dgr
-	sta $d020
-	lda #0		; cursor: blk
-	sta aktfarb
+	jsr tsbcols	; set colors, returns .a=0
 	sta $d4
 	sta mobbew
 	sta gmemflag
@@ -476,7 +471,7 @@ sbrk	lda #$04
 rs232nmi	jmp $fe72		; nmi when rs323
 
 ; ----------------------------------------- bef MERGE (TSB)
-; 8344			recoded
+; 8338			recoded
 befmerge	jsr incbasbz
 	jsr basromei
 	lda #0		; force LOAD
@@ -494,24 +489,20 @@ befmerge	jsr incbasbz
 +	jmp $e0f9		; sys no, break in...
 
 ; ----------------------------------------- 
-; 8369
+; 835d
 ++	jsr basromau
 	jsr domerge	; continue MERGE:
 endmrge	jsr $a660		; sys clear
 	jmp $a474		; sys out: ready.
 
 ; ----------------------------------------- 
-; 8375
+; 8369
 schkstr	jsr pspeibe
 	jsr $ad8f		; sys check for string
 	jmp prestor
 
-; ----------------------------------------- 
-
-	!by 0
-
 ; ----------------------------------------- bef RENUMBER (TSB)
-; 837f			recoded
+; 8372			recoded
 befrenum	jsr incbasbz
 	jsr sgetadr	; result in .y (lo) and .a (lo)
 	sty $a4
@@ -552,13 +543,19 @@ befrenum	jsr incbasbz
 	sta $a5
 	jmp -
 
-; 83d1
+; 83c4
 sbready	jsr $a659		; sys basic bef CLR
 	jmp $a474		; sys out: ready.
 
 ; ----------------------------------------- 
-
-	!by 0,0
+; 83ca
+tsbcols	ldx #12		; backgr: mgr
+	stx $d021
+	dex		; border: dgr
+	stx $d020
+	lda #0		; cursor: blk
+	sta aktfarb
+	rts
 
 ; ----------------------------------------- 
 ; 83d9
@@ -699,7 +696,7 @@ tabbef	!tx "hires@"	; 1
 	!by 0		; end of tab
 
 ; ----------------------------------------- 
-; 86a1
+; 869f
 tuned	!tx $0e,$08," tuned", $0d	; tsb start message 
 	!by 0
 

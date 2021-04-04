@@ -10,6 +10,7 @@
 ; patched on 13.01.2021 (commands KEY & VOL)
 ; patched on 25.01.2021 (added parts of FASTCALL)
 ; patched on 19.03.2021 (bugfix in EXEC)
+; patched on 03.04.2021 (commands CSET)
 ; 
 ; ----------------------------------------- 
 
@@ -1045,26 +1046,30 @@ txl2	jmp txloop
 ; ----------------------------------------- bef CSET
 ; b30d			original
 befcset	jsr sgetbytn
-	cpx #2
-	bne +
+	txa
+	beq +
 
-	lda #$3b		; bits for hires mode
+	dex
+	bne ++
+	lda #$17		; CSET 1: lower case chars
+	!by $2c
++	lda #$15		; CSET 0: upper case chars
+	jsr csetmem	; check for MEM, set charset
+-	jmp endsmb
+
+++	lda #$3b		; CSET 2: bits for hires mode
 	sta $d011
-	lda #$0b		; graphics at $e000
+	lda #$0b		; graphics at $e000, cols at $c000
 	sta $d018
 	lda #$94		; vic bank 3 ($c000)
 	sta $dd00
-	lda #10
+	lda #10		; flag for MOB SET
 	sta gmemflag
-	jmp endsmb	; 2a
+	bne -
 
-+	dex
-	bne +
-	lda #$17		; lower case chars
-	!by $2c
-+	lda #$15		; upper case chars
-	jsr nrm		; reset vic
-	jmp endsmb
+; ----------------------------------------- 
+
+	!by 0,0
 
 ; ----------------------------------------- bef VOL
 ; b339			enhanced

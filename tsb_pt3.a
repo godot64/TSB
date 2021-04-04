@@ -132,12 +132,12 @@ befhires	ldy #$01
 
 	lda #0
 	sta multijn
-	jsr nrm00
+	jsr nrm01
 	lda #10
 	sta gmemflag
 	lda #$3b
 	sta $d011
-	lda #$0b
+	lda #$0b		; colors at $c000
 	sta $d018
 	lda #$94
 	sta $dd00
@@ -550,16 +550,13 @@ befcolour	jsr docolor
 
 ; ----------------------------------------- part of USE
 ; 9533
-usedrv	jsr sgetbyt1	; get drive# (constant)
+usedrv	jsr sgetbyt1	; get drive# (constant[+expression])
 	stx drive		; and set
 	jmp endsmb
 
-; ----------------------------------------- !!! not needed anymore !!!
+; ----------------------------------------- 
 ; 953b
-slp1	jsr nrm		; process NRM
-	ldx #$17		; set lower chars
-	stx $d018
-	rts
+	!by 0,0,0,0,0,0,0,0,0	
 
 ; ----------------------------------------- bef DIR
 ; 9544			enhanced

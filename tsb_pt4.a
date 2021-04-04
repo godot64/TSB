@@ -8,6 +8,7 @@
 ;
 ; patched on 13.01.2021 (commands GLOBAL & LOCAL)
 ; patched on 25.01.2021 (added command CHECK)
+; patched on 04.04.2021 (commands CHECK, DO, CSET & NRM)
 ;
 ; ----------------------------------------- 
 
@@ -419,7 +420,7 @@ befhicol	lda #0
 	jmp bef0
 
 ; ----------------------------------------- bef CHECK
-; a278
+; a278			new
 befcheck	lda #>procstack	; set procstack address
 	ldy #<procstack
 	sta $21
@@ -1064,7 +1065,7 @@ desmulti	ldy #0
 
 ; ----------------------------------------- part of DO
 ; a757
-whichdo	bne waitkey	; "null"? (yes, if not .e)
+whichdo	bcs waitkey	; "null"? (yes, if .c)
 
 	ldy #$ff		; no, DONE?
 -	iny
@@ -1179,18 +1180,18 @@ befnrm	jsr nrm00
 nrm1	jmp nrm2
 
 ; a837
-nrm00	lda #$17		; lower case chars
-nrm	sta $d018
-	lda #$1b
+nrm00	lda #4		; video at $0400
+	sta $0288
+	lda #$c7		; VIC bank 0 ($0000)
+nrm02	sta $dd00
+	lda #$1b		; HIRES off
 	sta $d011
-	lda #$c8
+	lda #$c8		; MULTI off
 	sta $d016
-	lda #$c7
-	sta $dd00
 	lda #$63
 	sta gmemflag
-	lda #4		; video at $0400
-	sta $0288
+	lda #$17		; lower case chars
+nrm	sta $d018		; entry for CSET 
 	rts
 
 ; ----------------------------------------- bef MOB OFF
@@ -1285,9 +1286,32 @@ kreis	lda #$13
 	inc $21
 	bne kreis1
 
+; ----------------------------------------- Fallback from HIRES
+
+nrm01	lda $0288
+	cmp #$cc
+	bne +
+	lda #$c4
+	!by $2c
++	lda #$c7	
+	jsr nrm02
+	
+; ----------------------------------------- Part of CSET
+
+csm0	ldx $0288
+	cpx #$cc		; is MEM active?
+	bne +
+	eor #$2c		; yes, change values accordingly
++	jmp nrm
+
+csetmem	pha
+	jsr nrm01
+	pla
+	bne csm0
+
 ; ----------------------------------------- 
 
-	!fill 42,$ad
+	!fill 8
 
 ; ----------------------------------------- 
 ; a949

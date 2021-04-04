@@ -10,6 +10,7 @@
 ; patched on 13.01.2021 (commands DELAY & SECURE)
 ; patched on 25.01.2021
 ; patched on 24.03.2021 (command ERROR plus LIST & MOD)
+; patched on 03.04.2021 (commands MEM & NRM)
 ;
 ; ----------------------------------------- 
 
@@ -847,6 +848,7 @@ memnrml	lda #$cc		; video now at $cc00
 	sta $0288
 	lda #$93		; clr/home
 	jsr bsout
+
 	jsr charen0
 	lda #$d0		; open char generator
 	sta $21
@@ -867,12 +869,13 @@ memnrml	lda #$cc		; video now at $cc00
 	cpx #16		; 16 pages?
 	bne -
 	jsr charen1
+
 	lda #$94		; VIC bank 3
 	sta $dd00
 	lda #$39		; video at $cc00
 	sta $d018
 	jsr repchrget	; save bef vectors and leave
-	jmp setbmode	; at a035: bad mode to PLACE & RENUMBER
+	jmp setbmode	; at a035: set bad mode to PLACE & RENUMBER
 
 ; ----------------------------------------- 
 ; bdf1
