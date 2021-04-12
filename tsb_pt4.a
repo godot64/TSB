@@ -9,6 +9,8 @@
 ; patched on 13.01.2021 (commands GLOBAL & LOCAL)
 ; patched on 25.01.2021 (added command CHECK)
 ; patched on 04.04.2021 (commands CHECK, DO, CSET & NRM)
+; patched on 07.04.2021 (command DESIGN: optimized)
+; patched on 12.04.2021 (command AUTO)
 ;
 ; ----------------------------------------- 
 
@@ -914,154 +916,180 @@ vglae	lda vgla
 ; ----------------------------------------- bef DESIGN
 ; a632			original
 befdesign	jsr sgetbytn
-	stx $aa
+	stx $aa		; cset type (0..3)
 	cpx #4
 	bcc +
-	jmp swarm		; error bad mode
-	nop
-	nop
+	jmp swarm		; error bad mode if not
 
-+	lda #0
-	sta ax
-	sta ay
-	sta $a6
-	jsr schkcom
++	lda #0		; init:
+	sta ax		; hight of object (up to 8 or 21)
+	sta ay		; width of object (1 or 3)
+	sta $a6		; index into target
+
+	jsr schkcom	; get target address
 	jsr sgetadr
 	sty $ae
 	sta $af
-; a654
-des0	ldy #0
+
+; ----------------------------------------- main loop
+; a652
+design	ldy #0		; init gather byte
 	sty $a8
-	ldx #0
--	lda (progz),y
-	beq +
-	jsr incbasbz
-	jmp -
-; a664
-+	jsr incbasbz
+	ldx #0		; init byte line counter (0..7)
+	stx $a9		; index into multi bits (0..3)
+
+	jsr skipline	; find end of basic line
+
++	jsr incbasbz	; proceed:
 	lda (progz),y
 	sta ax+1
 	jsr incbasbz
-	lda (progz),y
+	lda (progz),y	; found end of program?
 	ora ax+1
+	beq err2b		; yes, error
+
++	jsr incbasbz	; skip next basic line header
+	jsr incbasbz
+
+; ----------------------------------------- per line loop
+; a675
+desloop	jsr incbasbz
+	lda (progz),y	; skip "@", .y=0
+	cmp #$40
+	beq desloop
+
+; ----------------------------------------- 
+; here in .a: first definition sign
+
+	stx $ab		; save .x
+	ldy $aa		; get type 
+	beq deshires
+	cpy #2		; type 0 or 2? (hires objects)
+	beq deshires
+; a688
+desmulti	ldy $a8		; no, multi: get gatherbyte
+	ldx $a9		; get index into multi bits
+	inc $a9		; and increment it for next pass
+	inc $ab		; also normal index (to gain 8 there)
+
+	cmp #$44		; "D"?
 	bne +
-	ldx #$2b		; error "too few lines"
+	tya
+	ora destab3,x
+	bne des2
++	cmp #$43		; "C"?
+	bne +
+	tya
+	ora destab2,x
+	bne des2
++	cmp #$42		; "B"?
+	bne +
+	tya
+	ora destab1,x
+	bne des2
+; a6a4
+deshires	cmp #$42		; "B"? (color1 pixel)
+	beq des1
+
++	cmp #$2e		; "."? (transparent)
+	beq descont
+	cmp #$20		; " "? (dito)
+	beq descont
+	cmp #$41		; "A"? (dito)
+	beq descont
+; a6be
+err2c2	ldx #$2c		; no, error "bad char f. a mob"
+	!by $2c
+err2b	ldx #$2b		; error "too few lines"
 	jmp ($0300)
-
-+	jsr incbasbz
-	jsr incbasbz
--	jsr incbasbz
-	ldy #0
-	lda (progz),y
-	cmp #$40		; "@"?
-	beq -
-
-	lda $aa
-	beq +
-	cmp #2
-	beq +
-	jmp desmulti
-
-+	lda ($7a),y
-	cmp #$42		; "b"?
-	beq +
-; a69d
-indes	cmp #$2e		; "."?
-	beq descont
-	cmp #$20		; " "?
-	beq descont
-	cmp #$41		; "a"?
-	beq descont
-	ldx #$2c		; error "bad char f. a mob"
-	jmp ($0300)
-; a6ae
-+	lda $a8
+; a6c6
+des1	lda $a8		; set B-pixels (color1 for MOB SET)
 	ora gbittabs,x
-	sta $a8
-; a6b5
-descont	inx
+des2	sta $a8
+; a6cd
+descont	ldy #0
+	ldx $ab		; re-get .x
+	inx		; proceed to next line in byte
 	cpx #8
-	bne -
+	bne desloop
 
-	ldy $a6
-	lda $a8
-	sta ($ae),y
-	inc $a6
-	inc ay
-	ldx #0
+; ----------------------------------------- after line
+; a6d6
+	ldy $a6		; get target index
+	lda $a8		; get gathered byte
+	sta ($ae),y	; store to target
+	inc $a6		; increment target index
+	inc ay		; increment width of object
+
+	ldy #0		; reset .y
+	ldx #0		; re-init gather byte
 	stx $a8
-	lda $aa
-	cmp #2
-	bcs +
-	lda ay
-	cmp #3
-	bne -
-+	ldy #0
-	sty ay
-	inc ax
-	lda $aa
-	cmp #2
-	bcc +
-	lda ax
-	cmp #8
-	beq ++
-+	lda ax
-	cmp #21
-	beq ++
-	jmp des0
+	stx $a9
 
--
-++	lda (progz),y
+	lda $aa		; check type
+	cmp #2		; is 2 or 3 (chars)
+	bcs +
+	lda ay		; no, 0 or 1 (mobs)
+	cmp #3		; so: is width=3?
+	beq +
+	jmp desloop	; no, loop
+
+; ----------------------------------------- line finished
+; a6f9
++	sty ay		; line finished, init width counter
+	inc ax		; increment object height
+	ldx ax		; get height
+	lda $aa
+	cmp #2		; of char?
+	bcc +
+	cpx #8		; yes, complete?
+	beq ++		; yes
++	cpx #21		; of mob: is height=21?
+	beq ++		; yes, complete
+
+	jmp design	; no, proceed
+
+; ----------------------------------------- object finished
+; a713
+++	jsr skipline	; finished, find end of basic line
+	jmp endsmb	; and return to interpreter
+
+; ----------------------------------------- 
+; a719
+skipline	lda (progz),y	; now find basic line end
 	beq +
 	jsr incbasbz
-	jmp -
-+	jmp endsmb
+	bne skipline
++	rts
+
+; ----------------------------------------- multicolor pixel pattern
+; a723
+destab3	!by $c0,$30,$0c,$03		; %11: D $d800..
+destab2	!by $80,$20,$08,$02		; %10: C $d023
+destab1	!by $40,$10,$04,$01		; %01: B $d022
+				; %00: A $d021
+
+; ----------------------------------------- 
+; a72f
+get10010	jsr incbasbz	; skip token
+	jsr chrgot	; anything following?
+	bne +
+	lda ipr1+1	; no, set start value (100)
+	sta autozi
+	ldx aut0+1	; get step (10)
+	lda #0
+	sta autozi+1
++	sec
+	rts		; 24
+
+; ----------------------------------------- 
+
+	!fill 10
 
 ; ----------------------------------------- part of DO
-; a702
+; a751
 waitkey	jsr getkey+5
 	jmp befproc	; skip rest of line
-
-; ----------------------------------------- 
-
-	!by 0,0
-
-; ----------------------------------------- 
-; a70a
-destab3	!by $c0,$00,$30,$00,$0c,$00,$03,$00
-destab2	!by $80,$00,$20,$00,$08,$00,$02,$00
-destab1	!by $40,$00,$10,$00,$04,$00,$01,$00
-
-; ----------------------------------------- 
-; a722
-desmulti	ldy #0
-	lda (progz),y
-	cmp #$44		; "d"?
-	bne +
-	lda $a8
-	ora destab3,x
-	sta $a8
-	inx
-	jmp descont
-
-+	cmp #$43		; "c"?
-	bne +
-	lda $a8
-	ora destab2,x
-	sta $a8
-	inx
-	jmp descont
-
-+	cmp #$42		; "b"?
-	bne +
-	lda $a8
-	ora destab1,x
-	sta $a8
-	inx
-	jmp descont
-
-+	inx
-	jmp indes
 
 ; ----------------------------------------- part of DO
 ; a757

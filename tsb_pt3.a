@@ -12,6 +12,7 @@
 ;   (interpreter, commands EXEC, CALL, EXIT & PROC)
 ; patched on 24.03.2021
 ;   (commands DIR, CALL, added FastCall)
+; patched on 12.04.2021 (command AUTO)
 ;
 ; ----------------------------------------- 
 
@@ -1502,23 +1503,23 @@ ren1	lda $2b
 
 ; ----------------------------------------- bef AUTO
 ; 9bd2			original
-befauto	jsr incbasbz
-	jsr sfrmnum
+befauto	jsr get10010	; any parameters?
+	beq aut1
+	jsr sfrmnum	; yes, get start value...
 	jsr sfacadr
-	sta autozi+1	; Startwert
-	sty autozi
+	sta autozi+1
+	sty autozi	; and step
 	jsr sgetbytc
-	stx autoinc	; Stepwert
-	lda #10
-	sta autoflag
-	sec		; ersten Wert initialisieren
-	lda autozi
-	sbc autoinc
+aut1	stx autoinc	; set step
+	lda autozi	; initialize auto (.c=1)
+	sbc autoinc	; (subtract step from start)
 	sta autozi
 	lda autozi+1
 	sbc #0
 	sta autozi+1
-	jmp endsmb
+aut0	lda #10		; activate auto
+	sta autoflag
+	bne ++		; uncond. branch
 
 ; ----------------------------------------- bef RESET
 ; 9c01			original
@@ -1538,7 +1539,7 @@ befreset	jsr incbasbz
 	dey
 +	sta $41
 	sty $42
-	jmp endsmb
+++	jmp endsmb
 
 ; ----------------------------------------- 
 ; 9c26
