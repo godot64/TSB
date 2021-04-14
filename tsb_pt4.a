@@ -11,6 +11,7 @@
 ; patched on 04.04.2021 (commands CHECK, DO, CSET & NRM)
 ; patched on 07.04.2021 (command DESIGN: optimized)
 ; patched on 12.04.2021 (command AUTO)
+; patched on 14.04.2021 (commands PAUSE, BCKGNDS)
 ;
 ; ----------------------------------------- 
 
@@ -1141,55 +1142,60 @@ befcmob	jsr sgetbytn
 	jmp endsmb
 
 ; ----------------------------------------- bef BCKGNDS
-; a7b5			original
+; a7b5			enhanced
 befbckgnds
-	lda $d011
+	jsr sgetbytn	; get backgrnd color
+	stx $d021
+	txa		; bit 7 set?
+	bmi +
+
+	lda $d011		; no, activate ECM
 	and #$df
 	ora #$40
 	sta $d011
-	lda $d016
+	lda $d016		; deactivate multicolor mode
 	and #$ef
 	sta $d016
-	jsr sgetbytn
-	stx $d021
-	jsr sgetbytc
+
++	jsr sgetbytc	; get 2nd bkgnd
 	stx $d022
-	jsr sgetbytc
+	jsr sgetbytc	; get 3rd bkgnd
 	stx $d023
-	jsr sgetbytc
+	jsr sgetbytc	; get 4th bkgnd
 	stx $d024
 	jmp endsmb
+
+; ----------------------------------------- 
+
+	!by 0,0,0
 
 ; ----------------------------------------- bef PAUSE
 ; a7e2			recoded
 befpause	jsr chrget
-	cmp #$30		; below "0"?
-	bcc +		; ok, string follows
-	cmp #$3a		; below "9"?
-	bcc ++		; ok, time follows
+	bcc ++		; time follows?
 
-+	jsr sgetstr
-	sta $a9
+	jsr sgetstr	; no, string first
+	sta $a9		; set address
 	stx $a8
-	ldy #0
+	ldy #0		; check length
 -	cpy $69
 	beq +
 	lda ($a8),y	; sys out string
 	jsr bsout
 	iny
 	bne -
-+	lda #$0d
++	lda #$0d		; and <return>
 	jsr bsout
+	jsr schkcom	; comma?
 
-	jsr schkcom
-++	jsr sgetadr
+++	jsr sgetadr	; get time value to $65/$14
 	lda #0
 	sta zaesec
 	sta zaeirq
 -	jsr $ffe4		; sys getin keyboard
-	cmp #$0d		; return?
+	cmp #$0d		; <return>?
 	beq +
-	lda zaesec
+	lda zaesec	; check timer
 	cmp $65
 	bne -
 

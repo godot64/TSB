@@ -842,20 +842,20 @@ ss1	sta $f8
 	bmi ss0
 	ldx #4		; 4 pages (video/colors)
 ; b1ae
-ss0	bit $fa
+ss0	bit $fa		; check sa
 	bmi ss4
 
-	lda ($fd),y	; get video bytes
+	lda ($fd),y	; sa=2: get video bytes
 	jsr distr		; process
 	sta ($fd),y	; and restore
 	lda ($fb),y
 	sec
 	bcs ss2		; and color bytes too
 ; b1be
-ss4	sei
+ss4	sei		; sa=3:
 	lda #$34
 	sta pport		; pixel aus bitmap holen
-	lda ($fb),y	; wird bei scrld verworfen
+	lda ($fb),y
 	pha
 	lda #$36
 	sta pport
@@ -863,7 +863,7 @@ ss4	sei
 	pla
 ; b1cc
 ss2	jsr distr
-	sta ($fb),y	; wird bei scrsv verworfen
+	sta ($fb),y
 	iny
 	bne ss3
 	inc $fc
@@ -903,15 +903,16 @@ intro	jsr incbasbz
 	ldy #$00
 	sty $fb		; fb: 0400/e000
 	sty $fd		; fd: d800
-	lda $b9		; 2 oder 3:
+	lda $b9		; sa 2 or 3:
 	ror		; 1 - 1
 	ror		; 0 - 128
-	sta $fa 
+	sta $fa		; set sa flag
 	bmi ss6
+; b217  (change b218 for charsets and so)
 	lda #$d8		; $d800
 	sta $fe
-; b21b
-	lda #$04		; $0400 (change after MEM!)
+; b21b  (change b21c after MEM!)
+	lda #$04		; $0400
 	bne ss7
 ss6	lda #$e0		; $e000
 ss7	sta $fc
@@ -921,7 +922,7 @@ ss7	sta $fc
 
 ; ----------------------------------------- 
 
-	!by $ea
+	!by 0
 
 ; ----------------------------------------- bef TEXT
 ; b229			original
