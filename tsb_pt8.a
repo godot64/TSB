@@ -6,6 +6,8 @@
 ;
 ; part 8, variables
 ;
+; 16.04.2021: depicted unused areas
+; 
 ; ----------------------------------------- 
 
 	!ct pet
@@ -16,56 +18,68 @@
 	lpy		= $c501
 	rotgr		= $c502
 	drgrz		= $c503
-	flashfls		= $c504
+	flashfls		= $c504		; 16 possible colors
 	detecterg		= $c514
 	detectart		= $c515
 	zaeirq		= $c516
 	zaesec		= $c517
 	strz1		= $c518
 	strz2		= $c519
-	vgle		= $c51a
-	errln		= $c51d
+	vgle		= $c51a		; /b
+	errln		= $c51d		; /e
 	pos		= $c51f
 	pos1		= $c520
-	vgla		= $c523
-	savecont		= $c529
+	;
+	vgla		= $c523		; /4
+	;
+	savecont		= $c529		; /a
 	hilffl1		= $c52b
 	hilfflag		= $c52c
 	xmaxlow		= $c52d
 	xmaxhigh		= $c52e
 	ueberdreh		= $c52f
 	prstack		= $c530
-	tracetab		= $c531
+	tracetab		= $c531		; ! unused (75 Bytes)
+	;
 	drehsinn		= $c57c
 	zwspei1		= $c57d
-	zn		= $c586
+	zn		= $c586		; ! unused (5 bytes)
+	;
 	pspeinmi		= $c58b
 	pageflag		= $c58c
 	pagewert		= $c58d
+	;                                         ! unused (8 bytes)
 	portspei		= $c596
 	ax		= $c597
-	procnffl		= $c597
-	mfreq		= $c599
-	ydiff		= $c59f
-	diffv		= $c5a1
+	procnffl		= $c598		; changed (from $c597)
+	mfreq		= $c599		; /a
+	;                                         ! unused (4 bytes)
+	ydiff		= $c59f		; /a0
+	diffv		= $c5a1		; /2
 	dry		= $c5a3
-	xdiff		= $c5a6
-	ey		= $c5a8
-	ex		= $c5aa
-	ay		= $c5ac
+	;                                         ! unused (2 bytes)
+	xdiff		= $c5a6		; /7
+	ey		= $c5a8		; /9
+	ex		= $c5aa		; /b
+	ay		= $c5ac		; /d
 	gflag		= $c5ae
+	;
 	multijn		= $c5b0
 	autoinc		= $c5b1
 	autoflag		= $c5b2
 	gmemflag		= $c5b3
 	mobbew		= $c5b4
 	mobspeed		= $c5b5
+	;                                         ! unused (5 bytes)
 	mobnr2		= $c5bb
 	mobnr		= $c5bc
+	;                                         ! unused (7 Bytes)
 	flashsp		= $c5c4
 	flashzae		= $c5c5
 	flashfl		= $c5c6
+	;                                         ! unused (4 bytes)
 	ifflag		= $c5cb
+	;                                         ! unused (9 bytes)
 	lcode		= $c5d5
 	inkey		= $c5d6
 	bflashsp		= $c5d7
@@ -75,110 +89,146 @@
 	bflashjn		= $c5db
 	optflag		= $c5dc
 	pendflag		= $c5dd
-	copbyte		= $c5e2
+	;                                         ! unused (4 bytes)
+	copbyte		= $c5e2		; ! unused (2 bytes)
+	;
 	codezae		= $c5e4
-	copzaey		= $c5e6
+	;
+	copzaey		= $c5e6		; ! unused
 	onkeypos		= $c5e7
-	onkeyzeig		= $c5e8
+	onkeyzeig		= $c5e8		; /9
 	onkeyflag		= $c5ea
+	;
 	keyon		= $c5ec
-	okstring		= $c5ed
+	okstring		= $c5ed		; /e
 	okstrlen		= $c5ef
-	basbzk		= $c5f0
+	basbzk		= $c5f0		; /1
+	; 				  ! unused (6 bytes)
 	delay		= $c5f8
-	onerrzeig		= $c5f9
+	onerrzeig		= $c5f9		; /a
 	onerrorflag	= $c5fb
 	errn		= $c5fc
+	; 				  ! unused (3 bytes)
 
 ; -----------------------------------------
 
 	stack		= $c600
 	traceflag		= $c601
 	doflag		= $c602
-	stackrepeat	= $c603
+	stackrepeat	= $c603		; 20 bytes
 	sprepeat		= $c617
-	execstack		= $c618
+	execstack		= $c618		; 20 bytes
 	spexec		= $c62c
-	stackloop		= $c62d
+	stackloop		= $c62d		; 20 bytes
 	sploop		= $c641
 	lastkey		= $c642
 	execflag		= $c643
+	; 				  ! unused (2 bytes)
 	keyflag		= $c646
+	; 				  ! unused (3 bytes)
 	wavetab		= $c64a
-	keytab		= $c64d
+	keytab		= $c64d		; up to $c74c
 
 ; ----------------------------------------- 
 
-	pxhtab		= $c751
-	pxltab		= $c850 
-	pytab		= $c94f
+	; 		  $c74d		  ! unused (3 bytes)
+	pxhtab		= $c751		; unused (code starts at $c750...)
+	pxltab		= $c850 		; unused
+	pytab		= $c94f		; unused
 
 ; ----------------------------------------- 
 
-	pzeig		= $ca4e
-	pymerk		= $ca4f
-	pyalt		= $ca50
-	pakty		= $ca51
-	flag1		= $ca52
+	pzeig		= $ca4e		; unused (...code here...)
+	pymerk		= $ca4f		; unused
+	pyalt		= $ca50		; unused
+	pakty		= $ca51		; unused
+	flag1		= $ca52		; unused (...up to $caa8)
+
+	; 				  ! unused from $caa9 to $cb1a (113 bytes)
 
 ; ----------------------------------------- 
 
 	lcfarb12		= $cb1b
 	lcfarb3		= $cb1c
 	lowcolflag	= $cb1d
-	movetab		= $cb1e
+	movetab		= $cb1e		; 42 bytes
 	krx		= $cb48
-	kmy		= $cb49
-	kmx		= $cb4b
-	winksw		= $cb4d
+	kmy		= $cb49		; /a
+	kmx		= $cb4b		; /c
+	winksw		= $cb4d		; /e
 	schrart		= $cb4d
 	drstrz		= $cb4f
 	drstatus		= $cb50
 	dryanf		= $cb51
+	; 				  ! unused (2 bytes)
 	zwisp2		= $cb54
-	drawtabx		= $cb59
-	drawtaby		= $cb5d
+	; 				  ! unused (4 bytes)
+	drawtabx		= $cb59		; 4 bytes
+	drawtaby		= $cb5d		; 4 bytes
 	drricht		= $cb61
+	; 				 ! unused (3 bytes)
 	drincx		= $cb65
+	; 				 ! unused (3 bytes)
 	drincy		= $cb69
+	; 				 ! unused (3 bytes)
 	drx		= $cb6d
 	chgr		= $cb6e
 	fetchanz		= $cb6f
 	joywert		= $cb70
 	zwisp4		= $cb71
 	fetchlen		= $cb72
+	; 				 ! unused (3 bytes)
 	zeileanf		= $cb76
 	spalteanf		= $cb77
 	spaltenanz	= $cb78
 	zeilenanz		= $cb79
 	zaehler		= $cb7a
-	richtz		= $cb7c
-	zaehlm1		= $cb7e
-	zaehlm2		= $cb80
-	bwflag		= $cb82
-	zwisp3		= $cb84
+	;				  ! unused (10 bytes)
+	richtz		= $cb7c		; ! unused
+	;				  ! unused
+	zaehlm1		= $cb7e		; ! unused
+	zaehlm2		= $cb80		; ! unused
+	bwflag		= $cb82		; ! unused
+	zwisp3		= $cb84		; ! unused
+	;				  ! unused
 	musicz2		= $cb86
 	musicz3		= $cb88
+	;
 	musicz4		= $cb8a
-	mregadr		= $cb8c
+	;
+	mregadr		= $cb8c		; /d
+	;				  ! unused (4 bytes)
 	playflag		= $cb91
+	;				  ! unused (4 bytes)
 	musicdau		= $cb96
-	musicadr		= $cb9b
+	;				  ! unused (4 bytes)
+	musicadr		= $cb9b		; /c
 	musicz1		= $cb9d
 	musiclen		= $cb9e
 	musicz5		= $cb9f
-	srtab		= $cba0
-	adtab		= $cba4
+	srtab		= $cba0		; 4 bytes
+	adtab		= $cba4		; 4 bytes
 	stimmenr		= $cba8
-	str1		= $cbab
+	;				  ! unused (2 bytes)
+	str1		= $cbab		; /c
+	;
 	dwert		= $cbae
+	;				  ! unused (2 bytes)
 	plpos		= $cbb1
+	;				  ! unused (2 bytes)
 	strlen2		= $cbb4
+	;				  ! unused (2 bytes)
 	strlen1		= $cbb7
-	idivsor		= $cbbb
-	idivdend		= $cbc0
-	idivrest		= $cbc2
+	;				  ! unused (3 bytes)
+	idivsor		= $cbbb		; /c
+	;				  ! unused (3 bytes)
+	idivdend		= $cbc0		; /1
+	idivrest		= $cbc2		; /3
+	;
 	kry		= $cbc5
+	;				  ! unused (59 bytes)
+
+	; 		total of 376 unused bytes between $c500 and $cc00
 
 ; ----------------------------------------- 
 ;
