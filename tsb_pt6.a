@@ -11,6 +11,7 @@
 ; patched on 25.01.2021
 ; patched on 24.03.2021 (command ERROR plus LIST & MOD)
 ; patched on 03.04.2021 (commands MEM & NRM)
+; patched on 21.04.2021 (command RENUMBER)
 ;
 ; ----------------------------------------- 
 
@@ -335,13 +336,13 @@ do0	jmp setdoflg
 
 ; ----------------------------------------- part of RENUMBER
 ; b9df
-ren2	ldy #0
-	lda ($a8),y
+ren2	ldy #0		; find PRG end
+	lda ($a8),y	; get line link
 	tax
 	iny
-	ora ($a8),y
+	ora ($a8),y	; 0? (prg end)
 	beq +
-	jmp ren5		; ce70
+	jmp ren5		; ce70 (loop: next line)
 ; b9ec
 +	jmp ren3		; 94bd
 
@@ -995,8 +996,8 @@ slist3	php
 	ldy $028d
 	cpy #1		; shift?
 	bne pge2		; no
-	ldx #0
--	iny		; yes, delay
+	ldx #$ff
+-	iny		; yes, DELAY
 	bne -
 	inx
 	cpx delay
@@ -1402,10 +1403,7 @@ beflin	jsr chkdrv	; is drive present?
 
 ; ----------------------------------------- 
 ; c8b5
-ren0	jsr schkcom
-	jsr sgetadr
-	sty ay
-	sta ay+1
+renum0	sta ay+1
 	sec
 	lda $a4
 	sbc ay
@@ -1413,7 +1411,14 @@ ren0	jsr schkcom
 	lda $a5
 	sbc ay+1
 	sta $21
-	jmp ren1		; 9bca
+	jmp ren1		; 9bca (21)
+
+renum1	tay
+	lda $2b		; get start of basic prog
+	ldx $2c
+	sta $a8
+	stx $a9
+	rts		; 10
 
 ; ----------------------------------------- 
 ; c8d3
@@ -1456,8 +1461,12 @@ fnnrm	jsr chrget
 	ldx $a8		; yes
 	jsr bincon
 +	jmp nrm0
+
+; ----------------------------------------- 
 ; c920
-	!fill 12,$ea	; patch 11.01.20
+	!fill 11		; patch 11.01.20
+
+; ----------------------------------------- 
 ; c92c
 ++	cmp #$24		; leading "$" in string?
 	bne +		; no

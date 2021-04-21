@@ -1310,7 +1310,8 @@ used	ldx #1
 	jsr $ffc9		; sys ckout 1
 	lda #$0d		; sys out linefeed
 	jsr bsout
-	lda #4		; video ram
+; b4d4
+	lda #4		; video ram ($cc after MEM!)
 	sta $21
 	lda #$00
 	sta $20

@@ -9,6 +9,7 @@
 ; patched on 13.01.2021
 ; patched on 25.01.2021 (tables)
 ; patched on 13.03.2021 (command COLD, Reset, Stop/Restore)
+; patched on 21.04.2021 (command RENUMBER)
 ;
 ; ----------------------------------------- 
 
@@ -25,7 +26,7 @@ modultext	!tx "CBM80"
 
 ; ----------------------------------------- 
 
-	!by $ff
+	!by $ad
 
 ; ----------------------------------------- 
 
@@ -503,16 +504,19 @@ schkstr	jsr pspeibe
 
 ; ----------------------------------------- bef RENUMBER (TSB)
 ; 8372			recoded
-befrenum	jsr incbasbz
-	jsr sgetadr	; result in .y (lo) and .a (lo)
-	sty $a4
-	sta $a5
-	jsr ren0
-	tay
-	lda $2b		; get start of basic prog
-	ldx $2c
-	sta $a8
-	stx $a9
+befrenum	jsr get10010	; .a=0
+	beq +
+
+	jsr sgetadr	; get start line number
+	sty $a4		; result in .y (lo) and .a (lo)
+	sta $a5		; 12 (statt 10)
+	jsr schkcom
+	jsr sgetadr	; get step
+	sty ay
+
++	jsr renum0
+	jsr renum1	; 27
+
 -	lda ($a8),y
 	sta $09
 	jsr inca8a9
@@ -530,10 +534,7 @@ befrenum	jsr incbasbz
 	lda $09
 	ora $0a
 	beq sbready
-	lda $09
-	sta $a8
-	lda $0a
-	sta $a9
+	jsr ren0
 	clc
 	lda $a4
 	adc ay

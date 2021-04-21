@@ -77,7 +77,8 @@
 	flashsp		= $c5c4
 	flashzae		= $c5c5
 	flashfl		= $c5c6
-	;                                         ! unused (4 bytes)
+	flashing		= $c5c7
+	;                                         ! unused (3 bytes)
 	ifflag		= $c5cb
 	;                                         ! unused (9 bytes)
 	lcode		= $c5d5
@@ -89,7 +90,8 @@
 	bflashjn		= $c5db
 	optflag		= $c5dc
 	pendflag		= $c5dd
-	;                                         ! unused (4 bytes)
+	bflashing		= $c5de
+	;                                         ! unused (3 bytes)
 	copbyte		= $c5e2		; ! unused (2 bytes)
 	;
 	codezae		= $c5e4

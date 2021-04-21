@@ -9,6 +9,7 @@
 ; patched on 11.02.2020 (func INSERT)
 ; patched on 24.03.2021 (added CHKDRV)
 ; patched on 04.04.2021 (command COLD)
+; patched on 20.04.2021 (bugfix in func $)
 ;
 ; ----------------------------------------- 
 

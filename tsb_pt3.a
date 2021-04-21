@@ -12,7 +12,7 @@
 ;   (interpreter, commands EXEC, CALL, EXIT & PROC)
 ; patched on 24.03.2021
 ;   (commands DIR, CALL, added FastCall)
-; patched on 12.04.2021 (command AUTO)
+; patched on 12.04.2021 (commands AUTO & RENUMBER)
 ;
 ; ----------------------------------------- 
 
@@ -251,50 +251,56 @@ punkt	clc
 	sta $a9
 	ldy #0
 	sty $90
-	sei
-	lda pport		; kernel off
-	and #$fd
-	sta pport
+	jsr kerromaus	; kernel off
 	lda gflag
 	beq +
 	rts
 
-; ----------------------------------------- set dots
-; 9311
-+	lda multijn	; now set dots, hires?
-	beq sethires	; yes
-	jmp setmulti	; no, go to multi
+; ----------------------------------------- 
 
-; 9319
+	!by 0
+
+; ----------------------------------------- set dots
+; 930e
++	lda multijn	; now set dots, hires?
+	beq sethires
+	jmp setmulti	; no, go to multi (9a7a)
+
+; ----------------------------------------- set hires dots
+; 9316
 sethires	lda $f7		; hires, get color source
 	beq herase
 	cmp #1
 	beq hset
 	cmp #2
 	beq hinvert
-
 	jmp ptest1	; a261	
 
+; 9325
+hset0	inx
 hset	lda ($a8),y
 	ora gbittabs,x
 	sta ($a8),y
 	rts
 
-; 9330
-gbittabs	!by $80,$40,$20,$10,$08,$04,$02,$01
-
+; 932e
+herase0	inx
 herase	lda ($a8),y
 	and gbittabl,x
 	sta ($a8),y
 	rts
 
-; 9340
-gbittabl	!by $7f,$bf,$df,$ef,$f7,$fb,$fd,$fe
-
+; 9337
+hinvert0	inx
 hinvert	lda ($a8),y
 	eor gbittabs,x
 	sta ($a8),y
 	rts
+
+; ----------------------------------------- 
+; 9340
+gbittabs	!by $80,$40,$20,$10,$08,$04,$02,$01
+gbittabl	!by $7f,$bf,$df,$ef,$f7,$fb,$fd,$fe
 
 ; ----------------------------------------- bef LINE
 ; 9350			original
@@ -557,7 +563,11 @@ usedrv	jsr sgetbyt1	; get drive# (constant[+expression])
 
 ; ----------------------------------------- 
 ; 953b
-	!by 0,0,0,0,0,0,0,0,0	
+ren0	lda $09
+	sta $a8
+	lda $0a
+	sta $a9
+	rts		; 9
 
 ; ----------------------------------------- bef DIR
 ; 9544			enhanced
@@ -679,14 +689,10 @@ mmb1	jsr sgetbytc
 use1	jsr basromau
 	jsr use3		; analyse USE parameters (b3e2)
 	jsr sclrch
-	jmp endsmb
+mmb4	jmp endsmb
 
 ; ----------------------------------------- 
-
-	!by 0
-
-; ----------------------------------------- 
-
+; 962c
 mobposs	lda $09
 	ldx #0
 mmb6	cpx mobspeed
@@ -718,7 +724,7 @@ mmb8	ldy mobnr
 	jmp mmb9
 
 ; ----------------------------------------- bef BFLASH
-; 966d			enhanced
+; 966c			recoded
 befbflash	lda #0
 	sta bflzae	; reset speed compare
 	jsr chkonoff	; get first parameter
@@ -733,45 +739,50 @@ befbflash	lda #0
 	jsr sgetbytc
 	stx bflashf2	; set color 2
 
-+	ldx #10		; switch flag on
-++	stx bflashjn
-mmb4	jmp endsmb
++	lda $d020		; save current border color
+	sta bflashing
+	ldx #10		; switch flag on
+	bne +
+
+++	lda bflashing	; restore border color
+	sta $d020
+
++	stx bflashjn
+	jmp endsmb
 
 ; ----------------------------------------- 
-; 9694			enhanced
-sirq	inc zaeirq
+; 96a1			enhanced
+sirq	ldy #0
+	inc zaeirq
 	lda zaeirq
-	cmp #60		; seconds
+	cmp #60		; count 60 passes (seconds)
 	bne +
 	inc zaesec
-	lda #0
-	sta zaeirq
-+	lda bflashjn
-	cmp #10
-	bne sq0
+	sty zaeirq
 
-	inc bflzae
++	lda bflashjn
+	cmp #10		; bflash active?
+	bne sq0		; no, skip
+
+	inc bflzae	; counter at max?
 	lda bflzae
 	cmp bflashsp
-	bne sq0
+	bne sq0		; no, skip
 
-	lda #0
-	sta bflzae
-	sec
-	lda $d020
-	sbc #$f0
+	sty bflzae	; reset counter
+	lda $d020		; toggle colors
+	and #$0f
 	cmp bflashf1
 	beq +
 	lda bflashf1
-	sta $d020
-	jmp sq0
+	jmp sq1
 
 +	lda bflashf2
-	sta $d020
+sq1	sta $d020
 sq0	jmp sirq2
 
 ; ----------------------------------------- bef MOB SET
-; 96da			enhanced
+; 96e1			enhanced
 befmobset	jsr sgetbytn
 	stx $aa
 	lda $d015
@@ -832,7 +843,7 @@ msk0	jsr sgetbytc
 	jmp endsmb
 
 ; ----------------------------------------- bef MUSIC
-; 9759			original
+; 9760			original
 befmusic	jsr sgetbytn
 	stx musicdau
 	jsr schkcom
@@ -846,21 +857,19 @@ befmusic	jsr sgetbytn
 bms0	jmp endsmb
 
 ; ----------------------------------------- 
-; 9778
+; 977f
 mbittabs	!by $01,$02,$04,$08,$10,$20,$40,$80
 ; 9780
 mbittabl	!by $fe,$fd,$fb,$f7,$ef,$df,$bf,$7f
-; 9788
-bitwtab	!by $80,$40,$20,$10,$08,$04,$02,$01
 
 ; ----------------------------------------- bef FLASH
-; 9790			recoded
+; 978f			recoded
 befflash	jsr flashinit	; color (or ON/OFF) in .x
 	jsr chrgot	; end of statement?
 	bne +		; no, cont
 	txa
 	bne +		; OFF?
-	jmp befoff	; yes, clear 
+	jmp endflash	; yes, clear 
 
 +	tay		
 	cpx #16		; Farbe über 15?
@@ -877,7 +886,7 @@ befflash	jsr flashinit	; color (or ON/OFF) in .x
 	bne bms0
 
 ; ----------------------------------------- func AT
-; 97b7			original
+; 97b6			original
 fnat	jsr sgetbytn
 	txa
 	pha
@@ -894,8 +903,8 @@ fnat	jsr sgetbytn
 	jmp fromat	; cont (8c94)
 
 ; ----------------------------------------- 
-; 97d2
-sirq2	lda $ff
+; 97d1			recoded
+sirq2	lda $ff		; save $fc to $ff
 	pha
 	lda $fe
 	pha
@@ -903,34 +912,33 @@ sirq2	lda $ff
 	pha
 	lda $fc
 	pha
-
-	lda flashfl
+; 97dd
+	lda flashfl	; is flash active?
 	cmp #10
-	beq +
-	jmp sirq3
+	bne sirq3 	; no, skip
 
-+	inc flashzae
+	inc flashzae	; is counter at speed?
 	lda flashzae
 	cmp flashsp
-	beq +
-	jmp sirq3
-
-+	lda #$d8
+	bne sirq3 	; no, skip
+; 97ef
+	lda flashing	; set sync byte
+	eor #$80
+	sta flashing
+	lda #$d8		; yes, set color ram at $fe/$ff
 	sta $ff
-	lda #$00
-	sta $fe
-	lda $0288
+	lda $0288		; set video ram at $fc/$fd
 	sta $fd
-	lda #0
-	sta flashzae
-	sta $fc
-	tay
--	lda ($fe),y
+	sty $fe		; .y=0
+	sty $fc
+	sty flashzae
+; 9807
+-	lda ($fe),y	; get color
 	and #$0f
 	tax
-	lda flashfls,x
+	lda flashfls,x	; is color tagged?
 	beq +
-	lda ($fc),y
+	lda ($fc),y	; yes, invert char in video ram
 	eor #$80
 	sta ($fc),y
 +	inc $fe
@@ -939,52 +947,35 @@ sirq2	lda $ff
 +	inc $fc
 	bne +
 	inc $fd
-+	lda $ff
++	lda $ff		; up to $e8db in color ram
 	cmp #$db
 	bne -
 	lda $fe
 	cmp #$e8
 	bne -
-	jmp sirq3
-
-; ----------------------------------------- bef PAGE
-; 9836			enhanced
-befpage	jsr chkonoff
-	txa		; OFF?
-	beq +++		; yes, set flag
-	cpx #10		; no, ON?
-	bne +		; no, set flag and new value
-
-	lda pagewert	; was ON, get last value
-	bne ++
-+	stx pagewert	; was 0: set as new one
-
-++	ldx #10		; set flag
-+++	stx pageflag
-	jmp endsmb
 
 ; ----------------------------------------- 
-; 9850
+; 982f			recoded
 sirq3	lda $d4
-	beq +
-	jmp sirq4
+	bne sirq4
 
-+	ldy $028d
+	ldy $028d		; Shift/C=?
 	lda shwerttab,y
 	sta inkey
 	lda $cb
 	cmp #4		; F1?
 	beq wasf1
-	cmp #5
+	cmp #5		; F3?
 	beq wasf3
-	cmp #6
+	cmp #6		; F5?
 	beq wasf5
-	cmp #3
+	cmp #3		; F7?
 	beq wasf7
-	lda #0
+; 984e
+	lda #0		; none of these
 	sta inkey
-	jmp sirq4
-
+	beq sirq4
+; 9855
 wasf7	inc inkey
 	inc inkey
 wasf5	inc inkey
@@ -992,23 +983,18 @@ wasf5	inc inkey
 wasf3	inc inkey
 	inc inkey
 wasf1	inc inkey
-	jmp sirq4
 
 ; ----------------------------------------- 
-; 9892
-shwerttab	!by $00,$01,$08,$09
-
-; ----------------------------------------- 
-; 9896
+; 986a			recoded
 sirq4	lda $cc
-	beq +
--	jmp sirq5
+	bne sirq5
 
-+	lda keyflag
+	lda keyflag
 	cmp #10
-	beq -
+	beq sirq5
 	lda $d4
-	bne -
+	bne sirq5
+; 9879
 	lda $cb
 	cmp lastkey
 	beq ams5
@@ -1016,7 +1002,7 @@ sirq4	lda $cc
 	bne ams5
 	lda inkey
 	beq ams5
-
+; 9889
 	lda inkey
 	sta $fe
 	cmp #17		; beyond 16?
@@ -1039,27 +1025,27 @@ sirq4	lda $cc
 	lda $ff
 	adc #>keytab
 	sta $ff
-	ldy #0		; out inkey
--	lda ($fe),y
+	ldy #0		; out inkey text
+-	lda ($fe),y	; (zero terminated)
 	beq ams4
-	cpy #15
+	cpy #15		; (max length: 16)
 	beq ams4
-	sta $0277,y	; clear keybuf
+	sta $0277,y	; write to keybuf
 	iny
-	jmp -
-
+	bne -
+; 98c5
 ams4	sty $c6
 ams5	lda $cb
 	sta lastkey
-	jmp sirq5		; ### shorter!
 
 ; ----------------------------------------- 
-; 98ff
+; 98cc			recoded
 sirq5	lda playflag
 	cmp #10
 	bne +
 	jsr sirqplay
-+	pla
+; 98d6
++	pla		; restore $fc to $ff
 	sta $fc
 	pla
 	sta $fd
@@ -1069,8 +1055,28 @@ sirq5	lda playflag
 	sta $ff
 	jmp $ea31		; sys IRQ
 
+; ----------------------------------------- 
+; 98e5
+shwerttab	!by $00,$01,$08,$09
+
+; ----------------------------------------- bef PAGE
+; 98e9			enhanced
+befpage	jsr chkonoff
+	txa		; OFF?
+	beq +++		; yes, set flag
+	cpx #10		; no, ON?
+	bne +		; no, set flag and new value
+
+	lda pagewert	; was ON, get last value
+	bne ++
++	stx pagewert	; was 0: set as new one
+
+++	ldx #10		; set flag
++++	stx pageflag
+	jmp endsmb
+
 ; ----------------------------------------- bef PLAY
-; 9918			recoded
+; 9903			recoded
 befplay	jsr chkonoff
 	txa		; OFF? (or PLAY 0?)
 	beq +		; yes, end music
@@ -1094,14 +1100,17 @@ befplay	jsr chkonoff
 --	jmp endsmb	; PLAY 2 or PLAY ON (PRG continues)
 
 ; ----------------------------------------- Part of FLASH
-
+; 9928
 flashactv	lda #10
 	sta flashsp	; Default-Speed: 10
 	sta flashfls,x	; Farbe aktivieren
 	rts
 
 ; ----------------------------------------- 
-	!by 0
+; 9931
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0
 
 ; ----------------------------------------- bef CENTRE
 ; 9947			enhanced
@@ -1230,7 +1239,7 @@ bincon	lda #0
 
 +	ldy $a6
 	lda $a8
-	ora bitwtab,y
+	ora gbittabs,y
 	sta $a8
 ++	inc $a6
 	jsr incbasbz
@@ -1286,70 +1295,58 @@ towarm	pla
 	pla
 	jmp swarm		; error
 
-; ----------------------------------------- part of BLOCK
+; ----------------------------------------- set multi dots
 ; 9a7a
-setmulti	lda $f7		; color?
-	cmp #11		; test?
-	beq testdot
-
-	cmp #0
+setmulti	lda $f7		; color src 0?
 	bne +
-	jsr gbitclr
-	jmp gbitclr
 
-+	cmp #1
+	jsr herase	; clear double pixel
+	bne +++		; uncond. branch
+
++	cmp #1		; 1?
 	bne +
-	jsr gbitclr
-	jmp gbitset
+	jsr herase	; clear left, set right pixel
+	jmp ++
 
-+	cmp #2
++	cmp #2		; 2?
 	bne +
-	jsr gbitset
-	jmp gbitclr
-
-+	cmp #3
-	bne +
-	jsr gbitset
-	jmp gbitset
-
-; 9aa8
-gbitset	lda ($a8),y
-	ora gbittabs,x
-	sta ($a8),y
+	jsr hset		; set left, clear right pixel
++++	jsr herase0
 	inx
 	rts
 
-; 9ab1
-gbitclr	lda ($a8),y
-	and gbittabl,x
-	sta ($a8),y
++	cmp #3		; 3?
+	bne +
+	jsr hset		; set double pixel
+++	jsr hset0
 	inx
 	rts
 
-+	cmp #4
++	cmp #4		; 4?
 	bne testdot
-	lda ($a8),y
-	eor gbittabs,x
-	sta ($a8),y
-	inx
-	eor gbittabs,x
-	sta ($a8),y
-	rts
-
-; 9acc
-testdot	lda ($a8),y
+	jsr hinvert	; invert double pixel
+	jmp hinvert0	; (no inx?)
+; 
+testdot	lda ($a8),y	; no, is 11 (test)
 	and gbittabs,x
 	beq +
 	lda #2
-	sta $90
+	sta $90		; result in status, bits 0 and 1
 +	inx
-	lda ($a8),y
+tdot0	lda ($a8),y
 	and gbittabs,x
 	beq +
 	lda $90
 	ora #1
 	sta $90
 +	rts
+
+; ----------------------------------------- 
+
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0
 
 ; ----------------------------------------- 
 ; 9ae6

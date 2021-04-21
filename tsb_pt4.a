@@ -409,12 +409,12 @@ chz0	lda ax
 ; ----------------------------------------- 
 ; a261
 ptest1	sty $90
-	lda ($a8),y
-	and gbittabs,x
-	beq +
-	iny
-	sty $90
-+	jmp kerromein
+	jsr tdot0
+	jmp kerromein
+
+; ----------------------------------------- 
+; a269
+	!by 0,0,0,0,0,0,0
 
 ; ----------------------------------------- bef HICOL
 ; a270			original
@@ -1075,17 +1075,19 @@ destab1	!by $40,$10,$04,$01		; %01: B $d022
 get10010	jsr incbasbz	; skip token
 	jsr chrgot	; anything following?
 	bne +
-	lda ipr1+1	; no, set start value (100)
+	lda #100		; no, set start value
 	sta autozi
-	ldx aut0+1	; get step (10)
+	sta $a4
+	ldx #10		; set step
+	stx ay		; (also for RENUMBER)
 	lda #0
 	sta autozi+1
-+	sec
-	rts		; 24
+	sta $a5
++	rts		; 24
 
 ; ----------------------------------------- 
-
-	!fill 10
+; a747
+	!fill 6
 
 ; ----------------------------------------- part of DO
 ; a751
@@ -1165,12 +1167,8 @@ befbckgnds
 	stx $d024
 	jmp endsmb
 
-; ----------------------------------------- 
-
-	!by 0,0,0
-
 ; ----------------------------------------- bef PAUSE
-; a7e2			recoded
+; a7e5			recoded
 befpause	jsr chrget
 	bcc ++		; time follows?
 
@@ -1202,18 +1200,18 @@ befpause	jsr chrget
 +	jmp endsmb
 
 ; ----------------------------------------- resume?
-; a826
+; a823
 	sty doflag
 	jsr chrget
 	beq +
 	jmp whichdo
 
 ; ----------------------------------------- bef NRM
-; a831			enhanced
+; a82e			enhanced
 befnrm	jsr nrm00
 nrm1	jmp nrm2
 
-; a837
+; a834
 nrm00	lda #4		; video at $0400
 	sta $0288
 	lda #$c7		; VIC bank 0 ($0000)
@@ -1229,7 +1227,7 @@ nrm	sta $d018		; entry for CSET
 	rts
 
 ; ----------------------------------------- bef MOB OFF
-; a856			original
+; a853			original
 befmoboff	jsr sgetbytn
 	lda $d015
 	and mbittabl,x
@@ -1237,8 +1235,11 @@ befmoboff	jsr sgetbytn
 +	jmp endsmb
 
 ; ----------------------------------------- bef OFF
-; a865			original
+; a862			original
+endflash	jsr dec7a
 befoff	ldx #0
+-	lda flashing
+	bmi -
 	stx flashfl
 	txa
 -	sta flashfls,x
@@ -1248,7 +1249,7 @@ befoff	ldx #0
 	jmp bef0
 
 ; ----------------------------------------- bef ARC
-; a876			enhanced
+; a87b			enhanced
 befarc	jsr arc1
 	lda strz1
 	sta $a8
@@ -1260,7 +1261,7 @@ befarc	jsr arc1
 	jmp endsmb
 
 ; ----------------------------------------- 
-; a88d
+; a892
 arc1	jsr incbasbz
 	lda #0
 	sta drehsinn
@@ -1313,7 +1314,7 @@ getrxryf	jsr sgetbytc
 	jsr sgetbytc
 	stx kry
 	jsr getpktf
-; a914
+; a919
 kreis	lda #$13
 	sta $21
 	jsr kreis1
@@ -1321,7 +1322,7 @@ kreis	lda #$13
 	bne kreis1
 
 ; ----------------------------------------- Fallback from HIRES
-
+; a924
 nrm01	lda $0288
 	cmp #$cc
 	bne +
@@ -1331,21 +1332,21 @@ nrm01	lda $0288
 	jsr nrm02
 	
 ; ----------------------------------------- Part of CSET
-
+; a933
 csm0	ldx $0288
 	cpx #$cc		; is MEM active?
 	bne +
 	eor #$2c		; yes, change values accordingly
 +	jmp nrm
-
+; a93f
 csetmem	pha
 	jsr nrm01
 	pla
 	bne csm0
 
 ; ----------------------------------------- 
-
-	!fill 8
+; a946
+	!by 0,0,0
 
 ; ----------------------------------------- 
 ; a949
