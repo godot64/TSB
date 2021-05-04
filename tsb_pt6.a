@@ -878,115 +878,97 @@ memnrml	lda #$cc		; video now at $cc00
 	jsr repchrget	; save bef vectors and leave
 	jmp setbmode	; at a035: set bad mode to PLACE & RENUMBER
 
-; ----------------------------------------- 
-; bdf1
-	!by 0,0,0,0,0,0	; 6 bytes
-
 ; ----------------------------------------- bef DETECT
-; bdf7			original
+; bdf1			original
 befdetect	jsr sgetbytn
 	stx detectart
 	lda $d01e,x
 	sta detecterg
 	jmp endsmb
 
-; ----------------------------------------- 
-; be06/be0a
-textkey	!tx "key",0
-textchr	!tx "chr$(13)",0
-
 ; ----------------------------------------- bef DISPLAY
-; be13			original
+; be00			original
 befdisplay
 	jsr incbasbz
 dpl2	ldx #0
 	stx $a7
-	lda #1		; first number: 1
-	sta $a6
-	lda #>keytab
+	inx		; first number: 1
+	stx $a6
+	lda #>keytab	; base address of texts
 	sta $21
 	lda #<keytab
 	sta $20
-; be26
+; 
 dpl1	ldy #0
 -	lda textkey,y	; out "KEY"
 	beq +
 	jsr bsout
 	iny
 	bne -
-+	lda $a6		; out number
-	sta $63
-	lda $a7
-	sta $62
++	sta $62 		; .a=0 (hi)
+	lda $a6		; out number of f-key
+	sta $63		; (lo)
 	ldx #$90
 	sec
 	jsr sxflp
 	jsr sfacasc
 	jsr outasc
-	lda #$2c		; out ","
-	jsr bsout
-	lda #$22		; out quote
-	jsr bsout
-	lda #1
-	sta ay
-	ldx #0
+	jsr komma		; out ","
+	jsr quote		; out quote
 	ldy #0
--	lda ($20),y	; out text
-	beq nxkey		; until 0
-	cmp #$0d		; cr?
-	beq crtxout	; yes
-	lda ay
-	bne +
-	lda #$2c		; out ","
-	jsr bsout
-	lda #$22		; out quote
-	jsr bsout
-	lda #1
-	sta ay
-+	lda ($20),y	; out text
-	jsr bsout
-dpl0	inx
-	iny
-	jmp -
 
-; ----------------------------------------- 
-; be80
-nxkey	inc $a6
+-	lda ($20),y	; get text of f-key
+	tax
+	beq nxkey		; is $00? (end of text)
+	cmp #$0d		; is cr?
+	beq crtxout	; yes, add "+chr$(13)"
+
+	txa
+	jsr bsout		; otherwise out text
+--	iny
+	bne -		; uncond. branch
+
+crtxout	jsr quote		; is cr: out quote
+	lda #$2b		; out "+"
+	jsr bsout
+	ldx #0
+-	lda textchr,x
+	beq +
+	jsr bsout		; out "chr$(13)"
+	inx
+	bne -		; uncond. branch
+
+nxkey	jsr quote		; end of text: out quote
++	inc $a6		; count texts
 	clc
-	lda $20
+	lda $20		; add 16 to address
 	adc #16
 	sta $20
-	lda $21
-	adc #0
-	sta $21
-	lda ay
-	beq +
-	lda #$22		; out quote
-	jsr bsout
-+	lda #$0d		; out cr
-	jsr bsout
-	lda $a6		; counter
-	cmp #$11		; at 17?
-	bne dpl1		; no, next key text
+	bcc +
+	inc $21
++	jsr return	; out LF
+	lda $a6		; loop until 16 texts
+	cmp #17
+	bne dpl1
+
 	jmp endsmb
 
 ; ----------------------------------------- 
-; bea7
-crtxout	lda ay
-	beq +
-	lda #$22		; out quote
-	jsr bsout
-	lda #$2b		; out "+"
-	jsr bsout
-	lda #0
-	sta ay
-+	ldx #$00
--	lda textchr,x	; out text
-	beq +
-	jsr bsout
-	inx
-	bne -
-+	jmp dpl0		; back to loop
+; 
+textkey	!tx "key",0
+textchr	!tx "chr$(13)",0
+
+; ----------------------------------------- 
+; 
+	!by 0,0,0,0,0,0,0,0	; 68 bytes free
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0
 
 ; ----------------------------------------- part of LIST/PAGE
 ; becb

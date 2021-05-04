@@ -6,6 +6,8 @@
 ;
 ; part 7, extension area
 ;
+; patched on 03.05.2021 (command PLACE: optimized)
+;
 ; ----------------------------------------- 
 
 	!ct pet
@@ -16,24 +18,18 @@ klaa	lda #$28		; 0 "("
 	!by $2c
 klaz	lda #$29		; 3 ")"
 	!by $2c
-glei	lda #$3d		; 6 "="
-	!by $2c
-retn	lda #$0d		; 9 cr
-	!by $2c
-comm	lda #$2c		; c ","
-	!by $2c
 doll	lda #$24		; f "$"
 	!by $2c
 proz	lda #$25		; 12 "%"
 	!by $2c
-spac	lda #$20		; 15 " "
-	!by $2c
 colo	lda #$3a		; 18 ":"
-	!by $2c
-anfz	lda #$22		; 1b quote
-	!by $2c
-leer	lda #$93		; 1e clr/home
 	jmp bsout		; out
+
+; ----------------------------------------- 
+
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0
 
 ; ----------------------------------------- 
 ; cc23
@@ -86,9 +82,9 @@ outdigits	jsr $b395		; sys int to float
 arrdims	jsr klaa		; "("
 	jsr getdims	; dims out
 	jsr klaz		; ")"
-	jsr glei		; "="
-	jsr retn		; cr
-	jmp retn		; cr
+	jsr outeql	; "="
+	jsr return	; cr
+	jmp return	; cr
 
 ; ----------------------------------------- 
 ; cc75
@@ -127,7 +123,7 @@ getdims	jsr inc20
 	dec $02
 	dec $02
 	beq +
-	jsr comm		; out ","
+	jsr komma		; out ","
 	bne -
 
 +	inc helpvec
@@ -159,7 +155,7 @@ befplace	jsr basromei
 	beq +
 	jmp $af08		; no, sys syntax error
 
-+	jsr retn		; yes, cr
++	jsr return	; yes, cr
 	jsr initvecs	; init vecs
 -	lda $21
 	cmp $32
@@ -170,7 +166,7 @@ befplace	jsr basromei
 
 +	jsr arrays	; array found, out 
 	jsr skiparr
-	jsr retn		; out cr
+	jsr return	; out cr
 	bne -
 ; cd09
 arrays	ldy #0
@@ -224,13 +220,13 @@ strarr	and #$7f		; out string array name 2
 	ldx #$ff		; set as string
 	stx $0d
 	jsr $af2b		; sys get variable
-	jsr anfz		; out quote
+	jsr quote		; out quote
 	ldy #2
 	lda ($64),y
 	cmp #8
 	bcc +
 	jsr $ab21		; sys out string
-+	jsr anfz		; out quote
++	jsr quote		; out quote
 	jsr nextarr
 	bne -
 	rts
@@ -257,11 +253,11 @@ outpos	lda $af		; show position in array
 	jsr outdigits
 	dec $02
 	beq +
-	jsr comm
+	jsr komma
 	bne -
-+	jsr spac
++	jsr leerzch
 	jsr colo
-	jsr spac
+	jsr leerzch
 	ldy #4
 	jmp $b2ea		; sys search for element
 
@@ -272,7 +268,7 @@ fltarr	jsr $af2b		; get variable
 	jsr $ab1e		; sys string out
 
 nextarr	jsr arrbreak
-	jsr retn
+	jsr return
 	lda $af
 	asl
 	sta $02
@@ -325,7 +321,7 @@ onearray	sta $45		; store first char
 	ora #$80
 	tax
 ++	stx $46		; mark as string
-	jsr retn		; out cr
+	jsr return	; out cr
 
 	jsr initvecs
 -	lda $21

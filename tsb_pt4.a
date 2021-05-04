@@ -12,19 +12,34 @@
 ; patched on 07.04.2021 (command DESIGN: optimized)
 ; patched on 12.04.2021 (command AUTO)
 ; patched on 14.04.2021 (commands PAUSE, BCKGNDS)
+; patched on 03.05.2021 (command DUMP: optimized)
 ;
 ; ----------------------------------------- 
 
 	!ct pet
 
+; ----------------------------------------- 
+; 9f3a			new
+outeql	lda #$3d		; =
+	!by $2c
+komma	lda #$2c		; ,
+	!by $2c
+clear	lda #$93		; CLS
+	!by $2c
+leerzch	lda #$20		; space
+	!by $2c
+quote	lda #$22		; "
+	!by $2c
+return	lda #$0d		; Return
+	jmp bsout
+	
 ; ----------------------------------------- bef DUMP
-; 9f3a			enhanced
+; 9f4e			enhanced
 befdump	lda $2d		; get start of vars
 	sta $20
 	lda $2e
 	sta $21
-dit6	lda #$0d		; sys out cr
-	jsr bsout
+dit6	jsr return	; sys out cr
 	lda $21
 	ldy #0
 	cmp $30		; is at start of arrays?
@@ -37,7 +52,7 @@ dit6	lda #$0d		; sys out cr
 dit1	jmp bef0		; yes, end of command
 
 ; ----------------------------------------- 
-
+; 9f6e
 dit0	lda ($20),y	; get 1st char of varname
 	sta $a6
 	bpl dit3		; check type
@@ -71,8 +86,7 @@ dit4	and #$7f		; 2nd is shifted, so integer
 	ldy #4
 	bne dit5
 
-dit3	and #$7f
-	jsr bsout
+dit3	jsr bsout
 	jsr inc20
 	lda ($20),y	; get 2nd char of unshifted varname
 	sta $a6
@@ -84,38 +98,35 @@ dit3	and #$7f
 	jsr bsout
 	jsr outeql
 
-	lda #$22		; string
-	jsr bsout
+	jsr quote		; string start
 	jsr inc20
-	lda ($20),y
+	lda ($20),y	; len
 	sta $a8
 	jsr inc20
-	lda ($20),y
+	lda ($20),y	; address
 	sta $23
 	jsr inc20
 	lda ($20),y
 	sta $24
-	ldy #0
--	cpy $a8
+-	cpy $a8		; string out
 	beq dit8
 	lda ($23),y
 	jsr bsout
 	iny
 	bne -
-dit8	lda #$22		; string end
-	jsr bsout
+dit8	jsr quote		; string end
 	ldy #3
-dit5	jsr inc20
+
+dit5	jsr inc20		; skip to next variable
 	dey
 	bne dit5
 
-	jsr getkey	; get key
+	jsr getkey	; key pressed?
 	jmp dit6		; start over
 
 ; ----------------------------------------- 
-; 9ffb
-dit7	and #$7f		; 2nd char unshifted, so float
-	jsr bsout
+; a005
+dit7	jsr bsout		; 2nd char unshifted, so float
 	jsr inc20
 	lda $20
 	ldy $21
@@ -127,8 +138,8 @@ dit7	and #$7f		; 2nd char unshifted, so float
 	bne dit5
 
 ; ----------------------------------------- 
-; a017
-outasc	ldx #$00
+; a01f
+outasc	ldx #0
 -	lda linenum,x
 	beq +
 	jsr bsout
@@ -136,21 +147,12 @@ outasc	ldx #$00
 	bne -
 +	rts
 
-; ----------------------------------------- 
-; a025
-outeql	lda #$3d		; =
-	jmp bsout
-
 ; ----------------------------------------- part of DO
-; a02a
+; a02d
 do8	jsr sfordo	; search for DO
 	pla
 	pla
 	jmp do9
-
-; ----------------------------------------- 
-
-	!by $ea,$ea,$00
 
 ; ----------------------------------------- part of INST and MEM
 ; a035
@@ -408,7 +410,7 @@ chz0	lda ax
 
 ; ----------------------------------------- 
 ; a261
-ptest1	sty $90
+ptest1	sty status
 	jsr tdot0
 	jmp kerromein
 
@@ -1235,7 +1237,7 @@ befmoboff	jsr sgetbytn
 +	jmp endsmb
 
 ; ----------------------------------------- bef OFF
-; a862			original
+; a862			enhanced
 endflash	jsr dec7a
 befoff	ldx #0
 -	lda flashing
