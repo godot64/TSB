@@ -10,6 +10,7 @@
 ; patched on 24.03.2021 (added CHKDRV)
 ; patched on 04.04.2021 (command COLD)
 ; patched on 20.04.2021 (bugfix in func $)
+; patched on 04.05.2021 (bugfix in func CHECK)
 ;
 ; ----------------------------------------- 
 
@@ -1219,11 +1220,11 @@ fncheck	jsr incbasbz
 	ora mbittabs,y
 	cmp detecterg
 	bne +
--	ldy #0
-	jmp sxyflp3
---
+---	ldy #0
+--	jmp sxyflp3
+-
 +	ldy #1
-	bne -
+	bne --
 
 ; -----------------------------------------
 
@@ -1232,8 +1233,8 @@ fncheck	jsr incbasbz
 	lda detecterg
 	ora mbittabs,y
 	cmp detecterg
-	bne --
-	beq -
+	bne -
+	beq ---
 
 ; ----------------------------------------- ERR entry
 ; 9146			original
