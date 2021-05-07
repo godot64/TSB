@@ -464,9 +464,9 @@ sbrk	lda #$04
 	sta $d4
 	sta mobbew
 	sta gmemflag
-	lda #8		; CTRL h
+	lda #14		; CTRL n:
 	sta playflag
-	jsr bsout		; fix keyb
+	jsr bsout		; cset 1
 	jmp ($a002)	; system nmi
 
 rs232nmi	jmp $fe72		; nmi when rs323

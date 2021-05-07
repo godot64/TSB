@@ -13,6 +13,8 @@
 ; patched on 24.03.2021
 ;   (commands DIR, CALL, added FastCall)
 ; patched on 12.04.2021 (commands AUTO & RENUMBER)
+; patched on 06.05.2021
+;   (added new command DRAW TO, changed PLOT)
 ;
 ; ----------------------------------------- 
 
@@ -102,12 +104,8 @@ ipr5	jsr incbasbz	; process sb command
 	pha
 	rts
 
-; ----------------------------------------- 
-
-	!by 0
-
 ; ----------------------------------------- bef HIRES
-; 9202			original (almost)
+; 9201			original (almost)
 befhires	ldy #$01
 	sty xmaxhigh
 	lda #$3f
@@ -156,34 +154,33 @@ setmod	sta $c000,y
 	jmp endsmb
 
 ; ----------------------------------------- bef PLOT
-; 9267			enhanced
+; 9266			recoded
 befplot	jsr incbasbz
 	jsr sgetadr	; x
 	sty $09
+	sty ax
 	sta $0a
+	sta ax+1
 	jsr sgetbytc	; y
 	stx $a4
+	stx ay
 	jsr getpktf	; col
 	jsr punkt		; set dot
 	jmp endsmb
 
 ; ----------------------------------------- 
-
-l927f	lda $39		; basic line #
-	sta errln
-	lda $3a
-	sta errln+1
-	rts
+; 9287
+	!by 0,0,0
 
 ; ----------------------------------------- part of DO
-
+; 928a
 dodone	bcs +		; DONE?
 	jmp befproc	; no, skip rest of line
 
 +	jmp docont	; b56a
 
 ; ----------------------------------------- 
-
+; 9292
 -	lda #$08		; nicht plausibel
 	sta $90
 	rts
@@ -305,25 +302,25 @@ gbittabl	!by $7f,$bf,$df,$ef,$f7,$fb,$fd,$fe
 ; ----------------------------------------- bef LINE
 ; 9350			original
 befline	jsr getxyxyf
-	jsr linzei
+line0	jsr linzei
 	jmp endsmb
 
 ; 9359
 getxyxyf	jsr incbasbz
-	jsr sgetadr
+	jsr sgetadr	; start x
 	sta ax+1
 	sty ax
-	jsr sgetbytc
+	jsr sgetbytc	; start y
 	stx ay
 ; 936b
-getxyf	jsr schkcom
-	jsr sgetadr
+getxyf	jsr schkcom	; comma?
+gxyf0	jsr sgetadr	; end x
 	sta ex+1
 	sty ex
-	jsr sgetbytc
+	jsr sgetbytc	; end y
 	stx ey
 
-getpktf	jsr sgetbytc
+getpktf	jsr sgetbytc	; draw mode
 	stx $f7
 	rts
 
@@ -1108,7 +1105,7 @@ flashactv	lda #10
 
 ; ----------------------------------------- 
 ; 9931
-	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0	; 22 bytes
 	!by 0,0,0,0,0,0,0,0
 	!by 0,0,0,0,0,0
 
@@ -1341,33 +1338,42 @@ tdot0	lda ($a8),y
 	sta $90
 +	rts
 
-; ----------------------------------------- 
+; ----------------------------------------- bef DRAW TO
+; 9ac9
+drawto	jsr get10010	; get byte after DRAW token
+	cmp #$a4		; token of TO?
+	bne +		; no, RTS
+	jsr incbasbz	; yes, skip TO
+	jsr gxyf0		; then get ex/ey-end and mode
+	jmp line0		; and draw line
 
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0
+; ----------------------------------------- 
+; 9ad9
+	!by 0,0,0,0,0,0,0,0	; 15 bytes
+	!by 0,0,0,0,0,0,0
 
 ; ----------------------------------------- 
-; 9ae6
+; 9ae8
 inca6a7	inc $a6
 	bne +
 	inc $a7
 +	rts
 
 ; ----------------------------------------- 
-; 9aed
+; 9aef
 inca8a9	inc $a8
 	bne +
 	inc $a9
 +	rts
 
 ; ----------------------------------------- bef REPEAT
-; 9af4			enhanced
+; 9af6			enhanced
 befrepeat	ldy sprepeat
 	cpy #20
 	bcc +
-err29	ldx #$2a		; error "stack too large"
+err2a	ldx #$2a		; error "stack too large"
+	!by $2c
+err29	ldx #$29		; error "until w/o repeat"
 	jmp ($0300)
 
 +	lda $7a
@@ -1380,15 +1386,13 @@ err29	ldx #$2a		; error "stack too large"
 	jmp bef0
 
 ; ----------------------------------------- bef UNTIL
-; 9b12			original
+; 9b17			original
 befuntil	jsr incbasbz
 	lda sprepeat
 	cmp #2
-	bcs +
-	ldx #$29		; error "until w/o repeat"
-	jmp ($0300)
-
-+	jsr sfrmevl
+	bcc err29
+; 9b21
+	jsr sfrmevl
 	jsr chrgot
 	lda $61
 	beq +

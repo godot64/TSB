@@ -13,6 +13,7 @@
 ; patched on 12.04.2021 (command AUTO)
 ; patched on 14.04.2021 (commands PAUSE, BCKGNDS)
 ; patched on 03.05.2021 (command DUMP: optimized)
+; patched on 06.05.2021 (added new command DRAW TO)
 ;
 ; ----------------------------------------- 
 
@@ -185,20 +186,20 @@ charen0	lda pport
 
 ; ----------------------------------------- bef DRAW
 ; a057			enhanced
-befdraw	jsr incbasbz
-	jsr sgetstr
-	stx $ac
+befdraw	jsr drawto	; check if DRAW TO
+	jsr sgetstr	; no, just DRAW, get string
+	stx $ac		; address
 	sta $ad
-	lda $69
+	lda $69		; len
 	pha
-	jsr schkcom
-	jsr sgetadr
+	jsr schkcom	; comma?
+	jsr sgetadr	; x
 	sty drx
 	sta drx+1
-	jsr sgetbytc
-	stx dry
-	jsr getpktf
-	pla
+	jsr sgetbytc	; comma?
+	stx dry		; y
+	jsr getpktf	; draw mode
+	pla		; len back
 	sta $5f
 	lda #0
 	sta drstrz
