@@ -415,7 +415,7 @@ movez	ldy #0
 	sty $a5
 	lda $a6
 	bne +
-	lda $0288		; video
+	lda video		; video
 	!by $2c
 +	lda #$d8		; or colors
 	sta $21

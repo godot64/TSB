@@ -788,8 +788,8 @@ befmobset	jsr sgetbytn
 
 	jsr sgetbytc
 	ldy $aa
-	lda $0288		; where is video?
-	cmp #$cc		; at $cc00 (mem)?
+	lda video		; where is video?
+	cmp #$cc		; at $cc00 (after mem)?
 	beq ifmem
 	lda gmemflag
 	cmp #10
@@ -924,7 +924,7 @@ sirq2	lda $ff		; save $fc to $ff
 	sta flashing
 	lda #$d8		; yes, set color ram at $fe/$ff
 	sta $ff
-	lda $0288		; set video ram at $fc/$fd
+	lda video		; set video ram at $fc/$fd
 	sta $fd
 	sty $fe		; .y=0
 	sty $fc

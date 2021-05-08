@@ -846,7 +846,7 @@ befmem	ldy #1		; commands following?
 ; ----------------------------------------- 
 ; bdaf
 memnrml	lda #$cc		; video now at $cc00
-	sta $0288
+	sta video
 	lda #$93		; clr/home
 	jsr bsout
 
@@ -873,7 +873,7 @@ memnrml	lda #$cc		; video now at $cc00
 
 	lda #$94		; VIC bank 3
 	sta $dd00
-	lda #$39		; video at $cc00
+	lda #$3b		; video at $cc00 (lower)
 	sta $d018
 	jsr repchrget	; save bef vectors and leave
 	jmp setbmode	; at a035: set bad mode to PLACE & RENUMBER

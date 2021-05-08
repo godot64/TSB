@@ -1164,9 +1164,9 @@ csgetarid	cmp #$61		; GRAPHICS?
 ; ----------------------------------------- 
 ; 90ca			original
 fngraphics
-	jsr incbasbz
 	ldx #$d0		; =$d000
--	ldy #$00
+cgaval	jsr incbasbz
+cga0	ldy #$00
 	jmp sxyflp
 
 ; ----------------------------------------- 
@@ -1176,95 +1176,113 @@ csgetarie	cmp #$60		; SOUND?
 
 ; ----------------------------------------- 
 ; 90d8			original
-fnsound	jsr incbasbz
-	ldx #$d4		; =$d400
-	bne -
+fnsound	ldx #$d4		; =$d400
+	bne cgaval
 
 ; ----------------------------------------- 
-
+; 90dc
 csgetarif	cmp #$67		; NRM?
 	bne csgetarig
 	jmp fnnrm
 
 ; ----------------------------------------- 
-
+; 90e3
 csgetarig	cmp #$28		; AT?
 	bne csgetarih
 	jmp fnat
 
 ; ----------------------------------------- 
-
+; 90ea
 csgetarih	cmp #$7c		; CHECK?
-	bne fnerr
+	bne csgetarii	; no
 
 ; ----------------------------------------- func CHECK
-; 90f1			original
+; 90ee			recoded
 fncheck	jsr incbasbz
 	jsr $aefa		; sys "("?
-	jsr sgetadr2
+	jsr sgetadr2	; get sprite#
 	sty pos
 	lda detectart
 	bne ++
-
 	jsr $aefd		; sys chkcom
-	jsr sgetadr2
+	jsr sgetadr2	; get sprite# (2nd sprite)
 	sty pos1
 	jsr $aef7		; sys ")"?
-	ldy pos
-	lda detecterg
-	ora mbittabs,y
-	cmp detecterg
-	bne +
-	ldy pos1
-	lda detecterg
-	ora mbittabs,y
-	cmp detecterg
-	bne +
----	ldy #0
---	jmp sxyflp3
+
+	ldy pos		; sprite #1
+	jsr wdetect	; check: an Kollision beteiligt?
+	beq +		; wenn nein: return 1
+
+	ldy pos1		; wenn ja: sprite #2
+	jsr wdetect	; check: an Kollision beteiligt?
+	beq +		; wenn ja: return 0
+
+--	ldy #0
+	!by $2c
 -
 +	ldy #1
-	bne --
+	jmp sxyflp3
+; 9123
+wdetect	lda detecterg
+	and mbittabs,y
+	rts
 
 ; -----------------------------------------
-
+; 912a
 ++	jsr $aef7		; sys ")"?
-	ldy pos
-	lda detecterg
-	ora mbittabs,y
-	cmp detecterg
-	bne -
-	beq ---
+
+	ldy pos		; sprite #x
+	jsr wdetect	; Hintergrund berührt?
+	beq -		; nein, return 1
+	bne --		; ja, return 0
+
+; ----------------------------------------- 
+; 9137
+csgetarii	cmp #$7d		; DISPLAY?
+	bne csgetarij
+
+; ----------------------------------------- func DISPLAY
+; 913b
+fndisplay	ldx video		; returns video address
+	bne cgaval	; normally uncond. branch
+
+; ----------------------------------------- 
+; 9140
+csgetarij	!fill 8,$ea	; extendible here /w new functions
+			; like: CMP #xx, bne csgetarik,...
 
 ; ----------------------------------------- ERR entry
-; 9146			original
-fnerr	jsr incbasbz
-	ldy #0
-	lda (progz),y
-	cmp #$4e		; "n" (errn)
-	beq fnerrn
+; 9148			recoded
+fnerr	ldy #0
+	jsr errnln	; "n" (errn)?	
+	beq cerrn
 
 ; ----------------------------------------- func ERRLN
-; 9151
-fnerrln	cmp #$4c		; "l" (errln)
+; 914f
+cerrln	cmp #$4c		; no, "l" (errln)?
 	beq +
+
 -	jmp endsmb
 
-+	jsr incbasbz
-	lda (progz),y
-	cmp #$4e		; "n" (errln)
+; ----------------------------------------- func ERRN 
+; 9156
+cerrn	ldy errn
+	ldx #0
+	beq ++
+
++	jsr errnln	; "n" (errln)?
 	bne -
 
 	ldy errln
 	ldx errln+1
--	jsr incbasbz
+++	jsr incbasbz
 	jmp sxyflp
 
-; ----------------------------------------- func ERRN 
-; 916d
-fnerrn	ldy errn
-	ldx #0
-	beq -
+; ----------------------------------------- sub 
+; 916e
+errnln	jsr chrget
+	cmp #$4e
+	rts
 
 ; ----------------------------------------- 
 ; 9174

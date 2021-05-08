@@ -1216,7 +1216,7 @@ nrm1	jmp nrm2
 
 ; a834
 nrm00	lda #4		; video at $0400
-	sta $0288
+	sta video
 	lda #$c7		; VIC bank 0 ($0000)
 nrm02	sta $dd00
 	lda #$1b		; HIRES off
@@ -1326,7 +1326,7 @@ kreis	lda #$13
 
 ; ----------------------------------------- Fallback from HIRES
 ; a924
-nrm01	lda $0288
+nrm01	lda video
 	cmp #$cc
 	bne +
 	lda #$c4
@@ -1336,7 +1336,7 @@ nrm01	lda $0288
 	
 ; ----------------------------------------- Part of CSET
 ; a933
-csm0	ldx $0288
+csm0	ldx video
 	cpx #$cc		; is MEM active?
 	bne +
 	eor #$2c		; yes, change values accordingly
