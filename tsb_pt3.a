@@ -15,6 +15,8 @@
 ; patched on 12.04.2021 (commands AUTO & RENUMBER)
 ; patched on 06.05.2021
 ;   (added new command DRAW TO, changed PLOT)
+; patched on 22.05.2021
+;   (commands HIRES, PLOT & MULTI, bugfix in EXEC)
 ;
 ; ----------------------------------------- 
 
@@ -105,7 +107,7 @@ ipr5	jsr incbasbz	; process sb command
 	rts
 
 ; ----------------------------------------- bef HIRES
-; 9201			original (almost)
+; 9201			optimized
 befhires	ldy #$01
 	sty xmaxhigh
 	lda #$3f
@@ -129,8 +131,8 @@ befhires	ldy #$01
 	cpx #$ff
 	bne -
 
-	lda #0
-	sta multijn
+	ldy #0
+	sty multijn
 	jsr nrm01
 	lda #10
 	sta gmemflag
@@ -140,21 +142,14 @@ befhires	ldy #$01
 	sta $d018
 	lda #$94
 	sta $dd00
-
-	ldy #0
+; 924b
 	sty lowcolflag
 	lda $ac		; clear colors
-setmod	sta $c000,y
-	sta $c0ff,y
-	sta $c1fe,y
-	sta $c2fd,y
-	iny
-	cpy #$ff
-	bne setmod
-	jmp endsmb
+setmod	jsr clrhicols
+	beq +
 
 ; ----------------------------------------- bef PLOT
-; 9266			recoded
+; 9255			recoded
 befplot	jsr incbasbz
 	jsr sgetadr	; x
 	sty $09
@@ -166,11 +161,22 @@ befplot	jsr incbasbz
 	stx ay
 	jsr getpktf	; col
 	jsr punkt		; set dot
-	jmp endsmb
++	jmp endsmb
+
+; ----------------------------------------- 
+; 9276
+clrhicols	sta $c000,y	; clear video ram
+	sta $c0f9,y
+	sta $c1f3,y
+	sta $c2ed,y
+	iny
+	cpy #$fb
+	bne clrhicols
+	rts
 
 ; ----------------------------------------- 
 ; 9287
-	!by 0,0,0
+	!by 0,0
 
 ; ----------------------------------------- part of DO
 ; 928a
@@ -506,44 +512,51 @@ l20pl40	clc
 	rts
 
 ; ----------------------------------------- 
-; 94db
+; ----------------------------------------- 
+; 94db			optimized
 l23pl40	clc
 	lda $23
 	adc #40
 	sta $23
-	lda $24
-	adc #0
-	sta $24
-	rts
+	bcc +
+	inc $24
++	rts
 
 ; ----------------------------------------- bef MULTI
-; 94e9			enhanced
-befmulti	lda #$2c
+; 94e7			recoded
+befmulti	lda #$2c		; set multi limits
 	sta multijn
 	lda #$9f
 	sta xmaxlow
 	lda #$00
 	sta xmaxhigh
-	jsr get2nyb	; get colors
+
+	jsr chkonoff	; check for ON/OFF
+	jsr chrgot	; anything following?
+	beq justmulti
+
+	jsr get2nyb2	; yes, get 2 parameters
 	ldy #0
--	sta $c000,y	; clear video ram
-	sta $c0f9,y
-	sta $c1f3,y
-	sta $c2ed,y
-	iny
-	cpy #$fb
-	bne -
-	jsr sgetbytc
+	jsr clrhicols	; set video ram
+
+	jsr sgetbytc	; get 3rd parameter
 	txa
 	ldy #0
--	sta $d800,y	; clear color ram
+-	sta $d800,y	; set color ram
 	sta $d8f9,y
 	sta $d9f3,y
 	sta $daed,y
 	iny
 	cpy #$fb
 	bne -
-	lda #$18
+	ldx #$ff
+
+justmulti	txa
+	beq +
+	lda #$18		; multi on
+	!by $2c
+
++	lda #$08		; multi off
 	sta $d016
 	jmp endsmb
 
@@ -1189,7 +1202,7 @@ flinend	jsr chrget
 ; ----------------------------------------- 
 ; 99c9
 get2nyb	jsr sgetbytn
-	jsr xnyb
+get2nyb2	jsr xnyb
 	stx $aa
 	asl $aa
 	asl $aa
@@ -1587,7 +1600,7 @@ befexec	lda progz		; save basic pz to stack
 ; ----------------------------------------- bef CALL
 ; 9c64			recoded
 befcall	jsr basromau	; switch basic rom off
-	jsr fastcall	; check exec stack (doesn't return if successful)
+	jsr cfreset	; check exec stack (doesn't return if successful)
 
 	jsr setsstart	; set start address for search
 	lda #$31		; search for PROC (code $31)
