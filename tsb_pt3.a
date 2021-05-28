@@ -17,6 +17,7 @@
 ;   (added new command DRAW TO, changed PLOT)
 ; patched on 22.05.2021
 ;   (commands HIRES, PLOT & MULTI, bugfix in EXEC)
+; patched on 29.05.2021 (bugfix in DRAW TO)
 ;
 ; ----------------------------------------- 
 
@@ -1356,14 +1357,16 @@ tdot0	lda ($a8),y
 drawto	jsr get10010	; get byte after DRAW token
 	cmp #$a4		; token of TO?
 	bne +		; no, RTS
-	jsr incbasbz	; yes, skip TO
+	pla		; yes, clear stack
+	pla
+	jsr incbasbz	; skip TO
 	jsr gxyf0		; then get ex/ey-end and mode
 	jmp line0		; and draw line
 
 ; ----------------------------------------- 
-; 9ad9
-	!by 0,0,0,0,0,0,0,0	; 15 bytes
-	!by 0,0,0,0,0,0,0
+; 9adb
+	!by 0,0,0,0,0,0,0,0	; 13 bytes
+	!by 0,0,0,0,0
 
 ; ----------------------------------------- 
 ; 9ae8
