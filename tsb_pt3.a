@@ -18,6 +18,7 @@
 ; patched on 22.05.2021
 ;   (commands HIRES, PLOT & MULTI, bugfix in EXEC)
 ; patched on 29.05.2021 (bugfix in DRAW TO)
+; patched on 06.06.2021 (added startadr to LOAD: BLOAD)
 ;
 ; ----------------------------------------- 
 
@@ -1365,8 +1366,15 @@ drawto	jsr get10010	; get byte after DRAW token
 
 ; ----------------------------------------- 
 ; 9adb
-	!by 0,0,0,0,0,0,0,0	; 13 bytes
-	!by 0,0,0,0,0
+bloadadr	jsr $aefd		; sys chkcom
+	jsr sgetadr	; word holen
+	sta $c4		; als startadresse
+	sty $c3
+	rts
+
+; ----------------------------------------- 
+
+	!by 0,0
 
 ; ----------------------------------------- 
 ; 9ae8

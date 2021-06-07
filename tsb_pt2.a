@@ -458,6 +458,10 @@ befgraphics
 ; 8bfc
 sysload	ldy drive
 	sty $ba
+	jsr chrgot	; more?
+	beq +
+	jsr bloadadr	; yes, get bload adr
++	lda #0
 	jmp $f4a5		; sys LOAD
 ; 8c03
 syssave	ldy drive
@@ -529,15 +533,6 @@ sclose	jsr $ffcc		; sys clrch
 	lda #1
 	jsr $ffc3		; sys close 1
 	jmp $ffcc		; sys clrch
-
-; ----------------------------------------- 
-
-	!by 0		; brk
-
-; ----------------------------------------- 
-; 8c75
-getbytc	jsr $aefd		; sys chkcom
-	jmp $b79e		; sys getbyt
 
 ; ----------------------------------------- 
 ; 8c7b
@@ -653,10 +648,6 @@ sfordo	jsr schdo		; search for DO
 ; ----------------------------------------- 
 
 +	rts
-
-; ----------------------------------------- 
-
-	!by $ea
 
 ; ----------------------------------------- 
 ; 8d28
@@ -811,10 +802,6 @@ getdouble	ldy #1
 	jsr chrget
 	jsr chrget
 	jmp enhexbin	; func %%/$$
-
-; ----------------------------------------- 
-
-	!by 0,0
 
 ; ----------------------------------------- 
 ; 8e48

@@ -1403,7 +1403,7 @@ renum1	tay
 	rts		; 10
 
 ; ----------------------------------------- 
-; c8d3
+; c8d4
 ren4	ldy #0
 	lda $2b
 	ldx $2c
@@ -1412,7 +1412,7 @@ ren4	ldy #0
 	jmp rbnc		; ce8d
 
 ; ----------------------------------------- func NRM
-; c8e0
+; c8e1
 fnnrm	jsr chrget
 	jsr $aefa		; sys check "("
 	jsr sgetstr1
@@ -1427,7 +1427,7 @@ fnnrm	jsr chrget
 	stx progz
 	sty progz+1
 	jsr fromnrm	; patch 11.01.20
-; c900
+; c901
 	ldx #0
 	ldy $69		; .y= len
 	cpy #8		; 8 (or 16) must be binary
@@ -1445,11 +1445,7 @@ fnnrm	jsr chrget
 +	jmp nrm0
 
 ; ----------------------------------------- 
-; c920
-	!fill 11		; patch 11.01.20
-
-; ----------------------------------------- 
-; c92c
+; c921
 ++	cmp #$24		; leading "$" in string?
 	bne +		; no
 	jsr chrget	; yes, skip "$"
@@ -1464,13 +1460,13 @@ nrm0	lda $69
 	jmp schkklz	; ")"?
 
 ; ----------------------------------------- bef DELAY
-; c947			enhanced
+; c93c			enhanced
 befdelay 	jsr chkonoff
 	stx delay
 	jmp endsmb
 
 ; ----------------------------------------- bef SECURE
-; c950			enhanced
+; c945			enhanced
 befsecure	jsr chkonoff
 	lda #$41		; search code for DISAPA
 	sta $22
@@ -1495,7 +1491,7 @@ befsecure	jsr chkonoff
 	bne -
 
 ; ----------------------------------------- bef END LOOP
-; c97e			original
+; c973			original
 befendloop
 	ldy sploop
 	cpy #2
@@ -1511,10 +1507,10 @@ err27	ldx #$27		; error "end loop w/o loop"
 	jmp bef0
 
 ; ----------------------------------------- 
-; c998
+; c98d
 stateofdo	ldy doflag	; DO active?
 	beq do4		; no, leave
-; c99d
+; c992
 stofdo2	ldy doflag	; DO active?
 	beq do5		; no
 	cpy #$d0
@@ -1548,19 +1544,19 @@ do2	jsr basromau
 	jmp do8
 
 ; ----------------------------------------- 
-; c9da
+; c9cf
 nrm2	jsr allnrm	; here: returned from TSB.MEM
 -	jmp bef0
 
 ; ----------------------------------------- 
-; c9e0
+; c9d5
 allnrm	lda vecrenum	; vector of bef RENUMBER
 	cmp #<befrenum-1	; unchanged? (after MEM)
 	beq -		; yes, leave
-; c9e7
+; c9dc
 	lda progz+2	; chrget changed?
 	cmp #$4c
-	beq nrm3		; yes, go to tsb.ext
+	beq nrm3		; yes, go to tsb.ext (!changes!)
 
 	ldx #<nammem	; load "tsb.mem"
 	jsr loadext
@@ -1577,7 +1573,7 @@ allnrm	lda vecrenum	; vector of bef RENUMBER
 	rts
 
 ; ----------------------------------------- 
-; ca09
+; c9fe
 iffail	pla
 	pla
 iffail1	ldx #24		; row 24
@@ -1586,12 +1582,8 @@ iffail1	ldx #24		; row 24
 	jsr basromau
 	jmp flpmsg2
 
-; ----------------------------------------- 
-; ca18
-	!by 0,0
-
 ; ----------------------------------------- bef INST
-; ca1a			new
+; ca0d			new
 befinst	ldx #<nameext	; load "tsb.ext"
 	jsr loadext
 	bcs iffail1	; leave if fail
@@ -1602,13 +1594,13 @@ befinst	ldx #<nameext	; load "tsb.ext"
 	jmp setbmode	; unlink vectors: PLACE/RENUMBER
 
 ; ----------------------------------------- 
-; ca2c
+; ca1f
 nrm3	jsr kerromein
 	cli
 	jmp $ce6c		; repair CHRGET
 
 ; ----------------------------------------- 
-; ca33
+; ca26
 loadext	stx helpvec
 	jsr chkdrv	; drive ready?
 	ldx helpvec
@@ -1620,8 +1612,18 @@ loadext	stx helpvec
 	tay
 	jsr $ffba		; sys setlfs
 	lda #0
-	sta $9d		; force prog mode
-	jmp load		; sys LOAD
+	bit $9d		; force prog mode
+	sta $0201
+	bmi +
+	nop
+	nop
+	nop
+;	jsr incbasbz
++	jmp $f4a5		; sys LOAD
+
+; ----------------------------------------- 
+; ca4b
+	!by 0,0,0,0,0
 
 ; ----------------------------------------- 
 ; ca50

@@ -49,6 +49,7 @@
 
 	neustr	= $b47d
 	pushstr	= $b4ca
+	getbytc	= $e200
 
 	!src "tsb_pt1.a"
 	!src "tsb_pt2.a"

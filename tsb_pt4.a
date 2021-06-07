@@ -1088,17 +1088,13 @@ get10010	jsr incbasbz	; skip token
 	sta $a5
 +	rts		; 24
 
-; ----------------------------------------- 
-; a747
-	!fill 6
-
 ; ----------------------------------------- part of DO
-; a751
+; a74b
 waitkey	jsr getkey+5
 	jmp befproc	; skip rest of line
 
 ; ----------------------------------------- part of DO
-; a757
+; a751
 whichdo	bcs waitkey	; "null"? (yes, if .c)
 
 	ldy #$ff		; no, DONE?
@@ -1110,7 +1106,7 @@ whichdo	bcs waitkey	; "null"? (yes, if .c)
 	jmp dodone
 
 ; ----------------------------------------- bef RLOCMOB
-; a768			original
+; a762			original
 befrlocm	jsr sgetbytn
 	stx mobnr2
 	stx mobnr
@@ -1134,12 +1130,11 @@ befrlocm	jsr sgetbytn
 	jmp mobcont
 
 ; ----------------------------------------- 
-; a7a1
+; a79b
 null	!tx "null"
-	!by $ff
 
 ; ----------------------------------------- bef CMOB
-; a7a6			original
+; a79f			original
 befcmob	jsr sgetbytn
 	stx $d025
 	jsr sgetbytc
@@ -1147,7 +1142,7 @@ befcmob	jsr sgetbytn
 	jmp endsmb
 
 ; ----------------------------------------- bef BCKGNDS
-; a7b5			enhanced
+; a7ae			enhanced
 befbckgnds
 	jsr sgetbytn	; get backgrnd color
 	stx $d021
@@ -1171,7 +1166,7 @@ befbckgnds
 	jmp endsmb
 
 ; ----------------------------------------- bef PAUSE
-; a7e5			recoded
+; a7de			recoded
 befpause	jsr chrget
 	bcc ++		; time follows?
 
@@ -1203,16 +1198,20 @@ befpause	jsr chrget
 +	jmp endsmb
 
 ; ----------------------------------------- resume?
-; a823
+; a81c
 	sty doflag
 	jsr chrget
 	beq +
 	jmp whichdo
 
+; ----------------------------------------- 
+
+	!by 0,0,0,0,0,0,0	; 7 bytes
+
 ; ----------------------------------------- bef NRM
 ; a82e			enhanced
 befnrm	jsr nrm00
-nrm1	jmp nrm2
+	jmp nrm2
 
 ; a834
 nrm00	lda #4		; video at $0400
