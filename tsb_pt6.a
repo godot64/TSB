@@ -12,6 +12,7 @@
 ; patched on 24.03.2021 (command ERROR plus LIST & MOD)
 ; patched on 03.04.2021 (commands MEM & NRM)
 ; patched on 21.04.2021 (command RENUMBER)
+; patched on 18.07.2021 (LIST)
 ;
 ; ----------------------------------------- 
 
@@ -960,7 +961,7 @@ textchr	!tx "chr$(13)",0
 
 ; ----------------------------------------- 
 ; 
-	!by 0,0,0,0,0,0,0,0	; 68 bytes free
+	!by 0,0,0,0,0,0,0,0	; 66 bytes free
 	!by 0,0,0,0,0,0,0,0
 	!by 0,0,0,0,0,0,0,0
 	!by 0,0,0,0,0,0,0,0
@@ -968,20 +969,22 @@ textchr	!tx "chr$(13)",0
 	!by 0,0,0,0,0,0,0,0
 	!by 0,0,0,0,0,0,0,0
 	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0
+	!by 0,0
 
 ; ----------------------------------------- part of LIST/PAGE
-; becb
-slist3	php
+; bec9
+slist3	php		; .a: current byte in BASIC code
 	sty $c5fe		; save .y
 	stx $c5ff		; save .x
-	ldy $028d
+	ldy $028d		; special key pressed
+	cpy #2		; C=?
+	beq pge3		; yes, skip PAGE
 	cpy #1		; shift?
-	bne pge2		; no
-	ldx #$ff
+	bne pge2
+
 -	iny		; yes, DELAY
 	bne -
-	inx
+	inx		; (.x starts randomly)
 	cpx delay
 	bne -
 	jmp pge1
@@ -989,7 +992,7 @@ slist3	php
 pge2	ldy $028d
 	beq pge1
 	cpy #4		; ctrl?
-	bne -		; yes, hold
+	beq -		; yes, hold LIST
 
 pge1	ldy pageflag	; page active? 
 	cpy #10
@@ -998,22 +1001,23 @@ pge1	ldy pageflag	; page active?
 	ldy pagewert	; yes
 	cpy $d6		; max crsr line?
 	bcs pge3
-	ldy #0		; no
+
+	ldy #0		; yes:
 	pha		; save .a
--	lda ($d1),y	; store screen line
+-	lda ($d1),y	; store basic line number up to space
 	sta $0244,y
 	cmp #$20
 	beq pge0
 	iny
 	bne -
 
-pge0	jsr $ffe1		; STOP?
+pge0	jsr $ffe1		; wait: STOP?
 	beq ++		; yes, break
-	jsr $ffe4		; get key
-	cmp #$0d		; cr?
-	bne pge0		; no, hold
+	jsr $ffe4		; (get key)
+	cmp #$0d		; or cr?
+	bne pge0		; no, hold PAGE at max
 
-	lda $d4	
+	lda $d4		; then:
 	pha
 	lda #0		; switch off crsr
 	tay
@@ -1022,7 +1026,7 @@ pge0	jsr $ffe1		; STOP?
 	jsr bsout
 -	lda #$20		; space
 	jsr bsout
-	lda $0244,y	; out last line
+	lda $0244,y	; out last line number
 	cmp #$20
 	beq +
 	sta $0400,y	; to screen
@@ -1030,18 +1034,20 @@ pge0	jsr $ffe1		; STOP?
 	bne -
 +	pla		; crsr back
 	sta $d4
-++	pla		; .a back
+++	pla		; .a back (current byte)
+
 pge3	ldx #>tabbef
 	stx $21
 	ldx #<tabbef
 	stx $20
 	cmp #$64		; sb token?
 	beq pge4		; yes
+
 -	ldy $c5fe		; no, .y back
 	ldx $c5ff		; .x back
 	jmp slist1	; to sys LIST
 ; bf51
-pge4	ldx $d4		; crsr off?
+pge4	ldx $d4		; SB token: crsr off?
 	cpx #0
 	bne -		; yes
 	ldy #0
