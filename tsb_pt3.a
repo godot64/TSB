@@ -19,6 +19,7 @@
 ;   (commands HIRES, PLOT & MULTI, bugfix in EXEC)
 ; patched on 29.05.2021 (bugfix in DRAW TO)
 ; patched on 06.06.2021 (added startadr to LOAD: BLOAD)
+; patched on 16.08.2021 (minor bugfix in RENUMBER)
 ;
 ; ----------------------------------------- 
 
@@ -495,10 +496,10 @@ befcircle	jsr incbasbz
 
 ; ----------------------------------------- part of RENUMBER
 ; 94bd
-ren3	jsr enternum	; cf5d
+ren3	jsr basromei
+	jsr enternum	; cf5d
 	cmp #250
 	bcs +
-	jsr basromei
 	jmp ren4		; c8d3
 +	jmp towarm
 
