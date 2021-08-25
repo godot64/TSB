@@ -10,6 +10,7 @@
 ; patched on 25.01.2021 (tables)
 ; patched on 13.03.2021 (command COLD, Reset, Stop/Restore)
 ; patched on 21.04.2021 (command RENUMBER)
+; patched on 25.08.2021 (make OPEN independent from drive number)
 ;
 ; ----------------------------------------- 
 
@@ -160,7 +161,7 @@ ssmni	lda pport
 	jmp $fe43		; sys NMI
 ; 8123
 sopen	jsr pspeibe
-	jsr $e1be		; bef OPEN
+	jsr newopen	; bef OPEN (with TSB drive)
 	jmp prestor
 
 ; ----------------------------------------- 

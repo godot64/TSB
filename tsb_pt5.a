@@ -11,6 +11,7 @@
 ; patched on 25.01.2021 (added parts of FASTCALL)
 ; patched on 19.03.2021 (bugfix in EXEC)
 ; patched on 03.04.2021 (commands CSET)
+; patched on 25.08.2021 (make OPEN independent from drive number)
 ; 
 ; ----------------------------------------- 
 
@@ -876,7 +877,7 @@ ss2	jsr distr
 ; b1dd			recoded
 befscrld	jsr intro
 	ldx $b8		; file#
-	jsr $ffc6		; open
+	jsr $ffc6		; chkin
 	jsr $ffcf		; skip load address
 	jsr $ffcf
 	lda #$cf		; (ff)cf= basin

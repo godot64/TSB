@@ -20,6 +20,7 @@
 ; patched on 29.05.2021 (bugfix in DRAW TO)
 ; patched on 06.06.2021 (added startadr to LOAD: BLOAD)
 ; patched on 16.08.2021 (minor bugfix in RENUMBER)
+; patched on 25.08.2021 (make OPEN independent from drive number)
 ;
 ; ----------------------------------------- 
 
@@ -1119,11 +1120,17 @@ flashactv	lda #10
 	sta flashfls,x	; Farbe aktivieren
 	rts
 
-; ----------------------------------------- 
+; ----------------------------------------- from SOPEN
 ; 9931
-	!by 0,0,0,0,0,0,0,0	; 22 bytes
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0
+newopen	jsr $e219		; sys get parameters
+	lda drive		; set drive
+	sta $ba
+	jmp $e1c1		; continue original routine
+
+; ----------------------------------------- 
+; 993b
+	!by 0,0,0,0,0,0,0,0	; 12 bytes
+	!by 0,0,0,0
 
 ; ----------------------------------------- bef CENTRE
 ; 9947			enhanced
