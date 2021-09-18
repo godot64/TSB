@@ -578,195 +578,192 @@ cfreset	lda #0
 	sta execflag
 	jmp fastcall
 
-; -----------------------------------------
-
-	!by 0,0,0
-
 ; ----------------------------------------- bef FETCH
-; b004			recoded
-beffetch	jsr sgetstrn
+; b001			recoded
+
+beffetch	jsr sgetstrn	; get ctrl string and its len
 	stx $20
 	sta $21
 	lda $69
-	sta fetchlen
+	sta fetchlen	; store len of ctrl string
 	jsr sgetbytc
-	stx fetchanz
+	stx fetchanz	; get max len
 	jsr schkcom
-	jsr stestdirm
-	jsr crsrout
-	lda #$2c		; comma
+	jsr stestdirm	; check for direct mode
+	jsr crsrout	; show cursor
+	lda #$2c		; prepare INPUT
 	sta $01ff
-; b024
-fetchit	jsr fgetkey	; gather input chars
-	lda $13		; io device?
-	beq +		; 0: keyboard
 
-	jsr $ffb7		; sys read status
+; ----------------------------------------- 
+
+fetchit	jsr fgetkey	; gather input chars
+	lda $13		; current io device
+	beq +		; is 0? (keyboard)
+
+	jsr $ffb7		; no, sys read floppy status
 	and #2		; timeout?
 	beq +		; no, proceed
 
 	jsr sclrch	; yes, clear io
--	jsr srem		; to next command
-	jmp endsmb	; end fetch
+-	jsr srem		; advance to next basic command
+	bne ++		; finish fetch
 
 ; ----------------------------------------- 
-; b03b
+
 +	lda basinbuf	; anything typed?
 	bne +
 	lda $13		; no, io device is 
-	bne fetchit	; not keyboard
-	beq -		; keyboard
-+	jsr sinput1
-	jmp endsmb
+	bne fetchit	;   not keyboard
+	beq -		;   keyboard
+
++	jsr sinput1	; yes, perform kernal input
+
+	ldx helpvec+1	; was comma in string?
+	beq ++
+	ldy #1		; yes, reconstruct comma
+	lda ($49),y
+	sta helpvec
+	iny
+	lda ($49),y
+	sta helpvec+1
+	txa
+	tay
+	lda #$2c
+	sta (helpvec),y
+
+++	jmp endsmb
 
 ; ----------------------------------------- 
-; b04c
-fgetkey	ldx #0
-floop	txa
-	pha
-	jsr $ffe4		; sys get key
-	sta joywert
-	pla
-	tax
-	lda joywert	; nothing?
+
+jfoa	jmp foutall	; yes, perform input
+
+; ----------------------------------------- 
+
+fgetkey	ldx #0		; .x=0: start length of input
+	stx helpvec	; store
+	stx helpvec+1	; store comma flag
+
+floop	jsr $ffe4		; sys get key
+	sta joywert	; merken
+	lda joywert	; nothing typed?
 	beq floop
-
-; ----------------------------------------- 
 
 	cmp #$0d		; cr?
-	bne +
-	jmp foutall	; yes, perform input
+	beq jfoa
+	cmp #$14		; del?
+	bne fquote
 
-+	cmp #$14		; del?
-	beq fdelete
+; ----------------------------------------- key: delete
 
-	lda $d4		; no, crsr on?
-	bne fcheck
-	txa
-	pha
-	ldx #0		; check 17 special chars
--	lda fetchtab,x
-	cmp joywert
-	beq ftc0
-	inx
-	cpx #18
-	bne -
-	pla
-	tax
-	lda joywert	; any key in buffer?
-	bne fcheck	; yes, check
+fdelete	ldx helpvec	; no input yet?
+	beq floop		; yes, loop
 
-ftc0	pla		; found one, skip it
-	tax
-	jmp floop
-
-; ----------------------------------------- 
-; b089
-fdelete	cpx #0
-	beq floop
-	txa
-	pha
 	ldx #7
 	jsr crsrdel
-	pla
-	tax
-	dex
+	dec helpvec
 	bpl floop
 
 ; ----------------------------------------- 
-; b099
-fcheck	lda joywert
-	cmp #$8d		; shift cr?
-	beq floop		; yes, skip
-	ldy #0
-chkloop	cmp ($20),y	; char in ctrl string?
-	bne fspecials
 
-; ----------------------------------------- 
-; b0a6
-fchrisin	sta basinbuf,x	; yes, sys out
-	jsr bsout
+fquote	lda $d4		; no, quote mode?
+	bne fcheck
+
+	ldx #0		; no, check special chars
+-	lda fetchtab,x
+	cmp joywert
+	beq floop		; found one, so skip it
 	inx
-	cpx fetchanz	; input len?
-	beq flastchar	; yes, wait for cr
-	txa
-	pha
-	jsr crsrout
-	bne ftc0
+	cpx #27
+	bne -
+
+; ----------------------------------------- check input char
+
+fcheck	ldy #0
+	lda joywert	; get current char
+chkloop	ldx helpvec	; get current len
+	cmp ($20),y	; is char in ctrl string?
+	beq fchrisin	; yes, store
 
 ; ----------------------------------------- 
-; b0b9
-fspecials	lda ($20),y
-	cmp #$13		; home?
+
+fspecials	tax
+	lda ($20),y	; no, check ctrl string:
+	cmp #$13		; home? (a..z)
 	beq fchkaz
-	cmp #$11		; crsr dwn?
+	cmp #$11		; crsr dwn? (a..z,A..Z)
 	beq fchkdig
-	cmp #$1d		; crsr rgt?
+	cmp #$1d		; crsr rgt? (space..0..9..?)
 	beq fchkazup
 
 ; ----------------------------------------- 
-; b0c7
+
 ftcont	lda joywert	; no, reget char
-	iny		; check next in list
-	cpy fetchlen
+	iny		; advance to next in list
+	cpy fetchlen	; until end of ctrl string
 	bne chkloop
-	jmp floop
+	beq ftc0		; at end of input: wait for finish
 
 ; ----------------------------------------- 
-; b0d3
-fend	cmp #$14		; del?
-	beq fdelete
-flastchar	txa
-	pha
-	jsr $ffe4		; sys get key
-	sta joywert
-	pla
-	tax
-	lda joywert
+
+fchrisin	jsr bsout		; sys out
+	cmp #$2c		; comma?
+	bne +
+	stx helpvec+1	; yes, store position
+	lda #$2e		; hide comma as period
++	sta basinbuf,x	; store in buffer
+	inx		; count chars
+	stx helpvec
+	cpx fetchanz	; input len?
+	beq flastchar	; yes, wait for cr
+	jsr crsrout	; otherwise: show cursor
+ftc0	jmp floop		; and wait for more input
+
+; ----------------------------------------- 
+
+flastchar	jsr $ffe4		; sys get key
+	sta joywert	; store
 	cmp #$0d		; cr?
-	bne fend		; check for del
 	beq foutcr	; yes, cr, end now
 
+fend	cmp #$14		; del?
+	beq fdelete
+	bne flastchar	; no, wait on
+
 ; ----------------------------------------- 
-; b0ea
-foutall	lda #$20		; sys out space (crsr off)
+
+foutall	lda #$20		; sys out space (switch crsr off)
 	jsr bsout
-foutcr	lda #$0d
+
+foutcr	ldx helpvec
+	lda #$0d
 	jmp spuf0cr	; out all
 
 ; ----------------------------------------- Checks
-; b0f4
-fchkaz	lda joywert
-	cmp #$41		; below a?
+
+fchkdig	cpx #$1f		; below space?
 	bcc notinit
-	cmp #$5b		; beyond z?
+	cpx #$41		; beyond a?
 	bcs notinit
-legal	jmp fchrisin	; yes, legal
-notinit	jmp ftcont
+	bcc legal		; no, legal
+
+fchkazup	cpx #$c1		; below A?
+	bcc fchkaz
+	cpx #$db		; beyond Z?
+	bcs notinit
+	bcc legal		; no, legal
+
+fchkaz	cpx #$41		; below a?
+	bcc notinit
+	cpx #$5b		; beyond z?
+	bcs notinit
+
+legal	txa
+	ldx helpvec
+	jmp fchrisin	; yes, legal
+notinit	jmp ftcont	; no, check against next one
 
 ; ----------------------------------------- 
-fchkdig	lda joywert
-	cmp #$1f		; below space?
-	bcc notinit
-	cmp #$41		; beyond a?
-	bcs notinit
-	bcc legal
-; b112
-fchkazup	lda $cb70
-	cmp #$41		; below a?
-	bcc notinit
-	cmp #$5b		; beyond z?
-	bcs +
-	bcc legal
 
-+	cmp #$c1		; below A?
-	bcc notinit
-	cmp #$db		; beyond Z?
-	bcs notinit
-	bcc legal
-
-; ----------------------------------------- 
-; b129
 crsrout	ldx fcursor	; crsr out
 crsrdel	lda $d4
 	pha
@@ -778,7 +775,6 @@ crsrdel	lda $d4
 	bne -
 	pla
 	sta $d4
-	lda #1
 back2call	rts
 
 ; ----------------------------------------- 
@@ -788,9 +784,14 @@ fcursor	!by $04,$9d,$92,$20,$12	; rvs on, space, rvs off, crsr lft
 
 ; ----------------------------------------- 
 ; b14a
-fetchtab	!by $05,$11,$12,$13,$1c,$1d,$1e,$1f	; all these get skipped
-	!by $90,$91,$92,$93,$94,$9c,$9d,$9e
-	!by $9f
+fetchtab	!by $05,$11,$12,$13,$1c,$1d,$1e,$1f	; all these 26 get skipped
+	!by $90,$91,$92,$93,$94,$9c,$9d,$9e	; (color codes, crsr, rvs, home)
+	!by $9f,$8d,$81,$95,$96,$97,$98,$99
+	!by $9a,$9b
+
+; ----------------------------------------- 
+
+	!by 0,0,0,0,0,0,0
 
 ; ----------------------------------------- part of CALL
 ; b15b
