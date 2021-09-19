@@ -706,11 +706,13 @@ ftcont	lda joywert	; no, reget char
 ; ----------------------------------------- 
 
 fchrisin	jsr bsout		; sys out
+	cmp #$3a		; colon?
+	beq +
 	cmp #$2c		; comma?
-	bne +
+	bne ++
 	stx helpvec+1	; yes, store position
-	lda #$2e		; hide comma as period
-+	sta basinbuf,x	; store in buffer
++	lda #$2e		; hide comma as period
+++	sta basinbuf,x	; store in buffer
 	inx		; count chars
 	stx helpvec
 	cpx fetchanz	; input len?
@@ -791,7 +793,7 @@ fetchtab	!by $05,$11,$12,$13,$1c,$1d,$1e,$1f	; all these 26 get skipped
 
 ; ----------------------------------------- 
 
-	!by 0,0,0,0,0,0,0
+	!by 0,0,0
 
 ; ----------------------------------------- part of CALL
 ; b15b
