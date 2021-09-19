@@ -28,8 +28,7 @@ colo	lda #$3a		; 18 ":"
 ; ----------------------------------------- 
 
 	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0
+	!by 0,0,0,0
 
 ; ----------------------------------------- 
 ; cc23
@@ -73,7 +72,7 @@ skiparr	ldy #$02
 
 ; ----------------------------------------- 
 ; cc5a
-outdigits	jsr $b395		; sys int to float
+outdigits	jsr $b395		; sys int to float (hi .a, lo .y)
 	jsr $bddf		; sys fac to asc
 	jmp $ab1e		; sys string out
 
@@ -82,7 +81,7 @@ outdigits	jsr $b395		; sys int to float
 arrdims	jsr klaa		; "("
 	jsr getdims	; dims out
 	jsr klaz		; ")"
-	jsr outeql	; "="
+	jsr colo		; ":"
 	jsr return	; cr
 	jmp return	; cr
 
@@ -233,30 +232,32 @@ strarr	and #$7f		; out string array name 2
 
 ; ----------------------------------------- 
 ; cd8c
-outpos	lda $af		; show position in array
+outpos	jsr klaa
+	lda $af		; show position in array
 	sta $02
 	sta $0b
 	asl
 	sta helpvec
 -	ldx helpvec
-	lda $02c0,x
+	lda $02c0,x	; lo nach .y
 	tay
 	inx
 	lda $02c0,x
 	pha
-	tax
+	tax		; hi nach .x
 	tya
-	pha
+	pha		; beide auf Stack (hi zuerst)
 	txa
 	inc helpvec
 	inc helpvec
-	jsr outdigits
+	jsr outdigits	; zuvor: klaa
 	dec $02
 	beq +
 	jsr komma
 	bne -
-+	jsr leerzch
-	jsr colo
++	jsr klaz
+	jsr leerzch	; zuvor: klaz
+	jsr outeql
 	jsr leerzch
 	ldy #4
 	jmp $b2ea		; sys search for element
