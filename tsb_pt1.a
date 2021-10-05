@@ -11,6 +11,7 @@
 ; patched on 13.03.2021 (command COLD, Reset, Stop/Restore)
 ; patched on 21.04.2021 (command RENUMBER)
 ; patched on 25.08.2021 (make OPEN independent from drive number)
+; patched on 05.10.2021 (added DIV as a command to Clear Screen)
 ;
 ; ----------------------------------------- 
 
@@ -231,11 +232,12 @@ tsbvecs	!wo warmstart,sloop,zeiumw,slist,sbasbef,sgetari
 
 ; ----------------------------------------- 
 ; 81b7
-tsbpudef	!by $00,$23,$2a,$2c,$2e,$2b,$2d	; #*,.+- (index 0 is free to use)
+tsbpudef	!by $23,$2a,$2c,$2e,$2b,$2d	; #*,.+-
 
-; ----------------------------------------- 
-; 81be
-signature	!tx "ad'86"
+; ----------------------------------------- bef DIV (Clear Video)
+; 81bd
+befdiv	jsr clear		; clear screen
+	jmp bef0
 
 ; ----------------------------------------- part of USE
 ; 81c3
@@ -802,7 +804,7 @@ vecplace	!wo befplace-1	;  16 $ccd7 place    (changed from 86e2)
 	!wo befold-1	;  80 $9eda old
 	!wo swarm-1	;     $9e9a bad mode (fn joy)
 	!wo befmod-1	;  82 $bfe3 mod      (fn mod)
-	!wo swarm-1	;     $9e9a bad mode (fn div)
+	!wo befdiv-1	;     $81bd div	 (fn div)
 	!wo befdelete-1	;  84 $b8ea d!
 	!wo befdup-1	;  85 $b7b8 dup      (fn dup)
 	!wo swarm-1	;     $9e9a bad mode (fn inkey)
