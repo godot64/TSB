@@ -1165,7 +1165,7 @@ usel3	ldy $bd
 	beq use5		; reached, cont in use3
 	lda ($49),y	; get char from ctrl string
 	ldx #6
--	cmp tsbpudef,x	; is a ctrl char?
+-	cmp tsbpudef-1,x	; is a ctrl char?
 	beq +		; yes, found
 	dex
 	bne -
@@ -1263,7 +1263,7 @@ mkoutstr	ldy $44		; index to current char
 
 	lda ($49),y	; compare to control chars
 	ldx #6
--	cmp tsbpudef,x
+-	cmp tsbpudef-1,x
 	beq usea		; found!
 	dex
 	bne -
