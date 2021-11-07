@@ -21,6 +21,7 @@
 ; patched on 06.06.2021 (added startadr to LOAD: BLOAD)
 ; patched on 16.08.2021 (minor bugfix in RENUMBER)
 ; patched on 25.08.2021 (make OPEN independent from drive number)
+; patched on 07.11.2021 (bugfix: now checks max values in PRINT AT() )
 ;
 ; ----------------------------------------- 
 
@@ -902,22 +903,25 @@ befflash	jsr flashinit	; color (or ON/OFF) in .x
 ; ----------------------------------------- func AT
 ; 97b6			original
 fnat	jsr sgetbytn
+	cpx #40
+	bcs +
 	txa
 	pha
 	jsr sgetbytc
 	clc
 	pla
+	cpx #25
+	bcs +
 	tay
 	jsr $fff0		; sys plot
 	jsr schkklz	; ")"?
 
-	lda #0
-	sta $0d
-	jsr chrgot
-	jmp fromat	; cont (8c94)
+	jsr dec7a
+	jmp sgetari	; cont (8c8d)
++	jmp swarm
 
 ; ----------------------------------------- 
-; 97d1			recoded
+; 97d8			recoded
 sirq2	lda $ff		; save $fc to $ff
 	pha
 	lda $fe
@@ -926,7 +930,7 @@ sirq2	lda $ff		; save $fc to $ff
 	pha
 	lda $fc
 	pha
-; 97dd
+; 97e4
 	lda flashfl	; is flash active?
 	cmp #10
 	bne sirq3 	; no, skip
@@ -935,7 +939,7 @@ sirq2	lda $ff		; save $fc to $ff
 	lda flashzae
 	cmp flashsp
 	bne sirq3 	; no, skip
-; 97ef
+; 97f6
 	lda flashing	; set sync byte
 	eor #$80
 	sta flashing
@@ -946,7 +950,7 @@ sirq2	lda $ff		; save $fc to $ff
 	sty $fe		; .y=0
 	sty $fc
 	sty flashzae
-; 9807
+; 980e
 -	lda ($fe),y	; get color
 	and #$0f
 	tax
@@ -969,7 +973,7 @@ sirq2	lda $ff		; save $fc to $ff
 	bne -
 
 ; ----------------------------------------- 
-; 982f			recoded
+; 9836			recoded
 sirq3	lda $d4
 	bne sirq4
 
@@ -985,11 +989,11 @@ sirq3	lda $d4
 	beq wasf5
 	cmp #3		; F7?
 	beq wasf7
-; 984e
+; 9855
 	lda #0		; none of these
 	sta inkey
 	beq sirq4
-; 9855
+; 985c
 wasf7	inc inkey
 	inc inkey
 wasf5	inc inkey
@@ -999,7 +1003,7 @@ wasf3	inc inkey
 wasf1	inc inkey
 
 ; ----------------------------------------- 
-; 986a			recoded
+; 9871			recoded
 sirq4	lda $cc
 	bne sirq5
 
@@ -1008,7 +1012,7 @@ sirq4	lda $cc
 	beq sirq5
 	lda $d4
 	bne sirq5
-; 9879
+; 9880
 	lda $cb
 	cmp lastkey
 	beq ams5
@@ -1016,7 +1020,7 @@ sirq4	lda $cc
 	bne ams5
 	lda inkey
 	beq ams5
-; 9889
+; 9890
 	lda inkey
 	sta $fe
 	cmp #17		; beyond 16?
@@ -1047,18 +1051,18 @@ sirq4	lda $cc
 	sta $0277,y	; write to keybuf
 	iny
 	bne -
-; 98c5
+; 98cc
 ams4	sty $c6
 ams5	lda $cb
 	sta lastkey
 
 ; ----------------------------------------- 
-; 98cc			recoded
+; 98d3			recoded
 sirq5	lda playflag
 	cmp #10
 	bne +
 	jsr sirqplay
-; 98d6
+; 98dd
 +	pla		; restore $fc to $ff
 	sta $fc
 	pla
@@ -1070,11 +1074,11 @@ sirq5	lda playflag
 	jmp $ea31		; sys IRQ
 
 ; ----------------------------------------- 
-; 98e5
+; 98ec
 shwerttab	!by $00,$01,$08,$09
 
 ; ----------------------------------------- bef PAGE
-; 98e9			enhanced
+; 98f0			enhanced
 befpage	jsr chkonoff
 	txa		; OFF?
 	beq +++		; yes, set flag
@@ -1090,7 +1094,7 @@ befpage	jsr chkonoff
 	jmp endsmb
 
 ; ----------------------------------------- bef PLAY
-; 9903			recoded
+; 990a			recoded
 befplay	jsr chkonoff
 	txa		; OFF? (or PLAY 0?)
 	beq +		; yes, end music
@@ -1114,23 +1118,22 @@ befplay	jsr chkonoff
 --	jmp endsmb	; PLAY 2 or PLAY ON (PRG continues)
 
 ; ----------------------------------------- Part of FLASH
-; 9928
+; 992f
 flashactv	lda #10
 	sta flashsp	; Default-Speed: 10
 	sta flashfls,x	; Farbe aktivieren
 	rts
 
 ; ----------------------------------------- from SOPEN
-; 9931
+; 9938
 newopen	jsr $e219		; sys get parameters
 	lda drive		; set drive
 	sta $ba
 	jmp $e1c1		; continue original routine
 
 ; ----------------------------------------- 
-; 993b
-	!by 0,0,0,0,0,0,0,0	; 12 bytes
-	!by 0,0,0,0
+; 9942
+	!by 0,0,0,0,0	; 5 bytes
 
 ; ----------------------------------------- bef CENTRE
 ; 9947			enhanced
