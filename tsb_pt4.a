@@ -14,6 +14,7 @@
 ; patched on 14.04.2021 (commands PAUSE, BCKGNDS)
 ; patched on 03.05.2021 (command DUMP: optimized)
 ; patched on 06.05.2021 (added new command DRAW TO)
+; patched 0n 22.11.2021 (command LOCAL: bugfix)
 ;
 ; ----------------------------------------- 
 
@@ -506,8 +507,12 @@ setonoff	jmp incbasbz	; (25)
 
 ; ----------------------------------------- bef LOCAL
 ; a2fa			recoded
+
+--	jsr incbasbz	; loop for next var
+	bne +
+; a2ff
 beflocal	jsr setoff	; set .x to 0
---	txa
++	txa
 	pha
 	jsr sgetvar	; search variable
 	pla
@@ -519,7 +524,7 @@ beflocal	jsr setoff	; set .x to 0
 	sta localtab,x
 
 	inx		; transfer name of variable to LOCALTAB
-	ldy #0		; so, each entry has 4 bytes
+	ldy #0		; so, each LOCAL entry has 4 bytes
 -	lda ($5f),y
 	sta localtab,x
 	inx
@@ -531,18 +536,15 @@ beflocal	jsr setoff	; set .x to 0
 	lda #$ff
 	sta ($5f),y
 
-	jsr chrgot	; anything following?
-	beq lcf0		; no, finish LOCALTAB
-
-	cpx #22		; buffer filled?
+	cpx #84		; buffer filled? (max 21 entries)
 	bcs lcf0		; yes, finish LOCALTAB
 
-+	jsr chrget	; proceed after LOCAL
-	beq lcf0
-	cmp #$2c		; comma?
+	jsr chrgot	; anything following?
+	beq lcf0		; no, finish LOCALTAB
+	cmp #$2c		; comma following?
 	beq --		; yes, next variable
 
-lcf0	lda #0		; no, set terminator ($0000)
+lcf0	lda #0		; no, set tab terminator ($0000)
 	sta localtab,x
 	inx
 	sta localtab,x

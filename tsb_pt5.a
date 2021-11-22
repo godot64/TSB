@@ -12,6 +12,7 @@
 ; patched on 19.03.2021 (bugfix in EXEC)
 ; patched on 03.04.2021 (commands CSET)
 ; patched on 25.08.2021 (make OPEN independent from drive number)
+; patched on 22.11.2021 (command HRDCPY: optimized)
 ; 
 ; ----------------------------------------- 
 
@@ -1298,83 +1299,69 @@ usel0	txa
 	rts		; no, leave it
 
 ; ----------------------------------------- 
-
-	nop
+; b4b7
+	!by 0,0,0,0,0,0,0,0	; 24 bytes
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
 
 ; ----------------------------------------- bef HRDCPY
-; b4b8			enhanced
+; b4cf			enhanced
 befhrdcpy	jsr incbasbz
-	jsr sclose
-	lda #1
-	ldx #4
-	ldy #$ff
-	jsr $ffba		; sys setlfs
-	jsr $ffc0		; sys open
-used	ldx #1
-	jsr $ffc9		; sys ckout 1
+
+	jsr open14
+
 	lda #$0d		; sys out linefeed
 	jsr bsout
-; b4d4
-	lda #4		; video ram ($cc after MEM!)
+; b4da
+	lda $0288		; video ram ($cc after MEM!)
 	sta $21
 	lda #$00
 	sta $20
-	tay
-	tax
-hdy1	lda ($20),y	; rvs?
-	cmp #$80
+	tay		; .y counts chars/row
+	tax		; .x counts rows
+hdy1	lda ($20),y	; read char
+	cmp #$80		; is rvs?
 	bcc hdy0
-	eor #$80
+	eor #$80		; yes
 	pha
 	lda #$12		; sys send rvs on
 	jsr bsout
 	pla
-hdy0	cmp #$20
+hdy0	cmp #$20		; letter?
 	bcs ++
-	pha
-	lda $d018		; lower case?
-	cmp #$17
-	bne +
-	lda #$11		; yes, send crsr dwn 
-	jsr bsout
-+	pla
-	ora #$40
+	jsr charmode	; set char mode
+	ora #$40		; to PETSCII
 	bne hdy2
-++	cmp #$40
+++	cmp #$40		; graphic chars?
 	bcc hdy2
 	cmp #$7f
 	beq hdy3
-	pha
-	lda $d018
-	cmp #$17
-	bne +
-	lda #$11		; send crsr dwn
-	jsr bsout
-+	pla
+	jsr charmode
 	clc
-	adc #$80
+	adc #$80		; to PETSCII
 	bne hdy2
 hdy3	lda #$bf
-hdy2	cmp #$22		; string?
+hdy2	cmp #$22		; is quote?
 	bne +
 	txa		; yes
 	pha
 	ldx #6
--	lda quotetab,x	; bit sequence for quote char
-	jsr bsout		; send
+-	lda quotetab,x	; send bit sequence for quote char
+	jsr bsout
 	dex
 	bpl -
 	pla
 	tax
-	lda #$0f		; send ctrl o
-+	jsr bsout
-	lda #0
+	lda #$0f		; send ctrl o (graphics off)
++	jsr bsout		; print char
+	lda #0		; reset modes
 	sta $d4
 	lda #$91		; send crsr up
 	jsr bsout
 	lda #$92		; send rvs off
 	jsr bsout
-	iny
+
+	iny		; proceed:
 	cpy #40		; one screen row?
 	beq +
 -	jmp hdy1
@@ -1387,8 +1374,19 @@ hdy2	cmp #$22		; string?
 	cpx #25		; all rows?
 	bne -		; no, loop
 
-	jsr sclose
-	jmp endsmb
+	jsr sclose	; close printer
+	jmp endsmb	; continue in Basic
+
+; ----------------------------------------- 
+; b554
+charmode	pha
+	lda $d018		; lower case?
+	cmp #$17
+	bne +
+	lda #$11		; yes, send crsr dwn 
+	jsr bsout
++	pla
+	rts
 
 ; ----------------------------------------- 
 ; b563

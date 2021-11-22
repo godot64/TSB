@@ -13,6 +13,7 @@
 ; patched on 03.04.2021 (commands MEM & NRM)
 ; patched on 21.04.2021 (command RENUMBER)
 ; patched on 18.07.2021 (LIST)
+; patched on 22.11.2021 (LOCALTAB optimized)
 ;
 ; ----------------------------------------- 
 
@@ -349,10 +350,21 @@ ren2	ldy #0		; find PRG end
 
 ; ----------------------------------------- 
 
-	!by $ea,$00
+	!by 0
+
+; ----------------------------------------- 
+; b9f0
+open14	jsr sclose	; ### shorter!
+	lda #1		; open 1,4
+	ldx #4
+	ldy #$ff
+	jsr $ffba
+	jsr $ffc0
+	ldx #1		; cmd 1
+	jmp $ffc9
 
 ; ----------------------------------------- bef COPY
-; b9f1			recoded
+; ba04			recoded
 befcopy	jsr incbasbz
 	lda xmaxlow
 	pha
@@ -367,14 +379,7 @@ befcopy	jsr incbasbz
 	lda #$3f
 	sta xmaxlow
 
-	jsr sclose	; ### shorter!
-	lda #1		; open 1,4
-	ldx #4
-	ldy #$ff
-	jsr $ffba
-	jsr $ffc0
-	ldx #1
-	jsr $ffc9
+	jsr open14
 
 	lda #0
 	sta $f8
@@ -385,9 +390,8 @@ cploop	sta $22
 	jsr bsout
 	dex
 	bne -
-	lda #0
-	sta $5f
-	sta $60
+	stx $5f
+	stx $60
 cploop1	lda #160
 	sta helpvec
 	bne +
@@ -451,7 +455,7 @@ cploop1	lda #160
 	jmp endsmb
 
 ; ----------------------------------------- 
-
+; bab8
 grprntab	!by $08,$35,$31,$10,$0f,$0d
 
 ; ----------------------------------------- part of COLOUR
@@ -1623,23 +1627,21 @@ loadext	stx helpvec
 	bmi +
 	nop
 	nop
-	nop
-;	jsr incbasbz
 +	jmp $f4a5		; sys LOAD
 
 ; ----------------------------------------- 
-; ca4b
-signature	!tx "ad'21"
+; ca4a
+signature	!tx "ad'86"
 
 ; ----------------------------------------- 
-; ca50
+; ca4f
 names
 nammem	!tx "tsb.mem"
 nameext	!tx "tsb.ext"
 namehsg	!tx "tsb.hsg"
 
 ; ----------------------------------------- 
-; ca65
+; ca64
 repchrget	lda progz+2	; chrget changed (by INST)?
 	cmp #$4c
 	bne +		; no, leave
@@ -1653,20 +1655,20 @@ repchrget	lda progz+2	; chrget changed (by INST)?
 +	rts
 
 ; ----------------------------------------- 
-; ca79
+; ca78
 g2nsafe	jsr repchrget	; repair chrget
 	jmp get2nyb
 
 ; ----------------------------------------- 
-; ca7f
+; ca7e
 byte2	cmp #2
 	bcc byte1		; max position? if not: continue
 	jmp incbasbz	; yes, out
-; ca86
+; ca85
 byte0	ldx #0		; formerly called from c8fd (nrm)
 	stx $a5		; now unsed
 	jmp chrgot
-; ca8d
+; ca8c
 fromnrm	ldx #1		; c8fd: jsr fromnrm
 	ldy $69		; len of digit string?
 	cpy #4		; less than 4?
@@ -1674,7 +1676,7 @@ fromnrm	ldx #1		; c8fd: jsr fromnrm
 	dex
 +	stx $a5		; set byte counter accordingly
 	jsr dec7a
-; ca9b
+; ca9a
 byte1	jsr chrget	; next char: decimal digit?
 	bcc ++		; yes, leave byte1 (so CLC)
 	pha		; no, is token? (so SEC)
@@ -1685,10 +1687,10 @@ byte1	jsr chrget	; next char: decimal digit?
 ++	rts
 
 ; ----------------------------------------- Part of bef LOCAL
-; caa9 (former address ca7f)
+; caa8 (former address ca7f)
 ;	!by $f8,$38,$4e,$52 (former content)
 
-localtab	!fill 87
+localtab	!fill 88
 
 ; ----------------------------------------- 
 ; cb00
