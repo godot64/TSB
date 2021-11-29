@@ -22,6 +22,7 @@
 ; patched on 16.08.2021 (minor bugfix in RENUMBER)
 ; patched on 25.08.2021 (make OPEN independent from drive number)
 ; patched on 07.11.2021 (bugfix: now checks max values in PRINT AT() )
+; patched on 29.11.2021 (added hold DIR output on keypress)
 ;
 ; ----------------------------------------- 
 
@@ -616,10 +617,10 @@ dir1	jsr $ffcf		; skip 5 chars
 	jsr $bdd1		; sys out integer
 	lda #2
 	sta helpvec
-dir2	jsr $ffe1		; STOP?
-	beq dir5
+dir2	jsr chk4key	; STOP? Any other key?
+	beq dir5		; if STOP: leave
 dir3	jsr $ffcf		; get char
-	ldx $90		; fail?
+	ldx status	; fail?
 	bne dir5
 dir4	jsr bsout		; write char
 	tay
@@ -1122,7 +1123,7 @@ befplay	jsr chkonoff
 flashactv	lda #10
 	sta flashsp	; Default-Speed: 10
 	sta flashfls,x	; Farbe aktivieren
-	rts
+-	rts
 
 ; ----------------------------------------- from SOPEN
 ; 9938
@@ -1133,10 +1134,16 @@ newopen	jsr $e219		; sys get parameters
 
 ; ----------------------------------------- 
 ; 9942
-	!by 0,0,0,0,0	; 5 bytes
+chk4key	jsr $ffe1		; STOP?
+	beq -		; yes, leave
+	jmp wanykey
+
+; ----------------------------------------- 
+; 994a
+	!by 0,0,0
 
 ; ----------------------------------------- bef CENTRE
-; 9947			enhanced
+; 994d			enhanced
 befcentre	jsr sgetstrn
 	clc
 	lda #40
@@ -1154,36 +1161,34 @@ befcentre	jsr sgetstrn
 	beq --
 
 ; ----------------------------------------- part of TRACE
-; 9966
+; 996c
 trace5	lda ($5f),y
 	tax
 	jmp trace6
 
 ; ----------------------------------------- 
-; 996c
+; 9972
 rtc1	jsr incbasbz
 	bne -
 
 ; ----------------------------------------- 
-; 9971
+; 9977
 cold1	lda #8
 	sta drive
 	jmp cold2
 
 ; ----------------------------------------- bef ENVELOPE
-; 9978			original
+; 997e			original
 befenvelope
 	jsr sgetbytn
 	jsr x123
 	dex
 	stx $a6
-	jsr schkcom
-	jsr dec7a
+	jsr iskomma
 	jsr get2nyb
 	lda $aa
 	sta $a8
-	jsr schkcom
-	jsr dec7a
+	jsr iskomma
 	jsr get2nyb
 	asl $a6
 	ldx $a6
@@ -1531,9 +1536,9 @@ schelse	lda #$47		; search for ELSE
 
 ; ----------------------------------------- part of RENUMBER
 ; 9bc7
-ren1	lda $2b
+ren1	lda $2b		; get basic start
 	ldx $2c
-	sta $a8
+	sta $a8		; to $a8/9
 	stx $a9
 	jmp ren2		; b9df
 

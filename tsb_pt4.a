@@ -15,6 +15,7 @@
 ; patched on 03.05.2021 (command DUMP: optimized)
 ; patched on 06.05.2021 (added new command DRAW TO)
 ; patched 0n 22.11.2021 (command LOCAL: bugfix)
+; patched on 29.11.2021 (added hold DIR output on keypress)
 ;
 ; ----------------------------------------- 
 

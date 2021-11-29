@@ -511,14 +511,14 @@ befrenum	jsr get10010	; .a=0
 	beq +
 
 	jsr sgetadr	; get start line number
-	sty $a4		; result in .y (lo) and .a (lo)
-	sta $a5		; 12 (statt 10)
+	sty $a4		; result in .y (lo) and .a (hi)
+	sta $a5
 	jsr schkcom
 	jsr sgetadr	; get step
-	sty ay
+	sty ay		; in .y (lo) and in...
 
 +	jsr renum0
-	jsr renum1	; 27
+	jsr renum1
 
 -	lda ($a8),y
 	sta $09

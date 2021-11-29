@@ -14,6 +14,7 @@
 ; patched on 21.04.2021 (command RENUMBER)
 ; patched on 18.07.2021 (LIST)
 ; patched on 22.11.2021 (LOCALTAB optimized)
+; patched on 29.11.2021 (added hold DIR output on keypress)
 ;
 ; ----------------------------------------- 
 
@@ -1270,17 +1271,20 @@ bin0	asl
 
 ; ----------------------------------------- 
 ; c7de
-	sta linenum+8,x	; this part is garbage, unused
-	tay
-	lda helpvec
-	cmp #8
-	beq $c77c		; don't care!
-	tya
-	beq $c77c		; 13 bytes
+iskomma	jsr schkcom
+	jmp dec7a
 
 ; ----------------------------------------- 
+; c7e4
+wanykey	lda $cb		; any key?
+	cmp #$40
+	bne wanykey	; yes, loop
+	lda #1
++	rts
 
-	!by 0,0,0,0
+; ----------------------------------------- 
+; c7ed
+	!by 0,0
 
 ; ----------------------------------------- part of OUT
 ; c7ef
@@ -1395,11 +1399,11 @@ beflin	jsr chkdrv	; is drive present?
 
 ; ----------------------------------------- 
 ; c8b5
-renum0	sta ay+1
+renum0	sta ay+1		; .a: step (hi)
 	sec
-	lda $a4
+	lda $a4		; start line minus step
 	sbc ay
-	sta $20
+	sta $20		; nach $20/1
 	lda $a5
 	sbc ay+1
 	sta $21
