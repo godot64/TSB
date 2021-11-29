@@ -1688,7 +1688,7 @@ zum1	iny		; yes, skip this line
 	ldx #0
 	stx codezae	; Tokenzähler auf null setzen
 tok3	cmp ($20,x)	; Zeichen in Befehlswort enthalten?
-	beq $abee		; ja (!!! Trick: springt auf INY)
+	beq abee		; ja (!!! Trick: springt auf INY)
 
 	and #$7f		; nein, Bit 7 aus (geshiftet?)
 	cmp ($20,x)	; jetzt im Befehlswort?
