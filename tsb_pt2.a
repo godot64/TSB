@@ -449,13 +449,15 @@ befgraphics
 	ldy #>namehsg
 	jsr loadext
 	bcs +
+	jsr basromei
 	jsr $7000		; init HSG
+	jsr $a660		; sys CLR
 	jmp bef0
 
 +	jmp iffail1
 
 ; ----------------------------------------- New LOAD/SAVE
-; 8bfc
+; 8c02
 sysload	ldy drive
 	sty $ba
 	jsr chrgot	; more?
@@ -463,17 +465,17 @@ sysload	ldy drive
 	jsr bloadadr	; yes, get bload adr
 +	lda #0
 	jmp $f4a5		; sys LOAD
-; 8c03
+; 8c13
 syssave	ldy drive
 	sty $ba
 	jmp $f5ed		; sys SAVE
 
 ; ----------------------------------------- 
-; 8c0a
+; 8c1a
 loadsave	!wo sysload,syssave
 
 ; ----------------------------------------- 
-; 8c0e
+; 8c1e
 cold2	ldy #3
 -	lda loadsave,y
 	sta $0330,y	; sys set vectors
@@ -481,14 +483,8 @@ cold2	ldy #3
 	bpl -
 	rts
 
-; ----------------------------------------- 
-; 8c1a
-safeopen	jsr sopen
-	bcc ++
--	jmp err05
-
 ; ----------------------------------------- Check Drive Presence
-; 8c22
+; 8c2a
 chkdrv	lda #$0f		; open 15, dr, 15
 	tay
 	ldx drive
@@ -500,13 +496,18 @@ chkdrv	lda #$0f		; open 15, dr, 15
 	jsr $ffc3
 	lda status	; what happened?
 	bmi err05
-++	rts
+-	rts
+
+; ----------------------------------------- 
+; 8c44
+safeopen	jsr sopen
+	bcc -
 
 err05	ldx #5		; drive not ready
 	jmp ($0300)
 
 ; ----------------------------------------- 
-; 8c41
+; 8c4e
 mobexs	lda $d01d
 	ora mbittabs,x
 	sta $d01d
@@ -528,14 +529,13 @@ mobeyl	lda $d017
 	rts
 
 ; ----------------------------------------- 
-; 8c69
+; 8c76
 sclose	jsr $ffcc		; sys clrch
 	lda #1
-	jsr $ffc3		; sys close 1
-	jmp $ffcc		; sys clrch
+	jmp $ffc3		; sys close 1
 
 ; ----------------------------------------- 
-; 8c7b
+; 8c7e
 sgetstr1	lda portspei
 	pha
 	jsr sgetstr
@@ -546,7 +546,7 @@ sgetstr1	lda portspei
 	rts
 
 ; ----------------------------------------- 
-; 8c8d			enhanced
+; 8c90			enhanced
 sgetari	lda #0
 	sta $0d
 	jsr chrget
@@ -563,10 +563,10 @@ fromat	bcs +		; 8c94
 +	jmp csgetari1	; yes: tsb
 
 ; ----------------------------------------- 
-; 8cab
+; 8cae
 chhexchr	jsr chrget	; get next char, is digit?
 	bcc ++		; yes, ok
-; 8cb0
+; 8cb3
 ishex	cmp #"g"		; no, beyond "f"?
 	bcs +		; yes, not hex
 	cmp #"a"		; below "a"?
@@ -576,20 +576,20 @@ ishex	cmp #"g"		; no, beyond "f"?
 	rts
 +	clc		; ok (is hexdigit)
 ++	rts
-; 8cbc
+; 8cbf
 err25	pla
 	pla
 	ldx #$25		; error "not hex char"
 	jmp ($0300)
 ; (24)
 ; ----------------------------------------- func %
-; 8cc3
+; 8cc6
 getbin	jsr getdouble
 	jsr bincon
 	ldy $a8
 
 ; ----------------------------------------- to Float
-; 8ccb
+; 8cce
 sxyflp3	ldx #0
 sxyflp	sty $63		; lo
 	stx $62		; hi
@@ -598,11 +598,11 @@ sxyflp2	ldx #$90
 	jmp $bc49		; sys convert to float
 
 ; ----------------------------------------- func $
-; 8cd7
+; 8cda
 gethex	ldx #0
 	stx $a5
 	jsr getdouble	; check wether $$, returns .y=1
-; 8cde
+; 8ce1
 hcon0	jsr dec7a
 
 hexcon	jsr onebyte	; first two digits of hex value
@@ -617,7 +617,7 @@ hexcon	jsr onebyte	; first two digits of hex value
 hcon1	jmp sxyflp
 ; (29)
 ; ----------------------------------------- 
-; 8cf1
+; 8cf7
 onebyte	jsr chhexchr	; hi nibble digit valid?
 	bcs err25		; no, error
 	tay
@@ -626,14 +626,14 @@ onebyte	jsr chhexchr	; hi nibble digit valid?
 	jmp hex2w		; yes, convert to byte
 ; (43)
 ; ----------------------------------------- 
-
+; 8d05
 l8d02	jsr sbzply
 	ldy #2		; found prog end?
 	lda (progz),y
 	beq +		; yes, to RTS
 	ldy #5
 --	jsr sbzply
-; 8d10
+; 8d13
 sfordo	jsr schdo		; search for DO
 	cmp #0		; found line end?
 	beq l8d02		; continue search
@@ -650,7 +650,7 @@ sfordo	jsr schdo		; search for DO
 +	rts
 
 ; ----------------------------------------- 
-; 8d28
+; 8d2a
 hex2w	inc $a5		; inc byte counter
 	jsr hexw		; convert .a und .y to byte...
 	sta zwisp2
@@ -671,7 +671,7 @@ hexw	sec		; make value from digit
 +	rts
 ; (30)
 ; ----------------------------------------- func EXOR
-; 8d46			original
+; 8d48			original
 fnexor	jsr chrget
 	jsr $aefa		; sys "("?
 	jsr sgetadr2
@@ -689,7 +689,7 @@ fnexor	jsr chrget
 	jmp sxyflp
 
 ; ----------------------------------------- func DUP
-; 8d69			original
+; 8d6b			original
 fndup	jsr chrget
 	jsr $aefa		; sys "("?
 	jsr sgetstr1
