@@ -25,10 +25,14 @@ proz	lda #$25		; 12 "%"
 colo	lda #$3a		; 18 ":"
 	jmp bsout		; out
 
-; ----------------------------------------- 
+; ----------------------------------------- Part of RENUMBER
 
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0
+isstep0	jsr basromei	; is step 0?
+	jsr bloadadr
+	beq +
+	rts
++	jsr basromau
+	jmp err14
 
 ; ----------------------------------------- 
 ; cc23
@@ -139,8 +143,7 @@ getdims	jsr inc20
 
 ; ----------------------------------------- 
 ; ccd1
-endplace	jsr chrget
-	jmp endsmb
+endplace	jmp bef0
 
 ; ----------------------------------------- bef PLACE
 ; ccd7			new

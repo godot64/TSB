@@ -1386,11 +1386,8 @@ bloadadr	jsr $aefd		; sys chkcom
 	jsr sgetadr	; word holen
 	sta $c4		; als startadresse
 	sty $c3
+	ora $c3
 	rts
-
-; ----------------------------------------- 
-
-	!by 0,0
 
 ; ----------------------------------------- 
 ; 9ae8

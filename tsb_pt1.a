@@ -513,9 +513,10 @@ befrenum	jsr get10010	; .a=0
 	jsr sgetadr	; get start line number
 	sty $a4		; result in .y (lo) and .a (hi)
 	sta $a5
-	jsr schkcom
-	jsr sgetadr	; get step
+	jsr isstep0	; get step, is it 0? Doesn't retrurn if	yes
 	sty ay		; in .y (lo) and in...
+	jsr basromau
+	lda $c4
 
 +	jsr renum0
 	jsr renum1
@@ -538,14 +539,13 @@ befrenum	jsr get10010	; .a=0
 	ora $0a
 	beq sbready
 	jsr ren0
-	clc
 	lda $a4
 	adc ay
 	sta $a4
 	lda $a5
 	adc ay+1
 	sta $a5
-	jmp -
+	bcc -
 
 ; 83c4
 sbready	jsr $a659		; sys basic bef CLR
