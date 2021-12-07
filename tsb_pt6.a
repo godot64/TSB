@@ -1427,8 +1427,7 @@ ren4	ldy #0
 
 ; ----------------------------------------- func NRM
 ; c8e1
-fnnrm	jsr chrget
-	jsr $aefa		; sys check "("
+fnnrm	jsr $aefa		; sys check "("
 	jsr sgetstr1
 	lda #0
 	sta $0d
@@ -1457,6 +1456,10 @@ fnnrm	jsr chrget
 	ldx $a8		; yes
 	jsr bincon
 +	jmp nrm0
+
+; ----------------------------------------- 
+
+	!by 0,0,0
 
 ; ----------------------------------------- 
 ; c921
