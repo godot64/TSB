@@ -1607,7 +1607,7 @@ befexec	lda progz		; save basic pz to stack
 	ldy spexec	; EXEC stack full?
 	cpy #20
 	bcc +
-	jmp err29		; yes, STACK TOO LARGE ERROR
+	jmp err2a		; yes, STACK TOO LARGE ERROR
 
 +	lda progz		; no, save new basic pz to EXEC stack
 	sta execstack,y	; (return address after END PROC)
@@ -1927,7 +1927,7 @@ res2	iny
 befloop	ldy sploop
 	cpy #20
 	bcc +
-	jmp err29		; error "stack too large"
+	jmp err2a		; error "stack too large"
 
 +	lda progz
 	sta stackloop,y
