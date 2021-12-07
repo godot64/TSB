@@ -11,6 +11,7 @@
 ; patched on 04.04.2021 (command COLD)
 ; patched on 20.04.2021 (bugfix in func $)
 ; patched on 04.05.2021 (bugfix in func CHECK)
+; patched on 07.12.2021 (optimized)
 ;
 ; ----------------------------------------- 
 
@@ -22,7 +23,6 @@ fnjoy	ldy #$00		; set $dc00
 	sty helpvec
 	lda #$dc
 	sta helpvec+1
-	jsr incbasbz	; (better: chrget)
 	jsr chrgot	; anything more?
 	beq +		; .y=0
 
@@ -70,8 +70,7 @@ tabjoy	!by $6e,$66,$67,$65,$6d,$69,$6b,$6a
 
 ; ----------------------------------------- func POT
 ; 891a			original
-fnpot	jsr chrget
-	jsr $aefa		; sys "("?
+fnpot	jsr $aefa		; sys "("?
 	jsr sgetadr2
 	jsr $aef7		; sys ")"?
 	lda $65
@@ -95,7 +94,6 @@ fnpenx	jsr penabfr
 
 fnpeny	ldy lpy		; lightpen y (do first: PENX!)
 +	ldx #0
-	jsr incbasbz
 	jmp sxyflp
 
 penabfr	lda $d019
@@ -545,7 +543,7 @@ sgetstr1	lda portspei
 	lda zwspei1
 	rts
 
-; ----------------------------------------- 
+; ----------------------------------------- Arithmetical Expression
 ; 8c90			enhanced
 sgetari	lda #0
 	sta $0d
@@ -672,8 +670,7 @@ hexw	sec		; make value from digit
 ; (30)
 ; ----------------------------------------- func EXOR
 ; 8d48			original
-fnexor	jsr chrget
-	jsr $aefa		; sys "("?
+fnexor	jsr $aefa		; sys "("?
 	jsr sgetadr2
 	sty $aa
 	sta $ab
@@ -690,87 +687,94 @@ fnexor	jsr chrget
 
 ; ----------------------------------------- func DUP
 ; 8d6b			original
-fndup	jsr chrget
-	jsr $aefa		; sys "("?
-	jsr sgetstr1
-	ldy $69
+fndup	jsr $aefa		; sys "("?
+	jsr sgetstr1	; get string to copy
+	ldy $69		; len
 	sty pos
 	sta str1+1
 	stx str1
-	jsr $aefd		; sys chkcom
-	jsr sgetadr2
+
+	jsr sgetbytc	; get copy factor
 	jsr $aef7		; sys ")"?
-	ldx $65
+	ldx $65		; factor
+	beq err14
 	stx dwert
+
 	ldy #0
 	sty pos1
---	ldy #$00
+--	ldy #0		; multiply len
 -	inc pos1
+	beq jerr23	; if more than 255: error
 	iny
 	cpy pos
 	bne -
 	dex
 	bne --
-	lda pos1
-	jsr neustr
-	lda str1+1
+
+	lda pos1		; get new len
+	jsr neustr	; create string (adr in $62)
+	lda str1+1	; get address of string to copy
 	sta $21
 	lda str1
 	sta $20
-	ldx dwert
+
+	ldx dwert		; get factor
 	ldy #0
-	sty strz1
--	lda ($20),y
-	sty strz2
-	ldy strz1
-	sta ($62),y
+	sty helpvec		; count full len
+-	lda ($20),y	; copy from original...
+	sty helpvec+1
+	ldy helpvec
+	sta ($62),y	; ...to copy
 	iny
-	sty strz1
-	ldy strz2
+	sty helpvec
+	ldy helpvec+1	; count separate len
 	iny
-	cpy pos
+	cpy pos		; is reached?
 	bne -
-	ldy #0
-	sty pos1
-	dex
+	ldy #0		; so back to 0
+	dex		; count # of copies
 	bne -
-	lda #$ff
+
+	lda #$ff		; publish new string
 	sta $0d
 	jmp pushstr
 
 ; ----------------------------------------- 
-; 8ddc
-csgetari1	jsr chrget
-	ldy #0		; ### shorter!
-	lda (progz),y
+; 8dd7
+err14	ldx #$0e		; error "illegal quantity"
+	jmp ($0300)
+jerr23	jmp err23		; error "string too large"
 
 ; ----------------------------------------- 
+; 8ddc
+csgetari1	jsr chrget
+	tay
+	jsr chrget
 
-	cmp #$55		; DUP?
+	cpy #$55		; DUP?
 	bne +
 	jmp fndup
 
 ; ----------------------------------------- 
 
-+	cmp #$5a		; EXOR?
++	cpy #$5a		; EXOR?
 	bne +
 	jmp fnexor
 
 ; ----------------------------------------- 
 
-+	cmp #$51		; JOY?
++	cpy #$51		; JOY?
 	bne +
 	jmp fnjoy
 
 ; ----------------------------------------- 
 
-+	cmp #$0e		; FRAC?
++	cpy #$0e		; FRAC?
 	bne csgetari2
 
 ; ----------------------------------------- func FRAC
 ; 8dfc			enhanced
-fnfrac	jsr chrget
-	ldy #0
+fnfrac	ldy #0
 	jsr sxyflp3
 	jsr $bc0c		; sys fac->arg
 	jsr $aefa		; sys "("?
@@ -805,14 +809,13 @@ getdouble	ldy #1
 
 ; ----------------------------------------- 
 ; 8e48
-csgetari2	cmp #$10		; PLACE?
+csgetari2	cpy #$10		; PLACE?
 	beq fnplace
 	jmp csgetari3
 
 ; ----------------------------------------- func PLACE
 ; 8e4f			original
-fnplace	jsr chrget
-	jsr $aefa		; sys "("?
+fnplace	jsr $aefa		; sys "("?
 	jsr sgetstr1
 	sta $a8
 	stx $a7
@@ -854,14 +857,13 @@ fnplace	jsr chrget
 
 ; ----------------------------------------- 
 ; 8eac
-csgetari3	cmp #$5b		; INSERT?
+csgetari3	cpy #$5b		; INSERT?
 	beq fninsert
 	jmp csgetari4
 
 ; ----------------------------------------- func INSERT
 ; 8eb3			recoded
-fninsert	jsr chrget
-	jsr $aefa		; sys "("?
+fninsert	jsr $aefa		; sys "("?
 	jsr sgetstr1
 	sta $a8		; 1st string
 	stx $a7
@@ -933,7 +935,17 @@ colsout	jsr $ff5b
 
 ; ----------------------------------------- 
 ; 8f43
-	!by 0,0
+frominsrt	jsr sgetstrn
+	jmp basromau
+	
+; ----------------------------------------- 
+
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0
 
 ; ----------------------------------------- 
 ; 8f45
@@ -970,13 +982,12 @@ idiv	lda #0
 
 ; ----------------------------------------- 
 ; 8f8a
-csgetari4	cmp #$53		; DIV?
+csgetari4	cpy #$53		; DIV?
 	bne csgetari5
 
 ; ----------------------------------------- func DIV
 ; 8f8e			original
-fndiv	jsr chrget
-	jsr $aefa		; sys "("?
+fndiv	jsr $aefa		; sys "("?
 	jsr sgetadr2
 	sta idivdend+1
 	sty idivdend
@@ -992,13 +1003,12 @@ fndiv	jsr chrget
 
 ; ----------------------------------------- 
 ; 8fb8
-csgetari5	cmp #$52		; MOD?
+csgetari5	cpy #$52		; MOD?
 	bne csgetari6
 
 ; ----------------------------------------- func MOD
 ; 8fbc			original
-fnmod	jsr chrget
-	jsr $aefa		; sys "("?
+fnmod	jsr $aefa		; sys "("?
 	jsr sgetadr2
 	sta idivdend+1
 	sty idivdend
@@ -1014,13 +1024,12 @@ fnmod	jsr chrget
 
 ; ----------------------------------------- 
 ; 8fe6
-csgetari6	cmp #$59		; LIN?
+csgetari6	cpy #$59		; LIN?
 	bne csgetari7
 
 ; ----------------------------------------- func LIN
 ; 8fea			original
-fnlin	jsr incbasbz
-	sec
+fnlin	sec
 	jsr $fff0		; sys plot
 	txa
 	tay
@@ -1029,13 +1038,12 @@ fnlin	jsr incbasbz
 
 ; ----------------------------------------- 
 ; 8ff8
-csgetari7	cmp #$58		; TEST?
+csgetari7	cpy #$58		; TEST?
 	bne csgetari8
 
 ; ----------------------------------------- func TEST
 ; 8ffc			original
-fntest	jsr chrget
-	jsr $aefa		; sys "("?
+fntest	jsr $aefa		; sys "("?
 	jsr sgetadr2
 	sty $09
 	sta $0a
@@ -1056,14 +1064,13 @@ fntest	jsr chrget
 
 ; ----------------------------------------- 
 ; 902c
-csgetari8	cmp #$57		; INST?
+csgetari8	cpy #$57		; INST?
 	beq fninst
 	jmp csgetari9
 
 ; ----------------------------------------- func INST
 ; 9033			enhanced
-fninst	jsr chrget
-	jsr $aefa		; sys "("?
+fninst	jsr $aefa		; sys "("?
 	jsr sgetstr1
 	sta $a8
 	stx $a7
@@ -1116,77 +1123,74 @@ fninst	jsr chrget
 
 ; ----------------------------------------- 
 ; 90a4			enhanced
-csgetari9	cmp #$56		; INKEY?
+csgetari9	cpy #$56		; INKEY?
 	bne csgetaria
 
 ; ----------------------------------------- func INKEY
 ; 90a8			original
-	jsr incbasbz
 	ldy inkey
 	jmp sxyflp3
 
 ; ----------------------------------------- 
 ; 90b1
-csgetaria	cmp #$5c		; POT?
+csgetaria	cpy #$5c		; POT?
 	bne csgetarib
 	jmp fnpot
 
 ; ----------------------------------------- 
 ; 90b8
-csgetarib	cmp #$5d		; PENX?
+csgetarib	cpy #$5d		; PENX?
 	bne csgetaric
 	jmp fnpenx
 
 ; ----------------------------------------- 
 
-csgetaric	cmp #$5f		; PENY?
+csgetaric	cpy #$5f		; PENY?
 	bne csgetarid
 	jmp fnpeny
 
 ; ----------------------------------------- 
 
-csgetarid	cmp #$61		; GRAPHICS?
+csgetarid	cpy #$61		; GRAPHICS?
 	bne csgetarie
 
 ; ----------------------------------------- 
 ; 90ca			original
 fngraphics
 	ldx #$d0		; =$d000
-cgaval	jsr incbasbz
 cga0	ldy #$00
 	jmp sxyflp
 
 ; ----------------------------------------- 
 
-csgetarie	cmp #$60		; SOUND?
+csgetarie	cpy #$60		; SOUND?
 	bne csgetarif
 
 ; ----------------------------------------- 
 ; 90d8			original
 fnsound	ldx #$d4		; =$d400
-	bne cgaval
+	bne cga0
 
 ; ----------------------------------------- 
 ; 90dc
-csgetarif	cmp #$67		; NRM?
+csgetarif	cpy #$67		; NRM?
 	bne csgetarig
 	jmp fnnrm
 
 ; ----------------------------------------- 
 ; 90e3
-csgetarig	cmp #$28		; AT?
+csgetarig	cpy #$28		; AT?
 	bne csgetarih
 	jmp fnat
 
 ; ----------------------------------------- 
 ; 90ea
-csgetarih	cmp #$7c		; CHECK?
+csgetarih	cpy #$7c		; CHECK?
 	bne csgetarii	; no
 
 ; ----------------------------------------- func CHECK
 ; 90ee			recoded
-fncheck	jsr incbasbz
-	jsr $aefa		; sys "("?
+fncheck	jsr $aefa		; sys "("?
 	jsr sgetadr2	; get sprite#
 	sty pos
 	lda detectart
@@ -1225,22 +1229,23 @@ wdetect	lda detecterg
 
 ; ----------------------------------------- 
 ; 9137
-csgetarii	cmp #$7d		; DISPLAY?
+csgetarii	cpy #$7d		; DISPLAY?
 	bne csgetarij
 
 ; ----------------------------------------- func DISPLAY
 ; 913b
 fndisplay	ldx video		; returns video address
-	bne cgaval	; normally uncond. branch
+	bne cga0		; normally uncond. branch
 
 ; ----------------------------------------- 
 ; 9140
-csgetarij	!fill 8,$ea	; extendible here /w new functions
+csgetarij	!fill 5,$ea	; extendible here /w new functions
 			; like: CMP #xx, bne csgetarik,...
 
 ; ----------------------------------------- ERR entry
 ; 9148			recoded
-fnerr	ldy #0
+fnerr	jsr dec7a
+	ldy #0
 	jsr errnln	; "n" (errn)?	
 	beq cerrn
 
