@@ -13,6 +13,7 @@
 ; patched on 03.04.2021 (commands CSET)
 ; patched on 25.08.2021 (make OPEN independent from drive number)
 ; patched on 22.11.2021 (command HRDCPY: optimized)
+; patched on 07.12.2021 (minor change at INSERT)
 ; 
 ; ----------------------------------------- 
 
@@ -470,12 +471,12 @@ to20	lda $a8
 
 ; ----------------------------------------- bef INSERT
 ; af42			new
-befinsert	jsr sgetstrn	; get box definition
+befinsert	jsr frominsrt	; get box definition
 	sty $21
 	stx $20
 	lda $69		; len<>9?
 	cmp #9
-	bne err14		; yes, error
+	bne jerr14	; yes, error
 
 	pha		; save len
 	ldx #0
@@ -515,8 +516,7 @@ befinsert	jsr sgetstrn	; get box definition
 
 ; ----------------------------------------- 
 ; af91
-err14	ldx #$0e		; error "illegal quantity"
-	jmp ($0300)
+jerr14	jmp err14		; error "illegal quantity"
 
 ; ----------------------------------------- 
 ; af96
