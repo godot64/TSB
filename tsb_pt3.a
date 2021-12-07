@@ -23,6 +23,7 @@
 ; patched on 25.08.2021 (make OPEN independent from drive number)
 ; patched on 07.11.2021 (bugfix: now checks max values in PRINT AT() )
 ; patched on 29.11.2021 (added hold DIR output on keypress)
+; patched on 07.12.2021 (BFLASH now starts immediately)
 ;
 ; ----------------------------------------- 
 
@@ -741,15 +742,15 @@ mmb8	ldy mobnr
 
 ; ----------------------------------------- bef BFLASH
 ; 966c			recoded
-befbflash	lda #0
-	sta bflzae	; reset speed compare
-	jsr chkonoff	; get first parameter
+befbflash	jsr chkonoff	; get first parameter
 	txa		; OFF?
 	beq ++		; yes, switch flag off
 	jsr chrgot	; ON?
 	beq +		; yes, switch flag on
 
-	stx bflashsp	; set speed
+	stx bflashsp	; no, set speed
+	dex
+	stx bflzae	; start flash immediately
 	jsr sgetbytc
 	stx bflashf1	; set color 1
 	jsr sgetbytc
@@ -765,6 +766,10 @@ befbflash	lda #0
 
 +	stx bflashjn
 	jmp endsmb
+
+; ----------------------------------------- 
+
+	!by 0
 
 ; ----------------------------------------- 
 ; 96a1			enhanced
@@ -903,7 +908,7 @@ befflash	jsr flashinit	; color (or ON/OFF) in .x
 
 ; ----------------------------------------- func AT
 ; 97b6			original
-fnat	jsr sgetbytn
+fnat	jsr sgetbyt1
 	cpx #40
 	bcs +
 	txa
