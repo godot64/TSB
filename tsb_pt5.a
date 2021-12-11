@@ -20,7 +20,7 @@
 	!ct pet
 
 ; ----------------------------------------- all MOVE befs
-; ac5d			recoded
+; ac5f			recoded
 movebef	lda progz		; entry for: MOVE, UP,
 	sta $c1		; LEFT, DOWN, RIGHT
 	lda progz+1	; (INSERT)
@@ -46,7 +46,7 @@ mve6	tya		; .y: code# (*2)
 	cmp #32		; upb?
 	bcc mve5		; no, move
 
-; ac88
+; ac8a
 	jsr mdistrb	; distribute
 mve4	inc $a6
 	lda $a6
@@ -55,7 +55,7 @@ mve4	inc $a6
 	jmp endsmb
 
 ; ----------------------------------------- 
-; ac96
+; ac98
 mve5	cmp #16		; is move?
 	bcs mve1
 
@@ -85,18 +85,18 @@ fillbox	dex
 	rts
 
 ; ----------------------------------------- 
-; acd0
+; acd2
 mve1	and #4
 	beq mve7
 	jsr mveb
 	beq mve4
 
 ; ----------------------------------------- bef INV
-; acd9			enhanced
+; acdb			enhanced
 mve7	jsr befinv
 	beq mve4
 
-; acde
+; ace0
 befinv	ldx #0		; inv
 --	ldy #0
 -	cpy spaltenanz
@@ -113,7 +113,7 @@ mve8	inx
 	bne --
 +	rts
 ; ----------------------------------------- 
-; acfc
+; acfe
 mveb	jsr sgetbytc
 	stx zeileanf
 	jsr sgetbytc
@@ -126,7 +126,7 @@ mveb	jsr sgetbytc
 	jmp moveit
 
 ; ----------------------------------------- 
-; ad16
+; ad18
 mdistrb	and #$0f		; reduce token nums
 	lsr
 	tay		; upb?
@@ -145,34 +145,34 @@ mdistrb	and #$0f		; reduce token nums
 	beq befleftb
 
 ; ----------------------------------------- bef LEFTW
-; ad34			enhanced
+; ad36			enhanced
 befleftw	lda #1
 	sta helpvec
 	bne mdb0
 ; ----------------------------------------- bef UPW
-; ad3a			enhanced
+; ad3c			enhanced
 befupw	lda #1
 	sta helpvec
 	bne befupb
 ; ----------------------------------------- bef LEFTB
-; ad40			enhanced
+; ad42			enhanced
 befleftb	lda #1
 	bne mdb0
 ; ----------------------------------------- bef DOWNB
-; ad44			enhanced
+; ad46			enhanced
 befdownb	lda #2
 	bne mdb1
 ; ----------------------------------------- bef DOWNW
-; ad48			enhanced
+; ad4a			enhanced
 befdownw	lda #3
 mdb1	sta helpvec
 
 ; ----------------------------------------- bef UPB
-; ad4c			enhanced
+; ad4e			enhanced
 befupb	lda #40
 
 ; ----------------------------------------- 
-; ad4e
+; ad50
 mdb0	sta helpvec+1
 
 	cpy #2		; up?
@@ -215,7 +215,7 @@ mcontright
 	jmp mfbox
 
 ; ----------------------------------------- 
-; ad98
+; ad9a
 mcontdown	dec zeilenanz
 	ldx zeilenanz
 	beq mcup0
@@ -234,7 +234,7 @@ mcontdown	dec zeilenanz
 	jmp mkln0
 
 ; ----------------------------------------- 
-; adc1
+; adc3
 mcontleft	jsr mplus
 	lda helpvec
 	and #1
@@ -250,11 +250,11 @@ mcontleft	jsr mplus
 	jmp mfbox
 
 ; ----------------------------------------- 
-; ade3
+; ade5
 mcup0	inc zeilenanz
 
 ; ----------------------------------------- up
-; ade6
+; ade8
 mcontup	jsr mplus
 	lda helpvec
 	and #1
@@ -267,7 +267,7 @@ mcontup	jsr mplus
 	jmp mkline
 
 ; ----------------------------------------- 
-; ae00
+; ae02
 moveit	ldx #0
 mvit0	ldy #0
 -	cpy spaltenanz
@@ -291,7 +291,7 @@ mvit0	ldy #0
 ++	rts
 
 ; ----------------------------------------- 
-; ae2d
+; ae2f
 mplus	clc
 	lda $20
 	adc helpvec+1
@@ -301,7 +301,7 @@ mplus	clc
 	sta $24
 	rts
 
-; ae3b
+; ae3d
 mminus	sec
 	lda $20
 	sbc helpvec+1
@@ -312,14 +312,14 @@ mminus	sec
 	rts
 
 ; ----------------------------------------- 
-; ae49
+; ae4b
 maddhg	jsr l20pl40
 	dex
 	bne maddhg
 	rts
 
 ; ----------------------------------------- 
-; ae50
+; ae52
 l20mn40	sec
 	lda $20
 	sbc #40
@@ -328,7 +328,7 @@ l20mn40	sec
 	dec $21
 +	rts
 
-; ae5c
+; ae5e
 l23mn40	sec
 	lda $23
 	sbc #40
@@ -338,7 +338,7 @@ l23mn40	sec
 +	rts
 
 ; ----------------------------------------- 
-; ae68
+; ae6a
 mfbox	jsr to20
 	ldx #0
 -	lda movetab,x
@@ -350,7 +350,7 @@ mfbox	jsr to20
 	rts
 
 ; ----------------------------------------- 
-; ae7c
+; ae7e
 mkln0	jsr to20
 mkline	ldy #0
 -	lda movetab,y
@@ -371,7 +371,7 @@ mfrow	ldx #0
 	bne -
 	jmp to20
 
-; aea0
+; aea2
 mfline	ldy #0
 -	lda ($20),y
 	sta movetab,y
@@ -380,7 +380,7 @@ mfline	ldy #0
 	bne -
 	rts
 
-; aeae
+; aeb0
 mfspace	dey		; fill movetab w/
 mspc0	lda #$20		; space
 fillmt	sta movetab,y
@@ -389,7 +389,7 @@ fillmt	sta movetab,y
 	rts
 
 ; ----------------------------------------- 
-; aeb8
+; aeba
 getrcwd	jsr sgetbytn	; get row
 	cpx #25		; >24? 
 	bcs err32		; yes, bad mode
@@ -411,7 +411,7 @@ getrcwd	jsr sgetbytn	; get row
 	stx zeilenanz
 
 ; ----------------------------------------- 
-; aede
+; aee0
 movez	ldy #0
 	sty zaehler
 	sty $20
@@ -452,17 +452,17 @@ movez	ldy #0
 	rts
 
 ; ----------------------------------------- 
-; af2d
+; af2f
 err32	jmp swarm		; error "bad mode"
 
 ; ----------------------------------------- 
-; af30
+; af32
 toa8	lda $20
 	sta $a8
 	lda $21
 	sta $a9
 	rts
-; af39
+; af3b
 to20	lda $a8
 	sta $20
 	lda $a9
@@ -470,7 +470,7 @@ to20	lda $a8
 	rts
 
 ; ----------------------------------------- bef INSERT
-; af42			new
+; af44			new
 befinsert	jsr frominsrt	; get box definition
 	sty $21
 	stx $20
@@ -515,7 +515,7 @@ befinsert	jsr frominsrt	; get box definition
 	jmp mve3		; out box
 
 ; ----------------------------------------- 
-; af91
+; af93
 jerr14	jmp err14		; error "illegal quantity"
 
 ; ----------------------------------------- 
@@ -781,19 +781,19 @@ crsrdel	lda $d4
 back2call	rts
 
 ; ----------------------------------------- 
-; b142
+; b136
 fcursor	!by $04,$9d,$92,$20,$12	; rvs on, space, rvs off, crsr lft
 	!by $9d,$9d,$20		; space, crsr lft, crsr lft
 
 ; ----------------------------------------- 
-; b14a
+; b13e
 fetchtab	!by $05,$11,$12,$13,$1c,$1d,$1e,$1f	; all these 26 get skipped
 	!by $90,$91,$92,$93,$94,$9c,$9d,$9e	; (color codes, crsr, rvs, home)
 	!by $9f,$8d,$81,$95,$96,$97,$98,$99
 	!by $9a,$9b
 
 ; ----------------------------------------- 
-
+; b158
 	!by 0,0,0
 
 ; ----------------------------------------- part of CALL

@@ -26,7 +26,7 @@ colo	lda #$3a		; 18 ":"
 	jmp bsout		; out
 
 ; ----------------------------------------- Part of RENUMBER
-
+; cc11
 isstep0	jsr basromei	; is step 0?
 	jsr bloadadr
 	beq +
@@ -35,20 +35,20 @@ isstep0	jsr basromei	; is step 0?
 	jmp err14
 
 ; ----------------------------------------- 
-; cc23
+; cc20
 arrbreak	jsr $ffe1		; sys STOP?
 	beq stopped	; yes
 	jsr getkey	; get key
 	jsr $ffe1
 	beq stopped
 	rts
-; cc31
+; cc2d
 stopped	pla
 	pla
 	jmp nrm2		; back to all normal
 
 ; ----------------------------------------- 
-; cc36
+; cc33
 initvecs	lda $2f
 	sta $20
 	sta $5f
@@ -58,7 +58,7 @@ initvecs	lda $2f
 	rts
 
 ; ----------------------------------------- 
-; cc43
+; cc40
 skiparr	ldy #$02
 	clc
 	lda ($5f),y
@@ -75,13 +75,13 @@ skiparr	ldy #$02
 	rts
 
 ; ----------------------------------------- 
-; cc5a
+; cc57
 outdigits	jsr $b395		; sys int to float (hi .a, lo .y)
 	jsr $bddf		; sys fac to asc
 	jmp $ab1e		; sys string out
 
 ; ----------------------------------------- 
-; cc63
+; cc60
 arrdims	jsr klaa		; "("
 	jsr getdims	; dims out
 	jsr klaz		; ")"
@@ -90,7 +90,7 @@ arrdims	jsr klaa		; "("
 	jmp return	; cr
 
 ; ----------------------------------------- 
-; cc75
+; cc72
 getdims	jsr inc20
 	jsr inc20
 	jsr inc20
@@ -142,11 +142,11 @@ getdims	jsr inc20
 	rts
 
 ; ----------------------------------------- 
-; ccd1
+; ccce
 endplace	jmp bef0
 
 ; ----------------------------------------- bef PLACE
-; ccd7			new
+; ccd1			new
 befplace	jsr basromei
 	jsr chrget
 	jsr $b113		; sys is char? (one array)
@@ -170,7 +170,7 @@ befplace	jsr basromei
 	jsr skiparr
 	jsr return	; out cr
 	bne -
-; cd09
+; cd03
 arrays	ldy #0
 	lda ($20),y
 	sta $45
@@ -183,7 +183,7 @@ arrays	ldy #0
 	jsr bsout		; out float array name 2
 	lda #0
 	beq +
-; cd24
+; cd1e
 intarr	and #$7f		; out int array name 1
 	jsr bsout
 	jsr inc20
@@ -193,7 +193,7 @@ intarr	and #$7f		; out int array name 1
 	jsr bsout
 	jsr proz		; out "%"
 	lda #$80
-; cd3a
+; cd34
 +	sta $0e
 	jsr arrdims	; out dims
 	jsr $b194		; sys first element
@@ -208,7 +208,7 @@ intarr	and #$7f		; out int array name 1
 	rts
 
 ; ----------------------------------------- 
-; cd56
+; cd50
 strarr	and #$7f		; out string array name 2
 	jsr bsout
 	jsr doll		; out "$"
@@ -234,7 +234,7 @@ strarr	and #$7f		; out string array name 2
 	rts
 
 ; ----------------------------------------- 
-; cd8c
+; cd86
 outpos	jsr klaa
 	lda $af		; show position in array
 	sta $02
@@ -373,7 +373,7 @@ ren5	lda ($a8),y
 
 ; ----------------------------------------- 
 ; ce86
-	!by $aa,$aa,$aa,$00
+	!by 0,0,0,0
 
 ; ----------------------------------------- 
 ; ce8a

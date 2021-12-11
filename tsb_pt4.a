@@ -22,7 +22,7 @@
 	!ct pet
 
 ; ----------------------------------------- 
-; 9f3a			new
+; 9f3c			new
 outeql	lda #$3d		; =
 	!by $2c
 komma	lda #$2c		; ,
@@ -37,7 +37,7 @@ return	lda #$0d		; Return
 	jmp bsout
 	
 ; ----------------------------------------- bef DUMP
-; 9f4e			enhanced
+; 9f50			enhanced
 befdump	lda $2d		; get start of vars
 	sta $20
 	lda $2e
@@ -55,7 +55,7 @@ dit6	jsr return	; sys out cr
 dit1	jmp bef0		; yes, end of command
 
 ; ----------------------------------------- 
-; 9f6e
+; 9f70
 dit0	lda ($20),y	; get 1st char of varname
 	sta $a6
 	bpl dit3		; check type
@@ -128,7 +128,7 @@ dit5	jsr inc20		; skip to next variable
 	jmp dit6		; start over
 
 ; ----------------------------------------- 
-; a005
+; a007
 dit7	jsr bsout		; 2nd char unshifted, so float
 	jsr inc20
 	lda $20
@@ -141,7 +141,7 @@ dit7	jsr bsout		; 2nd char unshifted, so float
 	bne dit5
 
 ; ----------------------------------------- 
-; a01f
+; a021
 outasc	ldx #0
 -	lda linenum,x
 	beq +
@@ -151,14 +151,14 @@ outasc	ldx #0
 +	rts
 
 ; ----------------------------------------- part of DO
-; a02d
+; a02f
 do8	jsr sfordo	; search for DO
 	pla
 	pla
 	jmp do9
 
 ; ----------------------------------------- part of INST and MEM
-; a035
+; a037
 setbmode	iny		; change bef vectors
 -	lda vecbmode,y	; to bad mode
 	sta vecplace,y
@@ -168,14 +168,14 @@ setbmode	iny		; change bef vectors
 	jmp bef0
 
 ; ----------------------------------------- 
-; a045
+; a047
 charen1	lda pport
 	ora #4
 	sta pport
 	rts
 
 ; ----------------------------------------- 
-; a04c
+; a04e
 charen0	lda pport
 	sei
 	and #$fb
@@ -183,11 +183,11 @@ charen0	lda pport
 	rts
 
 ; ----------------------------------------- 
-; a054
+; a056
 -	jmp endsmb
 
 ; ----------------------------------------- bef DRAW
-; a057			enhanced
+; a059			enhanced
 befdraw	jsr drawto	; check if DRAW TO
 	jsr sgetstr	; no, just DRAW, get string
 	stx $ac		; address
@@ -274,7 +274,7 @@ befdraw	jsr drawto	; check if DRAW TO
 +	jmp --
 
 ; ----------------------------------------- 
-; a11e
+; a120
 
 tabrot	!by $01,$00,$00,$ff,$00,$ff,$01,$00
 	!by $01,$01,$ff,$ff,$01,$ff,$01,$ff
@@ -286,7 +286,7 @@ tabrot	!by $01,$00,$00,$ff,$00,$ff,$01,$00
 	!by $01,$ff,$01,$ff,$ff,$ff,$01,$01
 
 ; ----------------------------------------- bef ROT
-; a15e			original
+; a160			original
 befrot	jsr sgetbytn
 	cpx #8
 	bcc +
@@ -308,7 +308,7 @@ befrot	jsr sgetbytn
 	jmp endsmb
 
 ; ----------------------------------------- bef CHAR
-; a184			original
+; a186			original
 befchar	jsr sgetadrn
 	sty $09
 	sta $0a
@@ -328,12 +328,12 @@ befchar	jsr sgetadrn
 	jmp endsmb
 
 ; ----------------------------------------- 
-; a1ae
+; a1b0
 sgetadrn	jsr incbasbz
 	jmp sgetadr
 
 ; ----------------------------------------- 
-; a1b4
+; a1b6
 charzei	lda #0
 	sta drx
 	jsr charen0
@@ -412,23 +412,23 @@ chz0	lda ax
 	jmp -
 
 ; ----------------------------------------- 
-; a261
+; a263
 ptest1	sty status
 	jsr tdot0
 	jmp kerromein
 
 ; ----------------------------------------- 
-; a269
+; a26b
 	!by 0,0,0,0,0,0,0
 
 ; ----------------------------------------- bef HICOL
-; a270			original
+; a272			original
 befhicol	lda #0
 	sta lowcolflag
 	jmp bef0
 
 ; ----------------------------------------- bef CHECK
-; a278			new
+; a27a			new
 befcheck	lda #>procstack	; set procstack address
 	ldy #<procstack
 	sta $21
@@ -475,7 +475,7 @@ fsende	inx		; programmende erreicht:
 	jmp bef0		; 8
 
 ; ----------------------------------------- bef ELSE
-; a2c6			recoded
+; a2c8			recoded
 befelse	lda doflag
 	beq +
 	lda #$47
@@ -483,7 +483,7 @@ befelse	lda doflag
 +	jmp befproc
 
 ; ----------------------------------------- Part of DIR
-; a2d3
+; a2d5
 fromdir	bne +		; anything following?
 	ldx #1		; no, set length of filename ("$"): 1
 	stx $69
@@ -493,7 +493,7 @@ fromdir	bne +		; anything following?
 +	jmp sgetstr	; return to regular DIR
 
 ; ----------------------------------------- Check if ON or OFF follow
-; a2e1			enhanced
+; a2e3			enhanced
 chkonoff 	ldx #10		; if yes: .x=10
 -	jsr chrget	; read next byte
 	cmp #$91		; ON?
@@ -507,11 +507,11 @@ setoff	ldx #0
 setonoff	jmp incbasbz	; (25)
 
 ; ----------------------------------------- bef LOCAL
-; a2fa			recoded
+; a2fc			recoded
 
 --	jsr incbasbz	; loop for next var
 	bne +
-; a2ff
+; a301
 beflocal	jsr setoff	; set .x to 0
 +	txa
 	pha
@@ -552,7 +552,7 @@ lcf0	lda #0		; no, set tab terminator ($0000)
 	jmp endsmb
 
 ; ----------------------------------------- bef GLOBAL
-; a341			original
+; a343			original
 befglobal	ldx #0
 --	lda localtab,x
 	sta $5f
@@ -573,7 +573,7 @@ befglobal	ldx #0
 	beq --
 
 ; ----------------------------------------- 
-; a363
+; a365
 linzei	clc
 	lda ax
 	sbc xmaxlow
@@ -606,7 +606,7 @@ linzei	clc
 	sta ey
 
 ; ----------------------------------------- 
-; a3b1
+; a3b3
 mobbeweg	lda #0
 	sta ydiff
 	sta ay+1
@@ -614,7 +614,7 @@ mobbeweg	lda #0
 	sta ydiff+1
 	sta diffv
 	sta diffv+1
-; a3c5
+; a3c7
 vloop	lda ax
 	sta $09
 	lda ax+1
@@ -629,11 +629,11 @@ vloop	lda ax
 	jsr mobposs
 	jmp vergl
 +	jsr punkt
-; a3e9
+; a3eb
 vergl	lda diffv
 	ora diffv+1
 	beq +
-; a3f1
+; a3f3
 vergl1	jsr ynext
 	jmp vloop
 
@@ -662,7 +662,7 @@ vergl1	jsr ynext
 +	rts
 
 ; ----------------------------------------- 
-; a438
+; a43a
 diff	sec
 	lda ey
 	sbc ay
@@ -718,7 +718,7 @@ diff	sec
 	sta xdiff+1
 	lda #0
 	sta diffv+1
-; a4a0
+; a4a2
 -	sta diffv
 	sec
 	lda ydiff
@@ -739,7 +739,7 @@ diff	sec
 	inc diffv+1
 +	lda diffv
 	jmp -
-; a4cc
+; a4ce
 ++	pla
 	pla
 	lda ax+1
@@ -768,7 +768,7 @@ diff	sec
 +	jmp vergl1
 
 ; ----------------------------------------- 
-; a511
+; a513
 ynext	lda diffv
 	ora diffv+1
 	beq ++
@@ -799,7 +799,7 @@ ynext	lda diffv
 +++	rts
 
 ; ----------------------------------------- 
-; a558
+; a55a
 tofind	lda $a6
 	cmp $a8
 	bne +
@@ -835,7 +835,7 @@ tofind	lda $a6
 	jmp -
 
 ; ----------------------------------------- bef FIND
-; a599			original
+; a59b			original
 beffind	jsr incbasbz
 	lda #$ff
 	sta $a8
@@ -846,7 +846,7 @@ beffind	jsr incbasbz
 	lda $2c
 	sta $21
 	bne infind
-; a5ae
+; a5b0
 fnd0	lda (progz),y
 	beq tofind
 	lda ($20),y
@@ -856,7 +856,7 @@ fnd0	lda (progz),y
 	bne fcont
 	iny
 	bne fnd0
-; a5bf
+; a5c1
 fcont	jsr inc20
 	ldy #0
 	lda ($20),y
@@ -886,7 +886,7 @@ infind	jsr inc20
 	bne fnd0		; uncond. branch
 
 ; ----------------------------------------- part of use
-; a5fd
+; a5ff
 	tax
 use8	lda $63
 	cmp #$2a		; "*"?
@@ -900,14 +900,14 @@ use9a	tax
 	dex
 	bne -
 	rts
-; a612
+; a614
 genout	ldy $44
 gno0	sta $02a7,y
 	inc $44
 	rts
 
 ; ----------------------------------------- 
-; a61a
+; a61c
 vglae	lda vgla
 	cmp vgle
 	beq +
@@ -921,7 +921,7 @@ vglae	lda vgla
 	rts
 
 ; ----------------------------------------- bef DESIGN
-; a632			original
+; a634			original
 befdesign	jsr sgetbytn
 	stx $aa		; cset type (0..3)
 	cpx #4
@@ -939,7 +939,7 @@ befdesign	jsr sgetbytn
 	sta $af
 
 ; ----------------------------------------- main loop
-; a652
+; a654
 design	ldy #0		; init gather byte
 	sty $a8
 	ldx #0		; init byte line counter (0..7)
@@ -959,7 +959,7 @@ design	ldy #0		; init gather byte
 	jsr incbasbz
 
 ; ----------------------------------------- per line loop
-; a675
+; a677
 desloop	jsr incbasbz
 	lda (progz),y	; skip "@", .y=0
 	cmp #$40
@@ -973,7 +973,7 @@ desloop	jsr incbasbz
 	beq deshires
 	cpy #2		; type 0 or 2? (hires objects)
 	beq deshires
-; a688
+; a68a
 desmulti	ldy $a8		; no, multi: get gatherbyte
 	ldx $a9		; get index into multi bits
 	inc $a9		; and increment it for next pass
@@ -994,7 +994,7 @@ desmulti	ldy $a8		; no, multi: get gatherbyte
 	tya
 	ora destab1,x
 	bne des2
-; a6a4
+; a6a6
 deshires	cmp #$42		; "B"? (color1 pixel)
 	beq des1
 
@@ -1004,16 +1004,16 @@ deshires	cmp #$42		; "B"? (color1 pixel)
 	beq descont
 	cmp #$41		; "A"? (dito)
 	beq descont
-; a6be
+; a6c0
 err2c2	ldx #$2c		; no, error "bad char f. a mob"
 	!by $2c
 err2b	ldx #$2b		; error "too few lines"
 	jmp ($0300)
-; a6c6
+; a6c8
 des1	lda $a8		; set B-pixels (color1 for MOB SET)
 	ora gbittabs,x
 des2	sta $a8
-; a6cd
+; a6cf
 descont	ldy #0
 	ldx $ab		; re-get .x
 	inx		; proceed to next line in byte
@@ -1021,7 +1021,7 @@ descont	ldy #0
 	bne desloop
 
 ; ----------------------------------------- after line
-; a6d6
+; a6d8
 	ldy $a6		; get target index
 	lda $a8		; get gathered byte
 	sta ($ae),y	; store to target
@@ -1042,7 +1042,7 @@ descont	ldy #0
 	jmp desloop	; no, loop
 
 ; ----------------------------------------- line finished
-; a6f9
+; a6fb
 +	sty ay		; line finished, init width counter
 	inc ax		; increment object height
 	ldx ax		; get height
@@ -1057,12 +1057,12 @@ descont	ldy #0
 	jmp design	; no, proceed
 
 ; ----------------------------------------- object finished
-; a713
+; a715
 ++	jsr skipline	; finished, find end of basic line
 	jmp endsmb	; and return to interpreter
 
 ; ----------------------------------------- 
-; a719
+; a71b
 skipline	lda (progz),y	; now find basic line end
 	beq +
 	jsr incbasbz
@@ -1070,14 +1070,14 @@ skipline	lda (progz),y	; now find basic line end
 +	rts
 
 ; ----------------------------------------- multicolor pixel pattern
-; a723
+; a725
 destab3	!by $c0,$30,$0c,$03		; %11: D $d800..
 destab2	!by $80,$20,$08,$02		; %10: C $d023
 destab1	!by $40,$10,$04,$01		; %01: B $d022
 				; %00: A $d021
 
 ; ----------------------------------------- 
-; a72f
+; a731
 get10010	jsr incbasbz	; skip token
 	jsr chrgot	; anything following?
 	bne +
@@ -1092,12 +1092,12 @@ get10010	jsr incbasbz	; skip token
 +	rts		; 24
 
 ; ----------------------------------------- part of DO
-; a74b
+; a74d
 waitkey	jsr getkey+5
 	jmp befproc	; skip rest of line
 
 ; ----------------------------------------- part of DO
-; a751
+; a753
 whichdo	bcs waitkey	; "null"? (yes, if .c)
 
 	ldy #$ff		; no, DONE?
@@ -1109,7 +1109,7 @@ whichdo	bcs waitkey	; "null"? (yes, if .c)
 	jmp dodone
 
 ; ----------------------------------------- bef RLOCMOB
-; a762			original
+; a764			original
 befrlocm	jsr sgetbytn
 	stx mobnr2
 	stx mobnr
@@ -1133,11 +1133,11 @@ befrlocm	jsr sgetbytn
 	jmp mobcont
 
 ; ----------------------------------------- 
-; a79b
+; a79d
 null	!tx "null"
 
 ; ----------------------------------------- bef CMOB
-; a79f			original
+; a7a1			original
 befcmob	jsr sgetbytn
 	stx $d025
 	jsr sgetbytc
@@ -1145,7 +1145,7 @@ befcmob	jsr sgetbytn
 	jmp endsmb
 
 ; ----------------------------------------- bef BCKGNDS
-; a7ae			enhanced
+; a7b0			enhanced
 befbckgnds
 	jsr sgetbytn	; get backgrnd color
 	stx $d021
@@ -1169,7 +1169,7 @@ befbckgnds
 	jmp endsmb
 
 ; ----------------------------------------- bef PAUSE
-; a7de			recoded
+; a7e0			recoded
 befpause	jsr chrget
 	bcc ++		; time follows?
 
@@ -1201,22 +1201,22 @@ befpause	jsr chrget
 +	jmp endsmb
 
 ; ----------------------------------------- resume?
-; a81c
+; a81e
 	sty doflag
 	jsr chrget
 	beq +
 	jmp whichdo
 
 ; ----------------------------------------- 
-
+; a829
 	!by 0,0,0,0,0,0,0	; 7 bytes
 
 ; ----------------------------------------- bef NRM
-; a82e			enhanced
+; a830			enhanced
 befnrm	jsr nrm00
 	jmp nrm2
 
-; a834
+; a836
 nrm00	lda #4		; video at $0400
 	sta video
 	lda #$c7		; VIC bank 0 ($0000)
@@ -1232,7 +1232,7 @@ nrm	sta $d018		; entry for CSET
 	rts
 
 ; ----------------------------------------- bef MOB OFF
-; a853			original
+; a855			original
 befmoboff	jsr sgetbytn
 	lda $d015
 	and mbittabl,x
@@ -1240,7 +1240,7 @@ befmoboff	jsr sgetbytn
 +	jmp endsmb
 
 ; ----------------------------------------- bef OFF
-; a862			enhanced
+; a864			enhanced
 endflash	jsr dec7a
 befoff	ldx #0
 -	lda flashing
@@ -1254,7 +1254,7 @@ befoff	ldx #0
 	jmp bef0
 
 ; ----------------------------------------- bef ARC
-; a87b			enhanced
+; a87d			enhanced
 befarc	jsr arc1
 	lda strz1
 	sta $a8
@@ -1266,7 +1266,7 @@ befarc	jsr arc1
 	jmp endsmb
 
 ; ----------------------------------------- 
-; a892
+; a894
 arc1	jsr incbasbz
 	lda #0
 	sta drehsinn
@@ -1319,7 +1319,7 @@ getrxryf	jsr sgetbytc
 	jsr sgetbytc
 	stx kry
 	jsr getpktf
-; a919
+; a91b
 kreis	lda #$13
 	sta $21
 	jsr kreis1
@@ -1327,7 +1327,7 @@ kreis	lda #$13
 	bne kreis1
 
 ; ----------------------------------------- Fallback from HIRES
-; a924
+; a926
 nrm01	lda video
 	cmp #$cc
 	bne +
@@ -1337,24 +1337,24 @@ nrm01	lda video
 	jsr nrm02
 	
 ; ----------------------------------------- Part of CSET
-; a933
+; a935
 csm0	ldx video
 	cpx #$cc		; is MEM active?
 	bne +
 	eor #$2c		; yes, change values accordingly
 +	jmp nrm
-; a93f
+; a941
 csetmem	pha
 	jsr nrm01
 	pla
 	bne csm0
 
 ; ----------------------------------------- 
-; a946
+; a948
 	!by 0,0,0
 
 ; ----------------------------------------- 
-; a949
+; a94b
 kreis1	lda $a8
 	pha
 	lda $a9
@@ -1445,7 +1445,7 @@ kreis1	lda $a8
 +	jmp kreis1
 
 ; ----------------------------------------- 
-; aa01
+; aa03
 sinmalkrx	jsr a8a9bogm
 	jsr ssin
 	jsr sfacarg
@@ -1456,17 +1456,17 @@ scm0	sta $63
 	jsr scflp
 	jsr sfmult
 	jmp sfacadr
-; aa1c
+; aa1e
 cosmalkry	jsr a8a9bogm
 	jsr scos
 	jsr sfacarg
 	lda kry
 	jmp scm0
-; aa2b
+; aa2d
 scflp	ldx #$90
 	sec
 	jmp sxflp
-;aa31
+;aa33
 a8a9bogm	lda $a8
 	sta $63
 	lda $a9
@@ -1486,7 +1486,7 @@ a8a9bogm	lda $a8
 	jmp jsfdiv
 
 ; ----------------------------------------- part of DIR
-; aa5a
+; aa5c
 fileopen	jsr $ffbd		; sys setnam
 	ldx $ba
 	lda #1
@@ -1503,7 +1503,7 @@ fileopen	jsr $ffbd		; sys setnam
 	!by 0
 
 ; ----------------------------------------- 
-; aa73
+; aa75
 pkber	lda $20
 	bne +
 	jsr kmyminus
@@ -1521,7 +1521,7 @@ pkber	lda $20
 
 +	jsr kmxminus
 	jmp kmyminus
-; aa97
+; aa99
 kmxplus	clc
 	lda $aa
 	adc kmx
@@ -1530,13 +1530,13 @@ kmxplus	clc
 	adc kmx+1
 	sta $ab
 	rts
-; aaa7
+; aaa9
 kmyplus	clc
 	lda $ae
 	adc kmy
 	sta $ae
 	rts
-; aab0
+; aab2
 kmxminus	sec
 	lda kmx
 	sbc $aa
@@ -1549,7 +1549,7 @@ kmxminus	sec
 	sta $aa
 	sta $ab
 +	rts
-; aac8
+; aaca
 kmyminus	sec
 	lda kmy
 	sbc $ae
@@ -1558,7 +1558,7 @@ kmyminus	sec
 	lda #0
 	sta $ae
 +	rts
-; aad7
+; aad9
 a8a9div90	lda #$5a		; 90
 	sta idivsor
 	lda #0
@@ -1579,7 +1579,7 @@ a8a9div90	lda #$5a		; 90
 	cmp #3
 	beq +
 	rts
-; ab06
+; ab08
 +	sec
 	lda #$5a
 	sbc $a8
@@ -1588,7 +1588,7 @@ a8a9div90	lda #$5a		; 90
 	rts
 
 ; ----------------------------------------- bef ANGL
-; ab10			original
+; ab12			original
 befangl	jsr incbasbz
 	jsr sgetadr
 	sty kmx
@@ -1616,7 +1616,7 @@ befangl	jsr incbasbz
 	jmp endsmb
 
 ; ----------------------------------------- 
-; ab57
+; ab59
 kreis2	jsr vglae
 	beq +
 	bcs +
@@ -1628,16 +1628,16 @@ kreis2	jsr vglae
 +	jmp kreis1
 
 ; ----------------------------------------- tokenizer
-; ab69
+; ab6b
 zum2	jmp tok5		; continue with next char
 
 ; ----------------------------------------- 
-; ab6c
+; ab6e
 zeiumw1	ldy #5		; entry point, .y=index in basic line
 zum0	lda $01fb,y	; read from $0200 (up to $00)
 	bne +
 --	rts
-; ab74
+; ab76
 +	cmp #$22		; string?
 	bne +
 -	iny		; yes, skip string
@@ -1646,7 +1646,7 @@ zum0	lda $01fb,y	; read from $0200 (up to $00)
 	cmp #$22		; or next quote
 	bne -
 	beq zum2		; then continue
-; ab84
+; ab86
 +	cmp #$40		; "@"? (precedes DESIGN lines)
 	bne +
 zum1	iny		; yes, skip this line
@@ -1706,7 +1706,7 @@ tok3	cmp ($20,x)	; Zeichen in Befehlswort enthalten?
 	bne -
 	inc $21
 	bne -
-; abe7
+; abe9
 tok2	inc codezae	; Vergleich negativ, Tokenzähler plus 1
 	ldy zwisp2	; Index in Basiczeile holen, nicht erhöhen!
 
@@ -1762,7 +1762,7 @@ tok5	iny		; continue with next char in basic line
 	jmp zum0
 
 ; ----------------------------------------- part of USE
-; ac46
+; ac48
 use4	sta $43		; len of ctrl string
 	stx $49		; and address
 	sty $4a
@@ -1773,7 +1773,7 @@ use4	sta $43		; len of ctrl string
 +	jmp err23		; error "string too large"
 
 ; ----------------------------------------- 
-; ac54
+; ac56
 jsfdiv	ldy $70
 	jmp sfdiv
 
@@ -1782,11 +1782,11 @@ jsfdiv	ldy $70
 	!by 0
 
 ; ----------------------------------------- 
-; ac5a
+; ac5c
 ata	!by $41,$54,$41
 
 ; ----------------------------------------- 
-; ac5d
+; ac5f
 ;
 ; End of part 4
 ;

@@ -83,9 +83,9 @@ sxflppl	jsr pspeibe
 sstrpz	jsr pspeibe
 	jsr $a613		; compute address of line start (number in INT)
 	jmp prestor
-; 8076
-sascflp	jmp $bcf3		; digits from basic to float
 ; 8079
+sascflp	jmp $bcf3		; digits from basic to float
+; 807c
 sgetari1	jmp $ae92		; get arithmetical expression from basic
 ; 807f
 schkklz	jsr pspeibe
@@ -851,7 +851,7 @@ vecrenum	!wo befrenum-1	; 121 $837f renumber (changed from 87b4)
 	!wo befout-1	; 127 $9ed1 out
 
 ; ----------------------------------------- 
-
+; 87c0 
 tsbf1	!tx "proc not founD"	; 33 / $21
 tsbf2	!tx "insert too largE"	; 34 / $22
 tsbf3	!tx "string too largE"	; 35 / $23
@@ -861,12 +861,12 @@ tsbf6	!tx "end proc without exeC"	; 38 / $26
 tsbf7	!tx "end loop without "	; 39 / $27
 tsbf8	!tx "looP"		; 40 / $28
 tsbf9	!tx "until without repeaT"	; 41 / $29
-tsbfa	!tx "stack too largE"	; 42 / $2a
+tsbfa	!tx "stack overfloW"	; 42 / $2a
 tsbfb	!tx "too few lineS"		; 43 / $2b
 tsbfc	!tx "bad char for a moB"	; 44 / $2c
 ;	    "array not found	; 45 / $2d (pt 7)
 tsbf0	!tx "bad modE"		; 32 / $20
-
+	!by 0
 ; ----------------------------------------- 
 ; 887d
 serrout	txa

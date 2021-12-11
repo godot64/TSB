@@ -65,11 +65,11 @@ fnjoy	ldy #$00		; set $dc00
 	jmp sxyflp3	; $8CCB
 
 ; ----------------------------------------- 
-
+;
 tabjoy	!by $6e,$66,$67,$65,$6d,$69,$6b,$6a
 
 ; ----------------------------------------- func POT
-; 891a			original
+; 8917			original
 fnpot	jsr $aefa		; sys "("?
 	jsr sgetadr2
 	jsr $aef7		; sys ")"?
@@ -83,19 +83,17 @@ fnpot	jsr $aefa		; sys "("?
 	jmp sxyflp	; convert to float
 
 ; ----------------------------------------- func PENX
-; 893a			original
-
+; 8934			original
 fnpenx	jsr penabfr
 	ldy lpx		; lightpen x
 	jmp +
 
 ; ----------------------------------------- func PENY
-; 8943			original
-
+; 893d			recoded
 fnpeny	ldy lpy		; lightpen y (do first: PENX!)
 +	ldx #0
 	jmp sxyflp
-
+; 8945
 penabfr	lda $d019
 	and #8		; wait for strobe
 	beq penabfr
@@ -109,7 +107,7 @@ penabfr	lda $d019
 	rts
 
 ; ----------------------------------------- 
-; 896a
+; 8961
 trace1	lda $d3		; save cursor
 	pha
 	lda $d5
@@ -161,7 +159,7 @@ trace1	lda $d3		; save cursor
 -	rts
 
 ; ----------------------------------------- 
-; 89bd
+; 89b4
 trace3	lda #$20
 	ldy $d3
 --	sta ($d1),y
@@ -169,7 +167,7 @@ trace3	lda #$20
 	bcs -
 	iny
 	bne --
-; 89ca
+; 89c1
 trace2	jsr $bdc9		; sys out: line # (.x/.a)
 	lda $39
 	ldx $3a
@@ -186,7 +184,7 @@ trace2	jsr $bdc9		; sys out: line # (.x/.a)
 	lda #$20
 tr2	ldy $49
 	and #$7f
-; 89ec
+; 89e3
 tr1	jsr $ab47		; sys out char in .a
 	cmp #$22		; string?
 	bne tr0
@@ -224,12 +222,12 @@ tr0	iny
 	bmi tr1
 	jsr trace4
 	bmi tr2
-; 8a34
+; 8a2b
 trace4	ldx #$a0		; sys address of basic commands
 	stx $21
 	ldx #$9e
 	stx $20
-; 8a3c
+; 8a33
 trace7	sty $49
 	tax
 	ldy #0
@@ -257,7 +255,7 @@ tr3	iny
 	nop
 
 ; ----------------------------------------- 
-; 8a67
+; 8a5e
 sirqplay	lda musicz4	; from sirq5
 	beq sip0
 	dec musicz2
@@ -410,21 +408,22 @@ sip10	lda mfreq+1
 	rts
 
 ; ----------------------------------------- 
-; 8b8e
+; 8b85
 mregs	!by $00,$07,$0e
-
+; 8b88
 nottab	!by $43,$c3,$44,$c4,$45,$46,$c6,$47,$c7,$41,$c1,$42,$5a
 	!by $ac,$b1,$bb,$a5,$b0,$bf,$bc
-
+; 8b9c
 frqtabl	!by $12,$23,$34,$46,$5a,$6e,$84,$9b
 	!by $b3,$cd,$e9,$06,$00,$23,$46,$5a
 	!by $84,$b3,$e9,$06
+; 8baf
 frqtabh	!by $01,$01,$01,$01,$01,$01,$01,$01
 	!by $01,$01,$01,$02,$00,$01,$01,$01
 	!by $01,$01,$01,$02
 
 ; ----------------------------------------- 
-; 8bcd
+; 8bc4
 stimmein	ldy #6
 	ldx stimmenr
 	lda srtab,x	; sustain/release
@@ -441,7 +440,7 @@ stimmein	ldy #6
 	rts
 
 ; ----------------------------------------- bef GRAPHICS
-; 8bea			new
+; 8be1			new
 befgraphics
 	ldx #<namehsg	; load high speed graphics
 	ldy #>namehsg
@@ -455,7 +454,7 @@ befgraphics
 +	jmp iffail1
 
 ; ----------------------------------------- New LOAD/SAVE
-; 8c02
+; 8bf9			new
 sysload	ldy drive
 	sty $ba
 	jsr chrgot	; more?
@@ -463,7 +462,7 @@ sysload	ldy drive
 	jsr bloadadr	; yes, get bload adr
 +	lda #0
 	jmp $f4a5		; sys LOAD
-; 8c13
+; 8c0a
 syssave	ldy drive
 	sty $ba
 	jmp $f5ed		; sys SAVE
@@ -473,7 +472,7 @@ syssave	ldy drive
 loadsave	!wo sysload,syssave
 
 ; ----------------------------------------- 
-; 8c1e
+; 8c15
 cold2	ldy #3
 -	lda loadsave,y
 	sta $0330,y	; sys set vectors
@@ -482,7 +481,7 @@ cold2	ldy #3
 	rts
 
 ; ----------------------------------------- Check Drive Presence
-; 8c2a
+; 8c21
 chkdrv	lda #$0f		; open 15, dr, 15
 	tay
 	ldx drive
@@ -497,7 +496,7 @@ chkdrv	lda #$0f		; open 15, dr, 15
 -	rts
 
 ; ----------------------------------------- 
-; 8c44
+; 8c3b
 safeopen	jsr sopen
 	bcc -
 
@@ -505,7 +504,7 @@ err05	ldx #5		; drive not ready
 	jmp ($0300)
 
 ; ----------------------------------------- 
-; 8c4e
+; 8c45
 mobexs	lda $d01d
 	ora mbittabs,x
 	sta $d01d
@@ -527,13 +526,13 @@ mobeyl	lda $d017
 	rts
 
 ; ----------------------------------------- 
-; 8c76
+; 8c6d
 sclose	jsr $ffcc		; sys clrch
 	lda #1
 	jmp $ffc3		; sys close 1
 
 ; ----------------------------------------- 
-; 8c7e
+; 8c75
 sgetstr1	lda portspei
 	pha
 	jsr sgetstr
@@ -544,7 +543,7 @@ sgetstr1	lda portspei
 	rts
 
 ; ----------------------------------------- Arithmetical Expression
-; 8c90			enhanced
+; 8c87			enhanced
 sgetari	lda #0
 	sta $0d
 	jsr chrget
@@ -561,7 +560,7 @@ fromat	bcs +		; 8c94
 +	jmp csgetari1	; yes: tsb
 
 ; ----------------------------------------- 
-; 8cae
+; 8ca5
 chhexchr	jsr chrget	; get next char, is digit?
 	bcc ++		; yes, ok
 ; 8cb3
@@ -574,20 +573,20 @@ ishex	cmp #"g"		; no, beyond "f"?
 	rts
 +	clc		; ok (is hexdigit)
 ++	rts
-; 8cbf
+; 8cb6
 err25	pla
 	pla
 	ldx #$25		; error "not hex char"
 	jmp ($0300)
-; (24)
+
 ; ----------------------------------------- func %
-; 8cc6
+; 8cbd
 getbin	jsr getdouble
 	jsr bincon
 	ldy $a8
 
 ; ----------------------------------------- to Float
-; 8cce
+; 8cc5
 sxyflp3	ldx #0
 sxyflp	sty $63		; lo
 	stx $62		; hi
@@ -596,11 +595,11 @@ sxyflp2	ldx #$90
 	jmp $bc49		; sys convert to float
 
 ; ----------------------------------------- func $
-; 8cda
+; 8cd1
 gethex	ldx #0
 	stx $a5
 	jsr getdouble	; check wether $$, returns .y=1
-; 8ce1
+; 8cd8
 hcon0	jsr dec7a
 
 hexcon	jsr onebyte	; first two digits of hex value
@@ -613,25 +612,25 @@ hexcon	jsr onebyte	; first two digits of hex value
 	jmp hcon0		; loop for 2nd two digits
 
 hcon1	jmp sxyflp
-; (29)
+
 ; ----------------------------------------- 
-; 8cf7
+; 8cee
 onebyte	jsr chhexchr	; hi nibble digit valid?
 	bcs err25		; no, error
 	tay
 	jsr chhexchr	; lo nibble digit valid?
 	bcs err25
 	jmp hex2w		; yes, convert to byte
-; (43)
+
 ; ----------------------------------------- 
-; 8d05
+; 8cfc
 l8d02	jsr sbzply
 	ldy #2		; found prog end?
 	lda (progz),y
 	beq +		; yes, to RTS
 	ldy #5
 --	jsr sbzply
-; 8d13
+; 8d0a
 sfordo	jsr schdo		; search for DO
 	cmp #0		; found line end?
 	beq l8d02		; continue search
@@ -648,7 +647,7 @@ sfordo	jsr schdo		; search for DO
 +	rts
 
 ; ----------------------------------------- 
-; 8d2a
+; 8d21
 hex2w	inc $a5		; inc byte counter
 	jsr hexw		; convert .a und .y to byte...
 	sta zwisp2
@@ -667,9 +666,9 @@ hexw	sec		; make value from digit
 	bcc +
 	sbc #7
 +	rts
-; (30)
+
 ; ----------------------------------------- func EXOR
-; 8d48			original
+; 8d3f			original
 fnexor	jsr $aefa		; sys "("?
 	jsr sgetadr2
 	sty $aa
@@ -686,7 +685,7 @@ fnexor	jsr $aefa		; sys "("?
 	jmp sxyflp
 
 ; ----------------------------------------- func DUP
-; 8d6b			original
+; 8d5f			original
 fndup	jsr $aefa		; sys "("?
 	jsr sgetstr1	; get string to copy
 	ldy $69		; len
@@ -740,13 +739,13 @@ fndup	jsr $aefa		; sys "("?
 	jmp pushstr
 
 ; ----------------------------------------- 
-; 8dd7
+; 8dc8
 err14	ldx #$0e		; error "illegal quantity"
 	jmp ($0300)
 jerr23	jmp err23		; error "string too large"
 
 ; ----------------------------------------- 
-; 8ddc
+; 8dd0
 csgetari1	jsr chrget
 	tay
 	jsr chrget
@@ -773,7 +772,7 @@ csgetari1	jsr chrget
 	bne csgetari2
 
 ; ----------------------------------------- func FRAC
-; 8dfc			enhanced
+; 8df0			enhanced
 fnfrac	ldy #0
 	jsr sxyflp3
 	jsr $bc0c		; sys fac->arg
@@ -796,7 +795,7 @@ fnfrac	ldy #0
 +	jmp $bc1b		; sys runden fac
 
 ; ----------------------------------------- 
-; 8e33
+; 8e24
 getdouble	ldy #1
 	cmp (progz),y
 	beq +
@@ -808,13 +807,13 @@ getdouble	ldy #1
 	jmp enhexbin	; func %%/$$
 
 ; ----------------------------------------- 
-; 8e48
+; 8e37
 csgetari2	cpy #$10		; PLACE?
 	beq fnplace
 	jmp csgetari3
 
 ; ----------------------------------------- func PLACE
-; 8e4f			original
+; 8e3e			original
 fnplace	jsr $aefa		; sys "("?
 	jsr sgetstr1
 	sta $a8
@@ -856,13 +855,13 @@ fnplace	jsr $aefa		; sys "("?
 	jmp --
 
 ; ----------------------------------------- 
-; 8eac
+; 8e98
 csgetari3	cpy #$5b		; INSERT?
 	beq fninsert
 	jmp csgetari4
 
 ; ----------------------------------------- func INSERT
-; 8eb3			recoded
+; 8e9f			recoded
 fninsert	jsr $aefa		; sys "("?
 	jsr sgetstr1
 	sta $a8		; 1st string
@@ -882,7 +881,7 @@ fninsert	jsr $aefa		; sys "("?
 	lda strlen2	; len of result string
 	adc strlen1
 	bcc +
-
+; 8ecf
 err22	ldx #$22		; error "insert too large"
 	!by $2c
 err23	ldx #$23		; error "string too large"
@@ -929,12 +928,12 @@ err23	ldx #$23		; error "string too large"
 	jmp pushstr
 
 ; ----------------------------------------- 
-; 8f3d
+; 8f26
 colsout	jsr $ff5b
 	jmp tsbcols
 
 ; ----------------------------------------- 
-; 8f43
+; 8f2c
 frominsrt	jsr sgetstrn
 	jmp basromau
 	
@@ -948,7 +947,7 @@ frominsrt	jsr sgetstrn
 	!by 0,0,0,0,0
 
 ; ----------------------------------------- 
-; 8f45
+; 8f5f
 idiv	lda #0
 	sta idivrest
 	sta idivrest+1
@@ -981,12 +980,12 @@ idiv	lda #0
 	rts
 
 ; ----------------------------------------- 
-; 8f8a
+; 8fa4
 csgetari4	cpy #$53		; DIV?
 	bne csgetari5
 
 ; ----------------------------------------- func DIV
-; 8f8e			original
+; 8fa8			original
 fndiv	jsr $aefa		; sys "("?
 	jsr sgetadr2
 	sta idivdend+1
@@ -1002,12 +1001,12 @@ fndiv	jsr $aefa		; sys "("?
 	jmp sxyflp
 
 ; ----------------------------------------- 
-; 8fb8
+; 8fcf
 csgetari5	cpy #$52		; MOD?
 	bne csgetari6
 
 ; ----------------------------------------- func MOD
-; 8fbc			original
+; 8fd3			original
 fnmod	jsr $aefa		; sys "("?
 	jsr sgetadr2
 	sta idivdend+1
@@ -1023,12 +1022,12 @@ fnmod	jsr $aefa		; sys "("?
 	jmp sxyflp
 
 ; ----------------------------------------- 
-; 8fe6
+; 8ffa
 csgetari6	cpy #$59		; LIN?
 	bne csgetari7
 
 ; ----------------------------------------- func LIN
-; 8fea			original
+; 8ffe			original
 fnlin	sec
 	jsr $fff0		; sys plot
 	txa
@@ -1037,12 +1036,12 @@ fnlin	sec
 	jmp sxyflp
 
 ; ----------------------------------------- 
-; 8ff8
+; 9009
 csgetari7	cpy #$58		; TEST?
 	bne csgetari8
 
 ; ----------------------------------------- func TEST
-; 8ffc			original
+; 900d			original
 fntest	jsr $aefa		; sys "("?
 	jsr sgetadr2
 	sty $09
@@ -1063,13 +1062,13 @@ fntest	jsr $aefa		; sys "("?
 	jmp sxyflp
 
 ; ----------------------------------------- 
-; 902c
+; 903a
 csgetari8	cpy #$57		; INST?
 	beq fninst
 	jmp csgetari9
 
 ; ----------------------------------------- func INST
-; 9033			enhanced
+; 9041			enhanced
 fninst	jsr $aefa		; sys "("?
 	jsr sgetstr1
 	sta $a8
@@ -1122,23 +1121,23 @@ fninst	jsr $aefa		; sys "("?
 	jmp pushstr
 
 ; ----------------------------------------- 
-; 90a4			enhanced
+; 90af			enhanced
 csgetari9	cpy #$56		; INKEY?
 	bne csgetaria
 
 ; ----------------------------------------- func INKEY
-; 90a8			original
+; 90b3			original
 	ldy inkey
 	jmp sxyflp3
 
 ; ----------------------------------------- 
-; 90b1
+; 90b9
 csgetaria	cpy #$5c		; POT?
 	bne csgetarib
 	jmp fnpot
 
 ; ----------------------------------------- 
-; 90b8
+; 90c0
 csgetarib	cpy #$5d		; PENX?
 	bne csgetaric
 	jmp fnpenx
@@ -1155,7 +1154,7 @@ csgetarid	cpy #$61		; GRAPHICS?
 	bne csgetarie
 
 ; ----------------------------------------- 
-; 90ca			original
+; 90d2			original
 fngraphics
 	ldx #$d0		; =$d000
 cga0	ldy #$00
@@ -1167,29 +1166,29 @@ csgetarie	cpy #$60		; SOUND?
 	bne csgetarif
 
 ; ----------------------------------------- 
-; 90d8			original
+; 90dd			original
 fnsound	ldx #$d4		; =$d400
 	bne cga0
 
 ; ----------------------------------------- 
-; 90dc
+; 90e1
 csgetarif	cpy #$67		; NRM?
 	bne csgetarig
 	jmp fnnrm
 
 ; ----------------------------------------- 
-; 90e3
+; 90e8
 csgetarig	cpy #$28		; AT?
 	bne csgetarih
 	jmp fnat
 
 ; ----------------------------------------- 
-; 90ea
+; 90ef
 csgetarih	cpy #$7c		; CHECK?
 	bne csgetarii	; no
 
 ; ----------------------------------------- func CHECK
-; 90ee			recoded
+; 90f3			recoded
 fncheck	jsr $aefa		; sys "("?
 	jsr sgetadr2	; get sprite#
 	sty pos
@@ -1213,13 +1212,13 @@ fncheck	jsr $aefa		; sys "("?
 -
 +	ldy #1
 	jmp sxyflp3
-; 9123
+; 9125
 wdetect	lda detecterg
 	and mbittabs,y
 	rts
 
 ; -----------------------------------------
-; 912a
+; 912c
 ++	jsr $aef7		; sys ")"?
 
 	ldy pos		; sprite #x
@@ -1228,36 +1227,36 @@ wdetect	lda detecterg
 	bne --		; ja, return 0
 
 ; ----------------------------------------- 
-; 9137
+; 9139
 csgetarii	cpy #$7d		; DISPLAY?
 	bne csgetarij
 
 ; ----------------------------------------- func DISPLAY
-; 913b
+; 913d
 fndisplay	ldx video		; returns video address
 	bne cga0		; normally uncond. branch
 
 ; ----------------------------------------- 
-; 9140
+; 9142
 csgetarij	!fill 5,$ea	; extendible here /w new functions
 			; like: CMP #xx, bne csgetarik,...
 
 ; ----------------------------------------- ERR entry
-; 9148			recoded
+; 9147			recoded
 fnerr	jsr dec7a
 	ldy #0
 	jsr errnln	; "n" (errn)?	
 	beq cerrn
 
 ; ----------------------------------------- func ERRLN
-; 914f
+; 9151
 cerrln	cmp #$4c		; no, "l" (errln)?
 	beq +
 
 -	jmp endsmb
 
 ; ----------------------------------------- func ERRN 
-; 9156
+; 9158
 cerrn	ldy errn
 	ldx #0
 	beq ++
@@ -1271,13 +1270,13 @@ cerrn	ldy errn
 	jmp sxyflp
 
 ; ----------------------------------------- sub 
-; 916e
+; 9170
 errnln	jsr chrget
 	cmp #$4e
 	rts
 
 ; ----------------------------------------- 
-; 9174
+; 9176
 ;
 ; End of part 2
 ;
