@@ -1282,12 +1282,8 @@ wanykey	lda $cb		; any key?
 	lda #1
 +	rts
 
-; ----------------------------------------- 
-; c7ed
-	!by 0,0
-
 ; ----------------------------------------- part of OUT
-; c7ef
+; c7ed
 outx	jsr chrget	; anything following?
 	beq +		; no
 
@@ -1297,6 +1293,7 @@ outx	jsr chrget	; anything following?
 	ldx #$80		; yes, indicate as wrong
 +	txa
 	bmi outx0		; and skip
+	beq outx0		; also when error is 0
 
 	cmp #$20		; no, 32 or more?
 	bcs +
