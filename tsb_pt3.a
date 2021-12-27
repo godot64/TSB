@@ -907,9 +907,9 @@ befflash	jsr flashinit	; color (or ON/OFF) in .x
 	bne bms0
 
 ; ----------------------------------------- func AT
-; 97b8			original
+; 97b8			enhanced
 fnat	jsr sgetbyt1
-	cpx #40
+	cpx #40		; check limits (40/25)
 	bcs +
 	txa
 	pha
@@ -1545,7 +1545,7 @@ ren1	lda $2b		; get basic start
 	jmp ren2		; b9df
 
 ; ----------------------------------------- bef AUTO
-; 9bd4			original
+; 9bd4			enhanced
 befauto	jsr get10010	; any parameters?
 	beq aut1
 	jsr sfrmnum	; yes, get start value...

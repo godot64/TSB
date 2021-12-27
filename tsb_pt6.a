@@ -351,10 +351,10 @@ ren2	ldy #0		; find PRG end
 
 ; ----------------------------------------- 
 
-	!by 0
+	!by 0,0,0
 
 ; ----------------------------------------- 
-; b9f0
+; b9f2
 open14	jsr sclose	; ### shorter!
 	lda #1		; open 1,4
 	ldx #4
@@ -365,7 +365,7 @@ open14	jsr sclose	; ### shorter!
 	jmp $ffc9
 
 ; ----------------------------------------- bef COPY
-; ba04			recoded
+; ba06			recoded
 befcopy	jsr incbasbz
 	lda xmaxlow
 	pha
@@ -443,8 +443,7 @@ cploop1	lda #160
 
 	lda #$0f		; close printer
 	jsr bsout
-	lda #$0d
-	jsr bsout
+	jsr return
 	jsr sclose
 
 	pla		; restore
@@ -853,8 +852,7 @@ befmem	ldy #1		; commands following?
 ; bdaf
 memnrml	lda #$cc		; video now at $cc00
 	sta video
-	lda #$93		; clr/home
-	jsr bsout
+	jsr clear		; clr/home
 
 	jsr charen0
 	lda #$d0		; open char generator
@@ -885,7 +883,7 @@ memnrml	lda #$cc		; video now at $cc00
 	jmp setbmode	; at a035: set bad mode to PLACE & RENUMBER
 
 ; ----------------------------------------- bef DETECT
-; bdf1			original
+; bdef			original
 befdetect	jsr sgetbytn
 	stx detectart
 	lda $d01e,x
@@ -893,7 +891,7 @@ befdetect	jsr sgetbytn
 	jmp endsmb
 
 ; ----------------------------------------- bef DISPLAY
-; be00			original
+; bffe			original
 befdisplay
 	jsr incbasbz
 dpl2	ldx #0
@@ -960,13 +958,13 @@ nxkey	jsr quote		; end of text: out quote
 	jmp endsmb
 
 ; ----------------------------------------- 
-; be7a
+; be78
 textkey	!tx "key",0
 textchr	!tx "chr$(13)",0
 
 ; ----------------------------------------- 
-; be87
-	!by 0,0,0,0,0,0,0,0	; 66 bytes free
+; be85
+	!by 0,0,0,0,0,0,0,0	; 72 bytes free
 	!by 0,0,0,0,0,0,0,0
 	!by 0,0,0,0,0,0,0,0
 	!by 0,0,0,0,0,0,0,0
@@ -974,10 +972,10 @@ textchr	!tx "chr$(13)",0
 	!by 0,0,0,0,0,0,0,0
 	!by 0,0,0,0,0,0,0,0
 	!by 0,0,0,0,0,0,0,0
-	!by 0,0
+	!by 0,0,0,0,0,0,0,0
 
 ; ----------------------------------------- part of LIST/PAGE
-; bec9
+; becd
 slist3	php		; .a: current byte in BASIC code
 	sty $c5fe		; save .y
 	stx $c5ff		; save .x
@@ -1027,10 +1025,8 @@ pge0	jsr $ffe1		; wait: STOP?
 	lda #0		; switch off crsr
 	tay
 	sta $d4
-	lda #$93		; clr/home
-	jsr bsout
--	lda #$20		; space
-	jsr bsout
+	jsr clear		; clr/home
+-	jsr leerzch	; space
 	lda $0244,y	; out last line number
 	cmp #$20
 	beq +

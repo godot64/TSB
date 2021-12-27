@@ -734,8 +734,7 @@ fend	cmp #$14		; del?
 
 ; ----------------------------------------- 
 
-foutall	lda #$20		; sys out space (switch crsr off)
-	jsr bsout
+foutall	jsr leerzch	; sys out space (switch crsr off)
 
 foutcr	ldx helpvec
 	lda #$0d
@@ -781,20 +780,20 @@ crsrdel	lda $d4
 back2call	rts
 
 ; ----------------------------------------- 
-; b136
+; b134
 fcursor	!by $04,$9d,$92,$20,$12	; rvs on, space, rvs off, crsr lft
 	!by $9d,$9d,$20		; space, crsr lft, crsr lft
 
 ; ----------------------------------------- 
-; b13e
+; b13c
 fetchtab	!by $05,$11,$12,$13,$1c,$1d,$1e,$1f	; all these 26 get skipped
 	!by $90,$91,$92,$93,$94,$9c,$9d,$9e	; (color codes, crsr, rvs, home)
 	!by $9f,$8d,$81,$95,$96,$97,$98,$99
 	!by $9a,$9b
 
 ; ----------------------------------------- 
-; b158
-	!by 0,0,0
+; b156
+	!by 0,0,0,0,0
 
 ; ----------------------------------------- part of CALL
 ; b15b
@@ -1300,19 +1299,19 @@ usel0	txa
 
 ; ----------------------------------------- 
 ; b4b7
-	!by 0,0,0,0,0,0,0,0	; 24 bytes
+	!by 0,0,0,0,0,0,0,0	; 26 bytes
 	!by 0,0,0,0,0,0,0,0
 	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0
 
 ; ----------------------------------------- bef HRDCPY
-; b4cf			enhanced
+; b4d3			enhanced
 befhrdcpy	jsr incbasbz
 
 	jsr open14
 
-	lda #$0d		; sys out linefeed
-	jsr bsout
-; b4da
+	jsr return	; sys out linefeed
+; b4dc
 	lda $0288		; video ram ($cc after MEM!)
 	sta $21
 	lda #$00
@@ -1368,8 +1367,7 @@ hdy2	cmp #$22		; is quote?
 
 +	ldy #0		; yes, next row
 	jsr l20pl40
-	lda #$0d		; send cr
-	jsr bsout
+	jsr return	; send cr
 	inx
 	cpx #25		; all rows?
 	bne -		; no, loop

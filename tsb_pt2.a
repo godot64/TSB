@@ -685,7 +685,7 @@ fnexor	jsr $aefa		; sys "("?
 	jmp sxyflp
 
 ; ----------------------------------------- func DUP
-; 8d5f			original
+; 8d5f			enhanced
 fndup	jsr $aefa		; sys "("?
 	jsr sgetstr1	; get string to copy
 	ldy $69		; len
@@ -719,7 +719,7 @@ fndup	jsr $aefa		; sys "("?
 
 	ldx dwert		; get factor
 	ldy #0
-	sty helpvec		; count full len
+	sty helpvec	; count full len
 -	lda ($20),y	; copy from original...
 	sty helpvec+1
 	ldy helpvec
@@ -1153,7 +1153,7 @@ csgetaric	cpy #$5f		; PENY?
 csgetarid	cpy #$61		; GRAPHICS?
 	bne csgetarie
 
-; ----------------------------------------- 
+; ----------------------------------------- func GRAPHICS
 ; 90d2			original
 fngraphics
 	ldx #$d0		; =$d000
@@ -1165,7 +1165,7 @@ cga0	ldy #$00
 csgetarie	cpy #$60		; SOUND?
 	bne csgetarif
 
-; ----------------------------------------- 
+; ----------------------------------------- func SOUND
 ; 90dd			original
 fnsound	ldx #$d4		; =$d400
 	bne cga0
