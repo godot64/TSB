@@ -15,6 +15,7 @@
 ; patched on 18.07.2021 (LIST)
 ; patched on 22.11.2021 (LOCALTAB optimized)
 ; patched on 29.11.2021 (added hold DIR output on keypress)
+; patched 0n 29.12.2021 (bugfix in INST: forced PRG mode)
 ;
 ; ----------------------------------------- 
 
@@ -1618,16 +1619,16 @@ loadext	stx helpvec
 	lda #7		; yes, set 7 chars
 	jsr $ffbd		; sys setnam
 	lda #1		; LOAD "name",dr,1
-	ldx $be		; drive
+	ldx drive		; get tsb drive
 	tay
 	jsr $ffba		; sys setlfs
 	lda #0
-	bit $9d		; force prog mode
-	sta $0201
-	bmi +
-	nop
-	nop
-+	jmp $f4a5		; sys LOAD
+	sta $9d		; force prog mode
+	jmp $f4a5		; sys LOAD
+
+; ----------------------------------------- 
+; ca44
+	!by 0,0,0,0,0,0,0	; 7 bytes
 
 ; ----------------------------------------- 
 ; ca4a
