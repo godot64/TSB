@@ -563,9 +563,9 @@ fromat	bcs +		; 8c94
 ; 8ca5
 chhexchr	jsr chrget	; get next char, is digit?
 	bcc ++		; yes, ok
-; 8cb3
+; 8caa
 ishex	cmp #"g"		; no, beyond "f"?
-	bcs +		; yes, not hex
+	bcs ++		; yes, not hex
 	cmp #"a"		; below "a"?
 	bcs +		; no, ok (is a-f)
 

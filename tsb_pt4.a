@@ -1208,15 +1208,15 @@ befpause	jsr chrget
 
 ; ----------------------------------------- 
 ; a829
-	!by 0,0,0,0,0,0,0,0	; 9 bytes
-	!by 0
+	!by 0,0,0,0,0,0,0,0	; 16 bytes
+	!by 0,0,0,0,0,0,0,0
 
 ; ----------------------------------------- bef NRM
-; a830			enhanced
+; a837			enhanced
 befnrm	jsr nrm00
 	jmp nrm2
 
-; a836
+; a83d
 nrm00	lda #4		; video at $0400
 	sta video
 	lda #$c7		; VIC bank 0 ($0000)
@@ -1232,7 +1232,7 @@ nrm	sta $d018		; entry for CSET
 	rts
 
 ; ----------------------------------------- bef MOB OFF
-; a855			original
+; a85c			original
 befmoboff	jsr sgetbytn
 	lda $d015
 	and mbittabl,x
@@ -1240,7 +1240,7 @@ befmoboff	jsr sgetbytn
 +	jmp endsmb
 
 ; ----------------------------------------- bef OFF
-; a864			enhanced
+; a86b			enhanced
 endflash	jsr dec7a
 befoff	ldx #0
 -	lda flashing
@@ -1254,16 +1254,13 @@ befoff	ldx #0
 	jmp bef0
 
 ; ----------------------------------------- bef ARC
-; a87d			enhanced
+; a884			enhanced
 befarc	jsr arc1
 	lda strz1
 	sta $a8
 	lda strz2
 	sta $a9
-	lda #$0a
-	sta $21
-	jsr kreis1
-	jmp endsmb
+	jmp doarc
 
 ; ----------------------------------------- 
 ; a894
@@ -1610,7 +1607,7 @@ befangl	jsr incbasbz
 	jsr sgetbytc
 	stx kry
 	jsr getpktf
-	lda #$0a
+doarc	lda #$0a
 	sta $21
 	jsr kreis1
 	jmp endsmb
