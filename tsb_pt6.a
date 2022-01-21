@@ -1608,7 +1608,7 @@ befinst	ldx #<nameext	; load "tsb.ext"
 ; ca1f
 nrm3	jsr kerromein
 	cli
-	jmp $ce6c		; repair CHRGET
+	jmp $ce6c		; repair CHRGET (inside DOS Wedge!)
 
 ; ----------------------------------------- 
 ; ca26
@@ -1628,11 +1628,12 @@ loadext	stx helpvec
 
 ; ----------------------------------------- 
 ; ca44
-	!by 0,0,0,0,0,0,0	; 7 bytes
+version	!tx "2.20121"	; Version Number
+	!by $0d
 
 ; ----------------------------------------- 
-; ca4a
-signature	!tx "ad'86"
+; ca4b
+signature	!tx "ad86"	; Signature
 
 ; ----------------------------------------- 
 ; ca4f

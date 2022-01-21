@@ -1453,9 +1453,9 @@ befuntil	jsr incbasbz
 ; ----------------------------------------- bef RETRACE
 ; 9b47			new
 befretrace
-	lda #<signature	; out "ad'86"
-	ldx #>signature
-	ldy #5
+	lda #<version	; out "ad86"
+	ldx #>version
+	ldy #12
 	jmp trc1		; retc0 
 
 ; ----------------------------------------- 
@@ -1955,7 +1955,7 @@ swm1	lda $3d
 	ldy $3e
 	sta savecont
 	sty savecont+1
-	rts
+-	rts		; - label from chkfchlen!
 
 ; ----------------------------------------- bef NO ERROR
 ; 9e95			original
@@ -1999,41 +1999,33 @@ befout	jsr basromei
 	jmp outx
 
 ; ----------------------------------------- bef OLD
-; 9edc			original
-befold	lda #4
-	sta $20
-	lda $2c
-	sta $21
-	ldy #0
--	jsr inc20
-	lda ($20),y
-	bne -
-	jsr inc20
-	lda $20
-	sta ($2b),y
-	iny
-	lda $21
-	sta ($2b),y
-	dey
+; 9edc			recoded
+befold	jsr basromei	; basic ein
 	lda #1
-	sta $2d
--	ldx #3
---	jsr inc20
-	lda ($20),y
-	bne -
-	dex
-	bne --
-	jsr inc20
-	lda $20
-	sta $31
-	lda $21
-	sta $32
-	ldx #3
--	lda $2f,x
-	sta $2d,x
-	dex
-	bpl -
-	jmp bef0
+	tay
+	sta ($2b),y
+	jsr $a533		; rechain lines             
+	txa
+	adc #02
+	sta $2d		; set start of basic variables
+	lda $23
+	jsr $a655		; sys: CLR
+	jmp $a474   	; sys: Ready.
+
+; ----------------------------------------- 
+; 9ef4
+chkfchlen	jsr sgetbytc	; get len
+	cpx #89		; too long?
+	bcc -
+	jmp err14		; yes: illegal quantity
+
+; -----------------------------------------
+; 9efe
+	!by 0,0,0,0,0,0,0,0	; 35 bytes
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0
 
 ; ----------------------------------------- bef RCOMP
 ; 9f21			original
