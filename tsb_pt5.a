@@ -587,8 +587,8 @@ beffetch	jsr sgetstrn	; get ctrl string and its len
 	sta $21
 	lda $69
 	sta fetchlen	; store len of ctrl string
-	jsr sgetbytc
-	stx fetchanz	; get max len
+	jsr chkfchlen	; get (and check) len
+	stx fetchanz	; get len (max 88)
 	jsr schkcom
 	jsr stestdirm	; check for direct mode
 	jsr crsrout	; show cursor
