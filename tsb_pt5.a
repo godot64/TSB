@@ -10,10 +10,11 @@
 ; patched on 13.01.2021 (commands KEY & VOL)
 ; patched on 25.01.2021 (added parts of FASTCALL)
 ; patched on 19.03.2021 (bugfix in EXEC)
-; patched on 03.04.2021 (commands CSET)
+; patched on 03.04.2021 (command CSET)
 ; patched on 25.08.2021 (make OPEN independent from drive number)
 ; patched on 22.11.2021 (command HRDCPY: optimized)
 ; patched on 07.12.2021 (minor change at INSERT)
+; patched on 20.02.2022 (commands SCRLD/SCRSV, by P. Hagemann)
 ; 
 ; ----------------------------------------- 
 
@@ -829,107 +830,105 @@ use1a	jsr use3		; get USE parameters (b3e2)
 	jsr sclrch
 	jmp endsmb
 
-; ----------------------------------------- bef SCRSV
-; b191			recoded
-befscrsv	jsr intro
-	ldx $b8		; file#
-	jsr $ffc9
-	tya
-	jsr bsout
-	lda $fc
-	jsr bsout
-	lda #$d2		; set (ff)d2= bsout to distributor
-; b1a4
-ss1	sta $f8
-	ldx #32		; 32 pages (bitmap)
-	bit $fa
-	bmi ss0
-	ldx #4		; 4 pages (video/colors)
-; b1ae
-ss0	bit $fa		; check sa
-	bmi ss4
-
-	lda ($fd),y	; sa=2: get video bytes
-	jsr distr		; process
-	sta ($fd),y	; and restore
-	lda ($fb),y
-	sec
-	bcs ss2		; and color bytes too
-; b1be
-ss4	sei		; sa=3:
-	lda #$34
-	sta pport		; pixel aus bitmap holen
-	lda ($fb),y
-	pha
-	lda #$36
-	sta pport
-	cli
-	pla
-; b1cc
-ss2	jsr distr
-	sta ($fb),y
-	iny
-	bne ss3
-	inc $fc
-	inc $fe
-	dex		; count pages
-	bne ss3
-	beq ss5
-
 ; ----------------------------------------- bef SCRLD
-; b1dd			recoded
+; b191
 befscrld	jsr intro
+	stx $b5		; store hibyte
 	ldx $b8		; file#
 	jsr $ffc6		; chkin
 	jsr $ffcf		; skip load address
 	jsr $ffcf
-	lda #$cf		; (ff)cf= basin
+	lda #$cf		; set (ff)cf= basin to distributor
 	bne ss1
+	
+; ----------------------------------------- bef SCRSV
+; b1a5			recoded by Peter Hagemann
+befscrsv	jsr intro
+	stx $b5		; Startadr. High merken
+	ldx $b8		; file#
+	jsr $ffc9		; CHKOUT
+	tya		; $00 = Low-Byte Startadresse
+	jsr bsout
+	lda $b5		; und High-Byte Startadresse schreiben
+	jsr bsout	
+	lda #$d2		; set (ff)d2= bsout to distributor
+; b1ba
+ss1	sta $f8
+ss0	bit $fa		; check sa, V an bei sa= 3 oder 5
+	bvc color
+; b1c0
+	ldx #32		; 3/5: 32 pages (bitmap)
+	lda $b5		; Hi-Byte Bitmap ($e0 oder gePOKEt)
+	jsr bloop		; Bitmap Subr. an $9efe
+	bne ss5		; Status: Fehler?
+	bit $fa
+	bmi ss5		; nur Bitmap? (wenn sa=3)
+; b1cd	
+color	lda $f7		; nein, $04 (bei Text), $c0 (bei Grafik) oder gePOKEt
+	sta $fc
+	ldx #4		; Anzahl Pages
+; b1d3
+col	lda ($fd),y	; Farb-RAM
+	jsr distr		; process
+	sta ($fd),y	; and restore
+	lda ($fb),y	; Video-RAM
+	jsr distr		; process
+	sta ($fb),y	; and restore
+	iny
+	bne col
+	inc $fc
+	inc $fe
+	dex	    	; count pages
+	beq ss5
+	lda status	; nach 256 Bytes
+	beq col
 
 ; ----------------------------------------- 
 ; b1ef
-ss3	lda #$c3		; (ff)c3= close (vorsichtshalber)
-	bit status
-	beq ss0
 ss5	jsr $ffcc		; clrch
 	lda $b8		; file#
 	jsr $ffc3		; close
 	jmp endsmb
 
-; ----------------------------------------- 
-
+; ----------------------------------------- 	
+; b1fa
 distr	jmp ($00f8)
 
 ; ----------------------------------------- 
-; b203
+; b1fd
+-	tax		; hibyte (to $b5)
+	bit $fa
+	bvs +   		; V-Flag = 1: Grafik
+	bvc ++		;          0: Text
+
+; ----------------------------------------- 
+; b204
 intro	jsr incbasbz
 	jsr safeopen
 	ldy #$00
-	sty $fb		; fb: 0400/e000
-	sty $fd		; fd: d800
-	lda $b9		; sa 2 or 3:
-	ror		; 1 - 1
-	ror		; 0 - 128
-	sta $fa		; set sa flag
-	bmi ss6
-; b217  (change b218 for charsets and so)
+	sty $fb		; fb/fc: 0400/c000/e000
+	sty $fd 		; fd/fe: d800
+	lda $b9		; sa: 2 (lores) or 3 or 5 (hires bitmap, hires+color):
+	ror
+	ror	
+	ror	    	; Flags N/V: 10 (2) - 11 (3) - 01 (5)
+	sta $fa 		; set saflag
+; b217  			(change $b218 for 2K charsets, 2nd half)
 	lda #$d8		; $d800
 	sta $fe
-; b21b  (change b21c after MEM!)
-	lda #$04		; $0400
-	bne ss7
-ss6	lda #$e0		; $e000
-ss7	sta $fc
-	lda #$ff
-	sta $f9		; 00f8: ff(cf/d2)
+; b21b 			(change $b21c to $cc for videoram after MEM!)	
+	lda #$04		; videoram text merken für Startadresse
+	bne - 		; uncond. branch
+; b21f 			(change $b220 for any 8K RAM area)
++	ldx #$e0		; default start address Hires
+	lda #$c0		; Videoram bei Hires
+++	sta $f7 		; merken
+	lda #$ff		; Verteiler Hibyte
+	sta $f9		; (an $00f8): $ff(cf/d2)
 	rts
 
-; ----------------------------------------- 
-
-	!by 0
-
 ; ----------------------------------------- bef TEXT
-; b229			original
+; b22a			original
 beftext	jsr incbasbz
 	jsr sgetadr
 	sty $09
@@ -1049,7 +1048,7 @@ txl1	eor $6a
 txl2	jmp txloop
 
 ; ----------------------------------------- bef CSET
-; b30d			original
+; b30e			original
 befcset	jsr sgetbytn
 	txa
 	beq +
@@ -1072,18 +1071,14 @@ befcset	jsr sgetbytn
 	sta gmemflag
 	bne -
 
-; ----------------------------------------- 
-
-	!by 0,0
-
 ; ----------------------------------------- bef VOL
-; b339			enhanced
+; b338			enhanced
 befvol	jsr chkonoff
 	stx $d418
 	jmp endsmb
 
 ; ----------------------------------------- 
-; b342
+; b341
 txcont	pla
 	sta chgr
 	pla
@@ -1098,7 +1093,7 @@ txcont	pla
 	beq +
 
 ; ----------------------------------------- bef DISK
-; b356			recoded
+; b355			recoded
 befdisk	jsr chkdrv	; is drive there? 
 	jsr sgetstrn	; yes, get string
 	lda $69
@@ -1125,7 +1120,7 @@ befdisk	jsr chkdrv	; is drive there?
 +	jmp endsmb	; no, end command
 
 ; ----------------------------------------- main part of USE
-; b38e			recoded
+; b38d			recoded
 use7	ldx #0		; clear current
 	ldy $44
 -	cpy $43		; compare to len
@@ -1176,12 +1171,12 @@ usel3	ldy $bd
 	bne --
 
 ; ----------------------------------------- 
-; b3dd
+; b3dc
 err11	ldx #$0b		; error "syntax"
 	jmp ($0300)
 
 ; ----------------------------------------- 
-; b3e2
+; b3e1
 use3	jsr sgetstr	; get ctrl string
 	lda $69		; len=0?
 	beq err11		; yes, syntax error
@@ -1192,7 +1187,7 @@ use3	jsr sgetstr	; get ctrl string
 	nop
 
 ; ----------------------------------------- 
-; b3ef
+; b3ee
 	ldy #0
 use5	sty $44		; current char in ctrl string
 useloop	jsr mkoutstr
@@ -1252,11 +1247,11 @@ usel5	jsr usel6
 	jmp useloop
 
 ; ----------------------------------------- 
-; b46b
+; b46a
 userdy	jmp useready
 
 ; ----------------------------------------- 
-; b46e
+; b46d
 mkoutstr	ldy $44		; index to current char
 	cpy $43		; = len?
 	beq userdy	; yes, ready
@@ -1298,11 +1293,11 @@ usel0	txa
 	rts		; no, leave it
 
 ; ----------------------------------------- 
-; b4b7
-	!by 0,0,0,0,0,0,0,0	; 26 bytes
+; b4b6
+	!by 0,0,0,0,0,0,0,0	; 29 bytes
 	!by 0,0,0,0,0,0,0,0
 	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0
+	!by 0,0,0,0,0
 
 ; ----------------------------------------- bef HRDCPY
 ; b4d3			enhanced
