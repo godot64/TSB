@@ -1105,23 +1105,23 @@ pge6	lda ($20),y	; out command word
 	jmp slist2	; to sys LIST
 
 ; ----------------------------------------- bef ERROR
-; bfba			new
+; bfba	new (code by D. Temme, 64'er 11/1984)
 beferror	jsr chrget
 	cmp #$b0		; next char is token of OR?
 	beq flpmsg
 	jmp swarm		; no, error bad mode
 
 flpmsg	jsr chkdrv	; is drive there? 
-flpmsg2	lda $ba		; and set
-	jsr $ffb4		; sys talk
+flpmsg2	lda drive		; and set
+	jsr $ffb4		; sys: talk
 	lda #$6f
 	sta $b9
-	jsr $ff96		; sys send sa after talk
--	jsr $ffa5		; sys read from IEC
+	jsr $ff96		; sys: send sa after talk
+-	jsr $ffa5		; sys: read from IEC
 	jsr bsout		; and out
 	cmp #$0d		; until cr
 	bne -
-	jsr $ffab		; sys send untalk
+	jsr $ffab		; sys: send untalk
 	jmp bef0
 
 ; ----------------------------------------- bef MOD
