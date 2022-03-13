@@ -937,14 +937,22 @@ colsout	jsr $ff5b
 frominsrt	jsr sgetstrn
 	jmp basromau
 	
-; ----------------------------------------- 
+; ----------------------------------------- Part of Warmstart
+; 8f32
+endcheck	jsr basromei
+	txa		; any error?
+	bpl +
+	lda #0		; no, clear on error flag
+	sta onerrorflag
++	rts
 
+; ----------------------------------------- 
+; 8f3e
+	!by 0,0,0,0,0,0,0,0		; 25 Bytes
 	!by 0,0,0,0,0,0,0,0
 	!by 0,0,0,0,0,0,0,0
 	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0
+	!by 0
 
 ; ----------------------------------------- 
 ; 8f5f

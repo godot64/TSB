@@ -1969,7 +1969,7 @@ befnoerr	lda #0
 swarm	ldx #$20		; bad mode
 warmstart	stx errn
 
-	jsr basromei
+	jsr endcheck
 	lda onerrorflag	; on error active?
 	cmp #10
 	beq +

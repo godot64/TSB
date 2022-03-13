@@ -1630,7 +1630,7 @@ loadext	stx helpvec
 ; ca44
 version	!tx "ad86"	; Signature
 	!by $0d
-	!tx "2.20220"	; Version Number
+	!tx "2.20313"	; Version Number
 
 ; ----------------------------------------- 
 ; ca4f
