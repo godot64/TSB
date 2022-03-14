@@ -25,6 +25,7 @@
 ; patched on 29.11.2021 (added hold DIR output on keypress)
 ; patched on 07.12.2021 (BFLASH now starts immediately)
 ; patched on 20.02.2022 (added to SCRLD/SCRSV sa: 5, by P. Hagemann)
+; patched on 13.03.2022 (bugfix in warmstart caused by ON ERROR/END)
 ;
 ; ----------------------------------------- 
 

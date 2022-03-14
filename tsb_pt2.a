@@ -12,6 +12,7 @@
 ; patched on 20.04.2021 (bugfix in func $)
 ; patched on 04.05.2021 (bugfix in func CHECK)
 ; patched on 07.12.2021 (optimized)
+; patched on 13.03.2022 (bugfix in warmstart caused by ON ERROR/END)
 ;
 ; ----------------------------------------- 
 
