@@ -616,15 +616,15 @@ blockzei	ldx ay
 	sta $09
 	lda ax
 	sta $a4
-	lda #$ff
+	lda #$ff		; set flag: don't colorize
 	sta gflag
-	jsr punkt
+	jsr punkt		; check if x/y-values are plausible
 	lda #0
-	sta gflag
+	sta gflag		; reset flag
 	lda status
 	cmp #8
 	bne +
-	jmp swarm		; error bad mode
+	jmp swarm		; error: bad mode (not plausible)
 
 +	sec
 	lda $a8
@@ -1630,7 +1630,7 @@ loadext	stx helpvec
 ; ca44
 version	!tx "ad86"	; Signature
 	!by $0d
-	!tx "2.20313"	; Version Number
+	!tx "2.20324"	; Version Number
 
 ; ----------------------------------------- 
 ; ca4f

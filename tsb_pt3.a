@@ -26,6 +26,7 @@
 ; patched on 07.12.2021 (BFLASH now starts immediately)
 ; patched on 20.02.2022 (added to SCRLD/SCRSV sa: 5, by P. Hagemann)
 ; patched on 13.03.2022 (bugfix in warmstart caused by ON ERROR/END)
+; patched on 24.03.2022 (LOW COL par 3)
 ;
 ; ----------------------------------------- 
 
@@ -197,62 +198,62 @@ dodone	bcs +		; DONE?
 ; ----------------------------------------- 
 ; 9294
 -	lda #$08		; nicht plausibel
-	sta $90
+	sta status
 	rts
 
 ; ----------------------------------------- set dot
 ; 9299			original
 punkt	clc
 	lda $09		; plausibel?
-	sbc xmaxlow
+	sbc xmaxlow	; x>319?
 	lda $0a
 	sbc xmaxhigh
-	bcs -
-	lda $a4
+	bcs -		; ja, Fehler
+	lda $a4		; y>199?
 	cmp #200
-	bcs -
+	bcs -		; ja, Fehler
 
-	lda multijn
+	lda multijn	; multi?
 	beq +
-	asl $09		; double x if multi
+	asl $09		; yes, double x
 	rol $0a
 +	lda $09
 	and #$07
-	tax
-	lda $a4		; y
+	tax		; .x used in setdots (below)
+	lda $a4		; y AND 7 (rasterline in tile)
 	and #$07
 	sta $63
-	lda $09
+	lda $09		; x AND 248
 	and #$f8
 	sta $09
 
-	lda $f7		; color
-	cmp #$0b		; 11=test
+	lda $f7		; current color
+	cmp #$0b		; 11=test (if yes, skip colorize)
 	beq +
-	lda lowcolflag	; no, low col?
+	lda lowcolflag	; LOW COL active? (no, then skip)
 	beq +
-	lda gflag		; no, block?
+	lda gflag		; BLOCK active? (yes, then skip)
 	bne +
 
-	lda $a4		; no, then test
+	lda $a4		; save y-pos
 	pha
-	lda $09
+	lda $09		; save x-pos
 	pha
 	lda $0a
 	pha
-	jsr farbset
+	jsr farbset	; colorize
 	pla
-	sta $0a
+	sta $0a		; restore x-pos
 	pla
 	sta $09
 	pla
-	sta $a4
+	sta $a4		; restore y-pos
 
-+	lda $a4		; lookup address
++	lda $a4		; compute address
 	lsr
 	lsr
 	lsr
-	tay
+	tay		; y-pos/8
 	clc
 	lda gadrtabl,y
 	adc $63
@@ -262,21 +263,21 @@ punkt	clc
 	adc $0a
 	sta $a9
 	ldy #0
-	sty $90
-	jsr kerromaus	; kernel off
-	lda gflag
-	beq +
-	rts
+	sty status
+	jsr kerromaus	; kernal off
+	lda gflag		; BLOCK active?
+	beq +		; no, set dots
+	rts		; yes, leave
+
+; ----------------------------------------- set dots
+; 930f
++	lda multijn	; now set dots, hires?
+	beq sethires
+	jmp setmulti	; no, go to multi (9a7a)
 
 ; ----------------------------------------- 
 
 	!by 0
-
-; ----------------------------------------- set dots
-; 9310
-+	lda multijn	; now set dots, hires?
-	beq sethires
-	jmp setmulti	; no, go to multi (9a7a)
 
 ; ----------------------------------------- set hires dots
 ; 9318
@@ -289,7 +290,7 @@ sethires	lda $f7		; hires, get color source
 	jmp ptest1	; a261	
 
 ; 9327
-hset0	inx
+hset0	inx		; inx: for multi double pixels
 hset	lda ($a8),y
 	ora gbittabs,x
 	sta ($a8),y
@@ -320,6 +321,7 @@ befline	jsr getxyxyf
 line0	jsr linzei
 	jmp endsmb
 
+; ----------------------------------------- 
 ; 935b
 getxyxyf	jsr incbasbz
 	jsr sgetadr	; start x
@@ -327,6 +329,8 @@ getxyxyf	jsr incbasbz
 	sty ax
 	jsr sgetbytc	; start y
 	stx ay
+
+; ----------------------------------------- 
 ; 936d
 getxyf	jsr schkcom	; comma?
 gxyf0	jsr sgetadr	; end x
@@ -335,13 +339,16 @@ gxyf0	jsr sgetadr	; end x
 	jsr sgetbytc	; end y
 	stx ey
 
+; ----------------------------------------- 
+
 getpktf	jsr sgetbytc	; draw mode
 	stx $f7
 	rts
 
-; 9385
+; ----------------------------------------- 
+; 9385			optimized
 farbset	jsr kerromein
-	lda $09		; x/8
+	lda $09		; x-pos/8 ( -> Kacheloffset in Zeile )
 	lsr
 	ror $0a
 	ror $09
@@ -353,59 +360,55 @@ farbset	jsr kerromein
 	lsr
 	ror $0a
 	ror $09
-	lsr $a4		; y/8
+	lsr $a4		; y-pos/8...
 	lsr $a4
 	lsr $a4
-	jsr a4mal40
+	jsr a4mal40	; mal 40 (Start der Kachelzeile)
 
-	clc		; compute color address
+	clc		; Start plus Offset = Kacheladresse
 	lda $a4
 	adc $09
 	sta $a8
-	sta $aa
 	lda $a5
 	adc $0a
 	sta $a9
 	sta $ab
-	clc
-	lda $a8
-	adc #$00		; in $c000:
-	sta $a8
+; 93b5
+	clc		; Low Col: Farben 1 und 2
 	lda $a9
-	adc #$c0
+	adc #$c0		; in $c000
 	sta $a9
 	ldy #0
-	lda lcfarb12	; low col color 1 and 2
+	lda lcfarb12
 	sta ($a8),y
 
+	lda lcfarb3	; Low Col: Farbe 3
+	bmi +		; (>127? dann nichts tun)
+	pha
 	clc
-	lda $aa
-	adc #$00
-	sta $a8
 	lda $ab
-	adc #$d8		; and in $d800:
+	adc #$d8		; in $d800
 	sta $a9
-	lda lcfarb3	; low col color 3
+	pla
 	sta ($a8),y
-	rts
++	rts
 
 ; ----------------------------------------- bef LOW COL
-; 93de			original
-beflowcol	jsr sgetbytn
-	stx lcfarb12
-	asl lcfarb12
-	asl lcfarb12
-	asl lcfarb12
-	asl lcfarb12
-	jsr sgetbytc
-	txa
-	ora lcfarb12
+; 93d4			optimized
+beflowcol	jsr get2nyb
 	sta lcfarb12
 	lda #10
 	sta lowcolflag
 	jsr sgetbytc
 	stx lcfarb3
 	jmp endsmb
+
+; ----------------------------------------- 
+; 93e8
+	!by 0,0,0,0,0,0,0,0		; 32 bytes gain
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
 
 ; ----------------------------------------- 
 ; 9408
@@ -520,7 +523,6 @@ l20pl40	clc
 	sta $21
 	rts
 
-; ----------------------------------------- 
 ; ----------------------------------------- 
 ; 94dd			optimized
 l23pl40	clc
