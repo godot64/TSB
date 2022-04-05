@@ -27,6 +27,7 @@
 ; patched on 20.02.2022 (added to SCRLD/SCRSV sa: 5, by P. Hagemann)
 ; patched on 13.03.2022 (bugfix in warmstart caused by ON ERROR/END)
 ; patched on 24.03.2022 (LOW COL par 3)
+; patched on 05.04.2022 (command CENTRE: new option)
 ;
 ; ----------------------------------------- 
 
@@ -1083,12 +1084,8 @@ sirq5	lda playflag
 	sta $ff
 	jmp $ea31		; sys IRQ
 
-; ----------------------------------------- 
-; 98ee
-shwerttab	!by $00,$01,$08,$09
-
 ; ----------------------------------------- bef PAGE
-; 98f2			enhanced
+; 98ee
 befpage	jsr chkonoff
 	txa		; OFF?
 	beq +++		; yes, set flag
@@ -1147,22 +1144,27 @@ chk4key	jsr $ffe1		; STOP?
 	beq -		; yes, leave
 	jmp wanykey
 
-; ----------------------------------------- 
-; 994c
-	!by 0,0,0
-
 ; ----------------------------------------- bef CENTRE
-; 994f			enhanced
-befcentre	jsr sgetstrn
-	clc
-	lda #40
-	sbc $69		; halve len
-	sta $6a
-	lsr $6a
+; 994c
+befcentre	jsr gcentpar
++	sec
+	sbc helpvec+2
+	bmi +
+	lsr
+	tax
+	beq +
+	
 	lda #$1d		; sys out CRSR right
 -	jsr bsout
-	dec $6a
+	dex
 	bne -
+
++	ldx helpvec
+	lda helpvec+1
+	stx $22
+	sta $23
+	lda helpvec+2
+	sta $69
 
 -	jsr basromei	; now sys out string
 	lda $69
@@ -1191,14 +1193,11 @@ cold1	lda #8
 befenvelope
 	jsr sgetbytn
 	jsr x123
-	dex
 	stx $a6
-	jsr iskomma
-	jsr get2nyb
+	jsr get2nybc
 	lda $aa
 	sta $a8
-	jsr iskomma
-	jsr get2nyb
+	jsr get2nybc
 	asl $a6
 	ldx $a6
 	lda sidtab,x
@@ -1228,6 +1227,7 @@ flinend	jsr chrget
 
 ; ----------------------------------------- 
 ; 99cb
+get2nybc	jsr iskomma
 get2nyb	jsr sgetbytn
 get2nyb2	jsr xnyb
 	stx $aa
@@ -1254,7 +1254,6 @@ cgoto0	jsr sfrmnum
 ; 99f6			original
 befwave	jsr sgetbytn
 	jsr x123
-	dex
 	stx $aa
 	jsr schkcom
 	jsr bincon
@@ -1326,6 +1325,7 @@ x123	cpx #4
 	bcs towarm
 	cpx #0
 	beq towarm
+	dex
 	rts
 
 towarm	pla

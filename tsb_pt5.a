@@ -15,6 +15,7 @@
 ; patched on 22.11.2021 (command HRDCPY: optimized)
 ; patched on 07.12.2021 (minor change at INSERT)
 ; patched on 20.02.2022 (commands SCRLD/SCRSV, by H. Haberl)
+; patched on 05.04.2022 (command CENTRE: new option)
 ; 
 ; ----------------------------------------- 
 
@@ -1292,12 +1293,22 @@ usel0	txa
 	beq usel0		; yes, store
 	rts		; no, leave it
 
-; ----------------------------------------- 
+; ----------------------------------------- Part of CENTRE
 ; b4b6
-	!by 0,0,0,0,0,0,0,0	; 29 bytes
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0
+gcentpar	jsr sgetstrn
+	stx helpvec
+	sta helpvec+1
+	lda $69
+	sta helpvec+2
+	ldx #40
+	jsr chrgot
+	beq +
+	jsr sgetbytc
++	txa
+	cmp #40
+	bne +
+	sbc $d3
++	rts
 
 ; ----------------------------------------- bef HRDCPY
 ; b4d3			enhanced

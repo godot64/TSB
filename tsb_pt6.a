@@ -1296,7 +1296,7 @@ outx	jsr chrget	; anything following?
 	bcs +
 	asl		; no, sys errors
 	tax
-	lda $a326,x	; sys addresses of sys errors
+	lda $a326,x	; sys: addresses of sys errors
 	sta $22
 	lda $a327,x
 	sta $23
@@ -1404,7 +1404,7 @@ renum0	sta ay+1		; .a: step (hi)
 	jmp ren1		; 9bca (21)
 
 renum1	tay
-	lda $2b		; get start of basic prog
+rnn1	lda $2b		; get start of basic prog
 	ldx $2c
 	sta $a8
 	stx $a9
@@ -1413,14 +1413,15 @@ renum1	tay
 ; ----------------------------------------- 
 ; c8d4
 ren4	ldy #0
-	lda $2b
-	ldx $2c
-	sta $a8
-	stx $a9
+	jsr rnn1
 	jmp rbnc		; ce8d
 
+; ----------------------------------------- 
+
+shwerttab	!by $00,$01,$08,$09
+
 ; ----------------------------------------- func NRM
-; c8e1
+; c8e0
 fnnrm	jsr $aefa		; sys check "("
 	jsr sgetstr1
 	lda #0
@@ -1453,7 +1454,7 @@ fnnrm	jsr $aefa		; sys check "("
 
 ; ----------------------------------------- 
 
-	!by 0,0,0
+	!by 0,0,0,0
 
 ; ----------------------------------------- 
 ; c921
@@ -1630,7 +1631,7 @@ loadext	stx helpvec
 ; ca44
 version	!tx "ad86"	; Signature
 	!by $0d
-	!tx "2.20324"	; Version Number
+	!tx "2.20405"	; Version Number
 
 ; ----------------------------------------- 
 ; ca4f
@@ -1687,7 +1688,6 @@ byte1	jsr chrget	; next char: decimal digit?
 
 ; ----------------------------------------- Part of bef LOCAL
 ; caa8 (former address ca7f)
-;	!by $f8,$38,$4e,$52 (former content)
 
 localtab	!fill 88
 
