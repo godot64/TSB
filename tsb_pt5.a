@@ -16,6 +16,7 @@
 ; patched on 07.12.2021 (minor change at INSERT)
 ; patched on 20.02.2022 (commands SCRLD/SCRSV, by H. Haberl)
 ; patched on 05.04.2022 (command CENTRE: new option)
+; patched on 16.04.2022 (command FETCH: complies with RVS mode)
 ; 
 ; ----------------------------------------- 
 
@@ -661,7 +662,7 @@ floop	jsr $ffe4		; sys get key
 fdelete	ldx helpvec	; no input yet?
 	beq floop		; yes, loop
 
-	ldx #7
+	ldx #6
 	jsr crsrdel
 	dec helpvec
 	bpl floop
@@ -739,7 +740,6 @@ fend	cmp #$14		; del?
 foutall	jsr leerzch	; sys out space (switch crsr off)
 
 foutcr	ldx helpvec
-	lda #$0d
 	jmp spuf0cr	; out all
 
 ; ----------------------------------------- Checks
@@ -767,35 +767,37 @@ legal	txa
 notinit	jmp ftcont	; no, check against next one
 
 ; ----------------------------------------- 
-
-crsrout	ldx fcursor	; crsr out
+; b11b
+crsrout	ldx #3		; crsr out
 crsrdel	lda $d4
 	pha
+	lda $c7		; store rvs flag (to helper)
+	sta int
 	lda #0		; crsr off
 	sta $d4
--	lda fcursor,x
-	jsr bsout
-	dex
-	bne -
+	jsr showcrsr
 	pla
 	sta $d4
 back2call	rts
 
 ; ----------------------------------------- 
-; b134
-fcursor	!by $04,$9d,$92,$20,$12	; rvs on, space, rvs off, crsr lft
-	!by $9d,$9d,$20		; space, crsr lft, crsr lft
+; b12f
+fcursor	!by $9d,$92,$20,$12	; rvs on, space, rvs off, crsr lft
+	!by $9d,$9d,$20	; space, crsr lft, crsr lft
+; b136
+rcursor	!by $9d,$12,$20,$92	; rvs off, space, rvs on, crsr lft
+	!by $9d,$9d,$20	; space, crsr lft, crsr lft
 
 ; ----------------------------------------- 
-; b13c
+; b13d
 fetchtab	!by $05,$11,$12,$13,$1c,$1d,$1e,$1f	; all these 26 get skipped
 	!by $90,$91,$92,$93,$94,$9c,$9d,$9e	; (color codes, crsr, rvs, home)
 	!by $9f,$8d,$81,$95,$96,$97,$98,$99
 	!by $9a,$9b
 
 ; ----------------------------------------- 
-; b156
-	!by 0,0,0,0,0
+; b157
+	!by 0,0,0,0			; 4 bytes
 
 ; ----------------------------------------- part of CALL
 ; b15b

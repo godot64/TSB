@@ -14,8 +14,9 @@
 ; patched on 14.04.2021 (commands PAUSE, BCKGNDS)
 ; patched on 03.05.2021 (command DUMP: optimized)
 ; patched on 06.05.2021 (added new command DRAW TO)
-; patched 0n 22.11.2021 (command LOCAL: bugfix)
+; patched on 22.11.2021 (command LOCAL: bugfix)
 ; patched on 29.11.2021 (added hold DIR output on keypress)
+; patched on 16.04.2022 (command FETCH: complies with RVS mode)
 ;
 ; ----------------------------------------- 
 
@@ -1203,20 +1204,27 @@ befpause	jsr chrget
 ; a81c
 	sty doflag
 	jsr chrget
-	beq +
+	beq +++
 	jmp whichdo
 
-; ----------------------------------------- 
-; a829
-	!by 0,0,0,0,0,0,0,0	; 16 bytes
-	!by 0,0,0,0,0,0,0,0
+; ----------------------------------------- Part of FETCH
+; a827
+showcrsr	lda int		; check rvs flag (in helper)
+	bne +
+	lda fcursor,x
+	bne ++
++	lda rcursor,x
+++	jsr bsout
+	dex
+	bpl showcrsr
+	rts
 
 ; ----------------------------------------- bef NRM
-; a837			enhanced
+; a83a			enhanced
 befnrm	jsr nrm00
 	jmp nrm2
 
-; a83d
+; a840
 nrm00	lda #4		; video at $0400
 	sta video
 	lda #$c7		; VIC bank 0 ($0000)
@@ -1232,15 +1240,15 @@ nrm	sta $d018		; entry for CSET
 	rts
 
 ; ----------------------------------------- bef MOB OFF
-; a85c			original
+; a85f			original
 befmoboff	jsr sgetbytn
 	lda $d015
 	and mbittabl,x
 	sta $d015
-+	jmp endsmb
++++	jmp endsmb
 
 ; ----------------------------------------- bef OFF
-; a86b			enhanced
+; a86e			enhanced
 endflash	jsr dec7a
 befoff	ldx #0
 -	lda flashing
@@ -1254,7 +1262,7 @@ befoff	ldx #0
 	jmp bef0
 
 ; ----------------------------------------- bef ARC
-; a884			enhanced
+; a887			enhanced
 befarc	jsr arc1
 	lda strz1
 	sta $a8
@@ -1263,7 +1271,7 @@ befarc	jsr arc1
 	jmp doarc
 
 ; ----------------------------------------- 
-; a894
+; a897
 arc1	jsr incbasbz
 	lda #0
 	sta drehsinn
@@ -1316,7 +1324,7 @@ getrxryf	jsr sgetbytc
 	jsr sgetbytc
 	stx kry
 	jsr getpktf
-; a91b
+; a91e
 kreis	lda #$13
 	sta $21
 	jsr kreis1
@@ -1324,7 +1332,7 @@ kreis	lda #$13
 	bne kreis1
 
 ; ----------------------------------------- Fallback from HIRES
-; a926
+; a929
 nrm01	lda video
 	cmp #$cc
 	bne +
@@ -1334,21 +1342,17 @@ nrm01	lda video
 	jsr nrm02
 	
 ; ----------------------------------------- Part of CSET
-; a935
+; a938
 csm0	ldx video
 	cpx #$cc		; is MEM active?
 	bne +
 	eor #$2c		; yes, change values accordingly
 +	jmp nrm
-; a941
+; a944
 csetmem	pha
 	jsr nrm01
 	pla
 	bne csm0
-
-; ----------------------------------------- 
-; a948
-	!by 0,0,0
 
 ; ----------------------------------------- 
 ; a94b
