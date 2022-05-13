@@ -1101,7 +1101,7 @@ befpage	jsr chkonoff
 	jmp endsmb
 
 ; ----------------------------------------- bef PLAY
-; 990c			recoded
+; 9908			recoded
 befplay	jsr chkonoff
 	txa		; OFF? (or PLAY 0?)
 	beq +		; yes, end music
@@ -1125,27 +1125,27 @@ befplay	jsr chkonoff
 --	jmp endsmb	; PLAY 2 or PLAY ON (PRG continues)
 
 ; ----------------------------------------- Part of FLASH
-; 9931
+; 992d
 flashactv	lda #10
 	sta flashsp	; Default-Speed: 10
 	sta flashfls,x	; Farbe aktivieren
 -	rts
 
 ; ----------------------------------------- from SOPEN
-; 993a
+; 9936
 newopen	jsr $e219		; sys get parameters
 	lda drive		; set drive
 	sta $ba
 	jmp $e1c1		; continue original routine
 
 ; ----------------------------------------- 
-; 9944
+; 9940
 chk4key	jsr $ffe1		; STOP?
 	beq -		; yes, leave
 	jmp wanykey
 
 ; ----------------------------------------- bef CENTRE
-; 994c
+; 9948
 befcentre	jsr gcentpar
 +	sec
 	sbc helpvec+2
@@ -1172,24 +1172,24 @@ befcentre	jsr gcentpar
 	beq --
 
 ; ----------------------------------------- part of TRACE
-; 996e
+; 9972
 trace5	lda ($5f),y
 	tax
 	jmp trace6
 
 ; ----------------------------------------- 
-; 9974
+; 9978
 rtc1	jsr incbasbz
 	bne -
 
 ; ----------------------------------------- 
-; 9979
+; 997d
 cold1	lda #8
 	sta drive
 	jmp cold2
 
 ; ----------------------------------------- bef ENVELOPE
-; 9980			original
+; 9984			original
 befenvelope
 	jsr sgetbytn
 	jsr x123
@@ -1219,14 +1219,14 @@ befenvelope
 	jmp endsmb
 
 ; ----------------------------------------- 
-; 99c3
+; 99c0
 flinend	jsr chrget
 	cmp #0
 	bne flinend
 	rts
 
 ; ----------------------------------------- 
-; 99cb
+; 99c8
 get2nybc	jsr iskomma
 get2nyb	jsr sgetbytn
 get2nyb2	jsr xnyb
@@ -1260,7 +1260,7 @@ befwave	jsr sgetbytn
 	jmp bwv0
 
 ; ----------------------------------------- 
-; 9a08
+; 9a07
 bincon	lda #0
 	sta $a6
 	sta $a8
@@ -1285,7 +1285,7 @@ bincon	lda #0
 	rts
 
 ; ----------------------------------------- 
-; 9a34
+; 9a33
 bwv0	asl $aa
 	ldy $aa
 	lda sidtab,y
@@ -1302,11 +1302,11 @@ bwv0	asl $aa
 	jmp endsmb
 
 ; ----------------------------------------- 
-; 9a53
+; 9a52
 sidtab	!wo $d400,$d407,$d40e
 
 ; ----------------------------------------- part of RETRACE
-; 9a59
+; 9a58
 dscbmout	ldy #0
 -	lda tuned,y
 	beq +
@@ -1316,7 +1316,7 @@ dscbmout	ldy #0
 +	jmp endsmb
 
 ; ----------------------------------------- 
-; 9a69
+; 9a68
 xnyb	cpx #16
 	bcs towarm
 	rts
