@@ -947,13 +947,20 @@ endcheck	jsr basromei
 	sta onerrorflag
 +	rts
 
-; ----------------------------------------- 
-; 8f3e
-	!by 0,0,0,0,0,0,0,0		; 25 Bytes
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0
+; ----------------------------------------- RESTORE for SCRLD/SCRSV
+; 8f3e by P. Hagemann
+scrsvrst	ldx #4
+	stx vramhi+1	; vram back to $0400
+	stx nvrbl+1	; 4 pages
+	ldx #$e0		; bitmap start at $e000
+	stx bmphi+1
+	ldx #$20		; 32 pages
+	stx nbmpbl+1
+	stx skipcr	; $20 = JSR
+	stx skipvr
+	stx skipslo
+	stx skipshi
+	jmp bef0
 
 ; ----------------------------------------- 
 ; 8f5f

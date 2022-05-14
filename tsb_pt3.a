@@ -337,7 +337,7 @@ getxyf	jsr schkcom	; comma?
 gxyf0	jsr sgetadr	; end x
 	sta ex+1
 	sty ex
-	jsr sgetbytc	; end y
+gyf0	jsr sgetbytc	; end y
 	stx ey
 
 ; ----------------------------------------- 

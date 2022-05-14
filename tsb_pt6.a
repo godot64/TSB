@@ -16,6 +16,7 @@
 ; patched on 22.11.2021 (LOCALTAB optimized)
 ; patched on 29.11.2021 (added hold DIR output on keypress)
 ; patched 0n 29.12.2021 (bugfix in INST: forced PRG mode)
+; patched 0n 13.05.2022 (command SCRLD/SV DEF added)
 ;
 ; ----------------------------------------- 
 
@@ -964,21 +965,57 @@ textkey	!tx "key",0
 textchr	!tx "chr$(13)",0
 
 ; ----------------------------------------- 
-; be85
-	!by 0,0,0,0,0,0,0,0	; 72 bytes free
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
+; be85 by P. Hagemann
+--	rts
+-	jmp scrsvrst
+
+scrsvplus	jsr chrget	; DEF follows?	
+	cmp #$8c		; Token for RESTORE?
+	beq -
+	cmp #$96		; Token for DEF?
+	bne --
+
+; ----------------------------------------- DEF after SCRLD/SV
+;be94 by P. Hagemann	
+defscrsv	jsr sgetbytn
+	stx helpvec	; Hibyte Ziel nach helpvec
+	txa
+	beq no
+	jsr sgetbytc	; Anzahl Pages in helpvec+1
+	stx helpvec+1
+
+	jsr gyf0		; get mode and sa
+	ldx helpvec
+	ldy helpvec+1
+	lda $f7		; sa 	     in $f7
+	ror		; 2 or 3/5 ?
+	bcs +		; odd?
+
+	stx vramhi+1	; Hibyte bei sa 2
+	sty nvrbl+1	; Pages
+
++	stx bmphi+1	; Hibyte bei 3/5
+	sty nbmpbl+1	; Pages
+
+	ldx ey		; Modus: 0,1,2
+	beq no		; Modus 0: nix ändern
+	lda #$2c		; sonst BIT schreiben
+	sta skipcr	; BIT: Colorram übergehen => nur Videoram
+	dex		; Modus 1: mit Startadresse
+	beq no		; Sonst (Modus >= 2)
+	sta skipslo	; BIT: ohne Startadresse
+	sta skipshi
+
+no	jmp endsmb	; Abschluss
+
+; ----------------------------------------- 
+
+	!by 0,0
 
 ; ----------------------------------------- part of LIST/PAGE
-; becd
+; becf
 slist3	php		; .a: current byte in BASIC code
-	sty $c5fe		; save .y
+	sty $fe		; save .y
 	stx $c5ff		; save .x
 	ldy $028d		; special key pressed
 	cpy #2		; C=?
@@ -1045,16 +1082,16 @@ pge3	ldx #>tabbef
 	cmp #$64		; sb token?
 	beq pge4		; yes
 
--	ldy $c5fe		; no, .y back
+-	ldy $fe		; no, .y back
 	ldx $c5ff		; .x back
 	jmp slist1	; to sys LIST
-; bf51
+; bf53
 pge4	ldx $d4		; SB token: crsr off?
 	cpx #0
 	bne -		; yes
 	ldy #0
 	sty $22		; init counter
-	ldy $c5fe		; .y back
+	ldy $fe		; .y back
 	iny
 	lda ($5f),y
 	tax
@@ -1098,7 +1135,7 @@ pge6	lda ($20),y	; out command word
 
 +	lda #$92		; rvs off
 	jsr bsout
-	ldy $c5fe		; .y back
+	ldy $fe		; .y back
 	iny
 	ldx $c5ff		; .x back
 	lda #2
@@ -1631,7 +1668,7 @@ loadext	stx helpvec
 ; ca44
 version	!tx "ad86"	; Signature
 	!by $0d
-	!tx "2.20416"	; Version Number
+	!tx "2.20513"	; Version Number
 
 ; ----------------------------------------- 
 ; ca4f

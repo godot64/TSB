@@ -17,6 +17,7 @@
 ; patched on 20.02.2022 (commands SCRLD/SCRSV, by H. Haberl)
 ; patched on 05.04.2022 (command CENTRE: new option)
 ; patched on 16.04.2022 (command FETCH: complies with RVS mode)
+; patched 0n 13.05.2022 (command SCRLD/SV DEF added)
 ; 
 ; ----------------------------------------- 
 
@@ -851,16 +852,16 @@ befscrsv	jsr intro
 	ldx $b8		; file#
 	jsr $ffc9		; CHKOUT
 	tya		; $00 = Low-Byte Startadresse
-	jsr bsout
+skipslo	jsr bsout
 	lda $b5		; und High-Byte Startadresse schreiben
-	jsr bsout	
+skipshi	jsr bsout	
 	lda #$d2		; set (ff)d2= bsout to distributor
 ; b1ba
 ss1	sta $f8
 ss0	bit $fa		; check sa, V an bei sa= 3 oder 5
 	bvc color
 ; b1c0
-	ldx #32		; 3/5: 32 pages (bitmap)
+nbmpbl	ldx #32		; 3/5: 32 pages (bitmap)
 	lda $b5		; Hi-Byte Bitmap ($e0 oder gePOKEt)
 	jsr bloop		; Bitmap Subr. an $9efe
 	bne ss5		; Status: Fehler?
@@ -869,13 +870,13 @@ ss0	bit $fa		; check sa, V an bei sa= 3 oder 5
 ; b1cd	
 color	lda $f7		; nein, $04 (bei Text), $c0 (bei Grafik) oder gePOKEt
 	sta $fc
-	ldx #4		; Anzahl Pages
+nvrbl	ldx #4		; Anzahl Pages
 ; b1d3
 col	lda ($fd),y	; Farb-RAM
-	jsr distr		; process
+skipcr	jsr distr		; process
 	sta ($fd),y	; and restore
 	lda ($fb),y	; Video-RAM
-	jsr distr		; process
+skipvr	jsr distr		; process
 	sta ($fb),y	; and restore
 	iny
 	bne col
@@ -906,7 +907,7 @@ distr	jmp ($00f8)
 
 ; ----------------------------------------- 
 ; b204
-intro	jsr incbasbz
+intro	jsr scrsvplus	; new: check for enhanced params
 	jsr safeopen
 	ldy #$00
 	sty $fb		; fb/fc: 0400/c000/e000
@@ -917,12 +918,13 @@ intro	jsr incbasbz
 	ror	    	; Flags N/V: 10 (2) - 11 (3) - 01 (5)
 	sta $fa 		; set saflag
 ; b217  			(change $b218 for 2K charsets, 2nd half)
-	lda #$d8		; $d800
+cramhi	lda #$d8		; $d800
 	sta $fe
 ; b21b 			(change $b21c to $cc for videoram after MEM!)	
-	lda #$04		; videoram text merken für Startadresse
+vramhi	lda #$04		; videoram text merken für Startadresse
 	bne - 		; uncond. branch
 ; b21f 			(change $b220 for any 8K RAM area)
+bmphi
 +	ldx #$e0		; default start address Hires
 	lda #$c0		; Videoram bei Hires
 ++	sta $f7 		; merken
