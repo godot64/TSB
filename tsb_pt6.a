@@ -979,25 +979,25 @@ scrsvplus	jsr chrget	; DEF follows?
 ;be94 by P. Hagemann	
 defscrsv	jsr sgetbytn
 	stx helpvec	; Hibyte Ziel nach helpvec
-	txa
-	beq no
 	jsr sgetbytc	; Anzahl Pages in helpvec+1
 	stx helpvec+1
 
 	jsr gyf0		; get mode and sa
-	ldx helpvec
+	ldx helpvec	; 1st par 0? (yes, don't set anything)
+	beq no
 	ldy helpvec+1
-	lda $f7		; sa 	     in $f7
+	lda $f7		; sa: in $f7
 	ror		; 2 or 3/5 ?
 	bcs +		; odd?
 
-	stx vramhi+1	; Hibyte bei sa 2
+	stx vramhi+1	; even: Hibyte bei sa 2
 	sty nvrbl+1	; Pages
+	jmp ++		; unbed. Sprung
 
-+	stx bmphi+1	; Hibyte bei 3/5
++	stx bmphi+1	; odd: Hibyte bei 3/5
 	sty nbmpbl+1	; Pages
 
-	ldx ey		; Modus: 0,1,2
+++	ldx ey		; Modus: 0,1,2
 	beq no		; Modus 0: nix ändern
 	lda #$2c		; sonst BIT schreiben
 	sta skipcr	; BIT: Colorram übergehen => nur Videoram
@@ -1007,10 +1007,6 @@ defscrsv	jsr sgetbytn
 	sta skipshi
 
 no	jmp endsmb	; Abschluss
-
-; ----------------------------------------- 
-
-	!by 0,0
 
 ; ----------------------------------------- part of LIST/PAGE
 ; becf
@@ -1668,7 +1664,7 @@ loadext	stx helpvec
 ; ca44
 version	!tx "ad86"	; Signature
 	!by $0d
-	!tx "2.20513"	; Version Number
+	!tx "2.20515"	; Version Number
 
 ; ----------------------------------------- 
 ; ca4f
