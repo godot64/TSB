@@ -1421,7 +1421,7 @@ trc1	sta $22
 
 ; ----------------------------------------- bef KEY
 ; b583			enhanced
-befkey	jsr chkonoff
+befkey	jsr keyget	; check for KEYGET (doesn't return if successful)
 	jsr chrgot	; get last byte
 	bne +
 	txa

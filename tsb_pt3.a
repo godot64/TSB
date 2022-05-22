@@ -185,25 +185,21 @@ clrhicols	sta $c000,y	; clear video ram
 	bne clrhicols
 	rts
 
-; ----------------------------------------- 
-; 928a
-	!by 0,0
-
 ; ----------------------------------------- part of DO
-; 928c
+; 928a
 dodone	bcs +		; DONE?
 	jmp befproc	; no, skip rest of line
 
 +	jmp docont	; b56a
 
 ; ----------------------------------------- 
-; 9294
+; 9292
 -	lda #$08		; nicht plausibel
 	sta status
 	rts
 
 ; ----------------------------------------- set dot
-; 9299			original
+; 9297			original
 punkt	clc
 	lda $09		; plausibel?
 	sbc xmaxlow	; x>319?
@@ -271,7 +267,7 @@ punkt	clc
 	rts		; yes, leave
 
 ; ----------------------------------------- set dots
-; 930f
+; 930d
 +	lda multijn	; now set dots, hires?
 	beq sethires
 	jmp setmulti	; no, go to multi (9a7a)
@@ -281,7 +277,7 @@ punkt	clc
 	!by 0
 
 ; ----------------------------------------- set hires dots
-; 9318
+; 9316
 sethires	lda $f7		; hires, get color source
 	beq herase
 	cmp #1
@@ -290,21 +286,21 @@ sethires	lda $f7		; hires, get color source
 	beq hinvert
 	jmp ptest1	; a261	
 
-; 9327
+; 9325
 hset0	inx		; inx: for multi double pixels
 hset	lda ($a8),y
 	ora gbittabs,x
 	sta ($a8),y
 	rts
 
-; 9330
+; 932e
 herase0	inx
 herase	lda ($a8),y
 	and gbittabl,x
 	sta ($a8),y
 	rts
 
-; 9339
+; 9337
 hinvert0	inx
 hinvert	lda ($a8),y
 	eor gbittabs,x
@@ -312,18 +308,18 @@ hinvert	lda ($a8),y
 	rts
 
 ; ----------------------------------------- 
-; 9342
+; 9340
 gbittabs	!by $80,$40,$20,$10,$08,$04,$02,$01
 gbittabl	!by $7f,$bf,$df,$ef,$f7,$fb,$fd,$fe
 
 ; ----------------------------------------- bef LINE
-; 9352			original
+; 9350			original
 befline	jsr getxyxyf
 line0	jsr linzei
 	jmp endsmb
 
 ; ----------------------------------------- 
-; 935b
+; 9359
 getxyxyf	jsr incbasbz
 	jsr sgetadr	; start x
 	sta ax+1
@@ -332,7 +328,7 @@ getxyxyf	jsr incbasbz
 	stx ay
 
 ; ----------------------------------------- 
-; 936d
+; 936b
 getxyf	jsr schkcom	; comma?
 gxyf0	jsr sgetadr	; end x
 	sta ex+1
@@ -347,7 +343,7 @@ getpktf	jsr sgetbytc	; draw mode
 	rts
 
 ; ----------------------------------------- 
-; 9385			optimized
+; 9383			optimized
 farbset	jsr kerromein
 	lda $09		; x-pos/8 ( -> Kacheloffset in Zeile )
 	lsr
@@ -374,7 +370,7 @@ farbset	jsr kerromein
 	adc $0a
 	sta $a9
 	sta $ab
-; 93b5
+; 93b3
 	clc		; Low Col: Farben 1 und 2
 	lda $a9
 	adc #$c0		; in $c000
@@ -395,7 +391,7 @@ farbset	jsr kerromein
 +	rts
 
 ; ----------------------------------------- bef LOW COL
-; 93d4			optimized
+; 93d2			optimized
 beflowcol	jsr get2nyb
 	sta lcfarb12
 	lda #10
@@ -404,12 +400,23 @@ beflowcol	jsr get2nyb
 	stx lcfarb3
 	jmp endsmb
 
-; ----------------------------------------- 
-; 93e8
-	!by 0,0,0,0,0,0,0,0		; 32 bytes gain
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
+; ----------------------------------------- Part of KEY
+; 93e6	KEYGET by P. Hagemann, v2.20521
+keyget	jsr chrget	; nächstes Zeichen holen
+	cmp #$a1		; GET-Token?
+	beq get
+	ldx #10		; no, continue KEY
+	jsr chkonoff+5
+	jmp befkey+3
+;15	
+;93f5
+get	ldx numkeys	; yes, Taste gedrückt?
+	beq get
+	jsr chrget
+	jsr pspeibe
+	jsr $ab7b   	; dann BASIC GET
+	jsr prestor
+	jmp endsmb	
 
 ; ----------------------------------------- 
 ; 9408
