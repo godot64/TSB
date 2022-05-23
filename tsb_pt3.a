@@ -326,18 +326,12 @@ getxyxyf	jsr incbasbz
 	sty ax
 	jsr sgetbytc	; start y
 	stx ay
-
-; ----------------------------------------- 
-; 936b
 getxyf	jsr schkcom	; comma?
 gxyf0	jsr sgetadr	; end x
 	sta ex+1
 	sty ex
 gyf0	jsr sgetbytc	; end y
 	stx ey
-
-; ----------------------------------------- 
-
 getpktf	jsr sgetbytc	; draw mode
 	stx $f7
 	rts
@@ -416,7 +410,7 @@ get	ldx numkeys	; yes, Taste gedrückt?
 	jsr pspeibe
 	jsr $ab7b   	; dann BASIC GET
 	jsr prestor
-	jmp endsmb	
+	jmp scd5		; Stack bereinigen, Ende	
 
 ; ----------------------------------------- 
 ; 9408
