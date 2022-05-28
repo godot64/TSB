@@ -28,6 +28,7 @@
 ; patched on 13.03.2022 (bugfix in warmstart caused by ON ERROR/END)
 ; patched on 24.03.2022 (LOW COL par 3)
 ; patched on 05.04.2022 (command CENTRE: new option)
+; patched on 21.05.2022 (new command KEYGET, enhanced on 28.05.22)
 ;
 ; ----------------------------------------- 
 
@@ -402,10 +403,11 @@ keyget	jsr chrget	; nächstes Zeichen holen
 	ldx #10		; no, continue KEY
 	jsr chkonoff+5
 	jmp befkey+3
-;15	
 ;93f5
-get	ldx numkeys	; yes, Taste gedrückt?
-	beq get
+get	ldx #0		; ### v2.20528
+	stx numkeys
+-	ldx numkeys	; yes, Taste gedrückt?
+	beq -
 	jsr chrget
 	jsr pspeibe
 	jsr $ab7b   	; dann BASIC GET
@@ -413,7 +415,11 @@ get	ldx numkeys	; yes, Taste gedrückt?
 	jmp scd5		; Stack bereinigen, Ende	
 
 ; ----------------------------------------- 
-; 9408
+
+	!by 0
+
+; ----------------------------------------- 
+; 940d
 kerromaus	sei
 	lda pport
 	and #$fd
@@ -421,14 +427,14 @@ kerromaus	sei
 	rts
 
 ; ----------------------------------------- 
-; 9410e
+; 9415
 kerromein	lda pport
 	ora #2
 	sta pport
 	rts
 
 ; ----------------------------------------- 
-; 9417
+; 941c
 sgetadr2	lda portspei
 	pha
 	jsr sgetadr
@@ -439,44 +445,46 @@ sgetadr2	lda portspei
 	rts
 
 ; ----------------------------------------- 
-; 9429
+; 942e
 sgetadr	jsr sfrmnum
 	jmp sfacadr
 
 ; ----------------------------------------- 
-; 942f
+; 9434
 gadrtabl	!by $00,$40,$80,$c0,$00,$40,$80,$c0
 	!by $00,$40,$80,$c0,$00,$40,$80,$c0
 	!by $00,$40,$80,$c0,$00,$40,$80,$c0
 	!by $00
-; 9448
+; 944d
 gadrtabh	!by $e0,$e1,$e2,$e3,$e5,$e6,$e7,$e8
 	!by $ea,$eb,$ec,$ed,$ef,$f0,$f1,$f2
 	!by $f4,$f5,$f6,$f7,$f9,$fa,$fb,$fc
 	!by $fe
 
 ; ----------------------------------------- 
-; 9461
+; 9466			optimized
 a4mal40	lda #0
-	sta $a5
+	asl $a4		; $a4 mal 8...
+	rol
 	asl $a4
-	rol $a5
+	rol
 	asl $a4
-	rol $a5
-	asl $a4
-	rol $a5
-	lda $a5
+	rol
+
+	sta $a5		; ...merken...
 	pha
 	lda $a4
 	pha
-	asl $a4
+
+	asl $a4		; ...mal 32...
 	rol $a5
 	asl $a4
 	rol $a5
-	clc
+
+	clc		; ...plus 8
 	pla
 	adc $a4
-	sta $a4
+	sta $a4		; Ergebnis in $a4/5
 	pla
 	adc $a5
 	sta $a5

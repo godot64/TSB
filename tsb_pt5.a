@@ -785,20 +785,21 @@ back2call	rts
 ; b12f
 fcursor	!by $9d,$92,$20,$12	; rvs on, space, rvs off, crsr lft
 	!by $9d,$9d,$20	; space, crsr lft, crsr lft
-; b136
-rcursor	!by $9d,$12,$20,$92	; rvs off, space, rvs on, crsr lft
-	!by $9d,$9d,$20	; space, crsr lft, crsr lft
-
 ; ----------------------------------------- 
-; b13d
+; b136
 fetchtab	!by $05,$11,$12,$13,$1c,$1d,$1e,$1f	; all these 26 get skipped
 	!by $90,$91,$92,$93,$94,$9c,$9d,$9e	; (color codes, crsr, rvs, home)
 	!by $9f,$8d,$81,$95,$96,$97,$98,$99
 	!by $9a,$9b
 
-; ----------------------------------------- 
+; ----------------------------------------- Part of DESIGN
 ; b157
-	!by 0,0,0,0			; 4 bytes
+usedesflg	inx
+	lda helpvec
+	beq +
+	jsr incbasbz
++	cpx #8
+	rts
 
 ; ----------------------------------------- part of CALL
 ; b15b

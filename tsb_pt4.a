@@ -310,20 +310,20 @@ befrot	jsr sgetbytn
 
 ; ----------------------------------------- bef CHAR
 ; a186			original
-befchar	jsr sgetadrn
+befchar	jsr sgetadrn	; x
 	sty $09
 	sta $0a
-	jsr sgetbytc
+	jsr sgetbytc	; y
 	stx $a4
 	jsr schkcom
-	jsr sgetadr
+	jsr sgetadr	; screen code
 	sty $ac
 	sta $ad
-	jsr getpktf
-	jsr sgetbytc
+	jsr getpktf	; color to $f7
+	jsr sgetbytc	; zoom
 	txa
 	bne +
-	ldx #1
+	ldx #1		; min: 1
 +	stx chgr
 	jsr charzei
 	jmp endsmb
@@ -335,92 +335,101 @@ sgetadrn	jsr incbasbz
 
 ; ----------------------------------------- 
 ; a1b6
-charzei	lda #0
-	sta drx
+charzei	ldy #0
 	jsr charen0
-	asl $ac
+	asl $ac		; scr code times 8
 	rol $ad
 	asl $ac
 	rol $ad
 	asl $ac
 	rol $ad
 	clc
-	lda #0
-	adc $ac
+	tya
+	adc $ac		; plus $d000 to ey (address of char)
 	sta ey
-	lda #$d0		; add $d000
+	lda #$d0
 	adc $ad
 	sta ey+1
-	lda #$00
-	sta $ac
-	sta $ad
+
+	sty drx		; init drx/ac/ad: = line index
+	sty $ad		; = char size (=1)
 	inc $ad
-	lda $09
+	lda #$80
+	sta $ac		; = bit index
+	lda $09		; x to ax
 	sta ax
 	lda $0a
 	sta ax+1
-	lda $a4
+	lda $a4		; y to ay
 	sta ay
 
--	ldy drx
-	lda $ac
-	and #7
-	tax
-	lda ey
+-	ldy drx		; line index (0: 1st line)
+	lda ey		; ey to fe/ff
 	sta $fe
 	lda ey+1
 	sta $ff
-	lda ($fe),y
-	and gbittabs,x
+	lda ($fe),y	; get char bit pattern
+	and $ac		; isolate bit
 	beq +
-	jsr punkt
+	jsr punkt		; if bit set: plot
 	jsr kerromein
-+	inc $ac
-	inc ax
++	lsr $ac		; proceed bit index
+	inc ax		; inc x
 	bne +
 	inc ax+1
-+	lda $ac
-	cmp #8
-	bne chz0
-	lda #0
++	lda $ac		; all bits through?
+	bne chz0		; no
+
+	lda #$80		; yes, reset bit index
 	sta $ac
 	clc
-	lda ax
+	lda ax		; ax back to start of line
 	sbc #7
 	sta ax
 	lda ax+1
 	sbc #0
 	sta ax+1
-	lda $ad
+
+	lda $ad		; size matches?
 	cmp chgr
-	bne +
-	inc drx
+	bne +		; no, stay in line
+	inc drx		; yes, inc drx to next line
 	lda #0
-	sta $ad
-+	inc ay
-	inc $ad
-	lda drx
+	sta $ad		; init size index to 1
++	inc ay		; inc ay
+	inc $ad		; inc size index
+	lda drx		; all lines through?
 	cmp #8
 	bne chz0
-	jmp charen1
+	jmp charen1	; yes, leave
 
-chz0	lda ax
+chz0	lda ax		; ax back to x
 	sta $09
 	lda ax+1
 	sta $0a
-	lda ay
+	lda ay		; ay back to y
 	sta $a4
-	jmp -
+	jmp -		; loop, next line
+
+; ----------------------------------------- Part of DESIGN
+; a25a
+setdesflg	txa
+	and #4
+	sta helpvec
+	txa
+	and #3
+	sta $aa
+	jmp schkcom
 
 ; ----------------------------------------- 
-; a263
+; a267
+	!by 0,0,0
+
+; ----------------------------------------- 
+; a26a
 ptest1	sty status
 	jsr tdot0
 	jmp kerromein
-
-; ----------------------------------------- 
-; a26b
-	!by 0,0,0,0,0,0,0
 
 ; ----------------------------------------- bef HICOL
 ; a272			original
@@ -925,7 +934,7 @@ vglae	lda vgla
 ; a634			original
 befdesign	jsr sgetbytn
 	stx $aa		; cset type (0..3)
-	cpx #4
+	cpx #8
 	bcc +
 	jmp swarm		; error bad mode if not
 
@@ -934,8 +943,8 @@ befdesign	jsr sgetbytn
 	sta ay		; width of object (1 or 3)
 	sta $a6		; index into target
 
-	jsr schkcom	; get target address
-	jsr sgetadr
+	jsr setdesflg	; set mode and flag
+	jsr sgetadr	; get target address
 	sty $ae
 	sta $af
 
@@ -1017,8 +1026,7 @@ des2	sta $a8
 ; a6cf
 descont	ldy #0
 	ldx $ab		; re-get .x
-	inx		; proceed to next line in byte
-	cpx #8
+	jsr usedesflg	; proceed to next line in byte
 	bne desloop
 
 ; ----------------------------------------- after line
@@ -1188,33 +1196,36 @@ befpause	jsr chrget
 	jsr schkcom	; comma?
 
 ++	jsr sgetadr	; get time value to $65/$14
-	lda #0
-	sta zaesec
+	sta zaesec	; .a=0 (normally)
 	sta zaeirq
 -	jsr $ffe4		; sys getin keyboard
 	cmp #$0d		; <return>?
-	beq +
+	beq ++
 	lda zaesec	; check timer
 	cmp $65
 	bne -
 
-+	jmp endsmb
+	beq ++
 
 ; ----------------------------------------- resume?
-; a81c
+; a819
 	sty doflag
 	jsr chrget
-	beq +++
+	beq ++
 	jmp whichdo
 
 ; ----------------------------------------- Part of FETCH
-; a827
-showcrsr	lda int		; check rvs flag (in helper)
+; a824
+showcrsr	lda fcursor,x
+	tay
+	and #$7f		; reduce
+	cmp int		; is $12?
 	bne +
-	lda fcursor,x
-	bne ++
-+	lda rcursor,x
-++	jsr bsout
+	tya
+	eor #$80		; 12 <-> 92
+	!by $24
++	tya
+	jsr bsout
 	dex
 	bpl showcrsr
 	rts
@@ -1245,7 +1256,7 @@ befmoboff	jsr sgetbytn
 	lda $d015
 	and mbittabl,x
 	sta $d015
-+++	jmp endsmb
+++	jmp endsmb
 
 ; ----------------------------------------- bef OFF
 ; a86e			enhanced
