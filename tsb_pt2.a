@@ -13,7 +13,7 @@
 ; patched on 04.05.2021 (bugfix in func CHECK)
 ; patched on 07.12.2021 (optimized)
 ; patched on 13.03.2022 (bugfix in warmstart caused by ON ERROR/END)
-; patched on 05.06.2022 (optimized, added func D!PEEK)
+; patched on 06.06.2022 (optimized, added func D!PEEK)
 ;
 ; ----------------------------------------- 
 
@@ -1279,13 +1279,14 @@ csgetarij	cpy #$54
 	bne csgetarik
 
 fndpeek	ldy #0
+	lda #$c2		; PEEK following?
 	cmp (progz),y
 	beq +
-	jmp swarm		; syntax error
+	jmp swarm		; no, bad mode error
 
-+	jsr incbasbz
-	jsr $aefa		; sys: "("?
-	jsr sgetadr2	; get address, .y=0
++	jsr incbasbz	; yes, advance:
+	jsr $aefa		; sys: "("?, returns .y=0
+	jsr sgetadr2	; get address
 	sty int
 	sta int+1
 	jsr $aef7		; sys: ")"?
@@ -1296,11 +1297,11 @@ fndpeek	ldy #0
 	tax
 	pla
 	tay
-	jmp sxyflp
+	jmp sxyflp	; .y/.x to float
 	
 ; ----------------------------------------- 
-; 9172
-	!by 0,0,0,0
+; 9174
+	!by 0,0
 
 ; ----------------------------------------- 
 ; 9176
