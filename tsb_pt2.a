@@ -14,6 +14,7 @@
 ; patched on 07.12.2021 (optimized)
 ; patched on 13.03.2022 (bugfix in warmstart caused by ON ERROR/END)
 ; patched on 06.06.2022 (optimized, added func D!PEEK)
+; patched on 27.06.2022 (bugfix in VERIFY)
 ;
 ; ----------------------------------------- 
 
@@ -456,7 +457,7 @@ sysload	ldy drive
 	jsr chrgot	; more?
 	beq +
 	jsr bloadadr	; yes, get bload adr
-+	lda #0
++	lda $0a		; ### 2.20627 (VERIFY-Patch)
 	jmp $f4a5		; sys LOAD
 ; 8c02
 syssave	ldy drive
