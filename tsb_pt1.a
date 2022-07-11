@@ -611,12 +611,12 @@ tabbef	!tx "hires@"	; 1
 	!tx "fetch@"
 	!tx "at(@"
 	!tx "until@"	; 41
-	!tx ">>@"		; *
-	!tx ">>@"		; +
+	!tx ">@"		; *
+	!tx ">@"		; +
 	!tx "use@"
-	!tx ">>@"		; -
+	!tx ">@"		; -
 	!tx "global@"
-	!tx ">>@"		; /
+	!tx ">@"		; /
 	!tx "reset@"
 	!tx "proc@"	; 49
 	!tx "call@"
@@ -629,9 +629,9 @@ tabbef	!tx "hires@"	; 1
 	!tx "resume@"	; 57
 	!tx "loop@"
 	!tx "delay@"
-	!tx ">>@"		; <
-	!tx ">>@"		; =
-	!tx ">>@"		; >
+	!tx ">@"		; <
+	!tx ">@"		; =
+	!tx ">@"		; >
 	!tx ">@"		; ?
 	!tx "secure@"
 	!tx "disapa@"	; 65
@@ -673,7 +673,7 @@ tabbef	!tx "hires@"	; 1
 	!tx "bckgnds@"
 	!tx "pause@"
 	!tx "nrm@"
-	!tx "mob off@"
+	!tx "mob@"
 	!tx "off@"	; 105
 	!tx "angl@"
 	!tx "arc@"
@@ -697,7 +697,9 @@ tabbef	!tx "hires@"	; 1
 	!tx "display@"
 	!tx "err@"
 	!tx "out@"
-	!by 0		; end of tab
+
+	!by 0,0,0,0,0,0,0,0	; end of tab
+	!by 0,0,0,0
 
 ; ----------------------------------------- 
 ; 869f

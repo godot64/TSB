@@ -308,13 +308,18 @@ befrot	jsr sgetbytn
 	stx rotgr
 	jmp endsmb
 
+; ----------------------------------------- 
+; a186
+	!by 0,0,0,0,0,0,0,0
+	!by 0
+
+; ----------------------------------------- 
+; a18f
+ata	!by $41,$54,$41
+
 ; ----------------------------------------- bef CHAR
-; a186			original
-befchar	jsr sgetadrn	; x
-	sty $09
-	sta $0a
-	jsr sgetbytc	; y
-	stx $a4
+; a192			original
+befchar	jsr getxy		; get X/Y
 	jsr schkcom
 	jsr sgetadr	; screen code
 	sty $ac
@@ -329,12 +334,12 @@ befchar	jsr sgetadrn	; x
 	jmp endsmb
 
 ; ----------------------------------------- 
-; a1b0
+; a1b3
 sgetadrn	jsr incbasbz
 	jmp sgetadr
 
 ; ----------------------------------------- 
-; a1b6
+; a1b9
 charzei	ldy #0
 	jsr charen0
 	asl $ac		; scr code times 8
@@ -412,7 +417,7 @@ chz0	lda ax		; ax back to x
 	jmp -		; loop, next line
 
 ; ----------------------------------------- Part of DESIGN
-; a25a
+; a25d
 setdesflg	txa
 	and #4
 	sta helpvec
@@ -420,10 +425,6 @@ setdesflg	txa
 	and #3
 	sta $aa
 	jmp schkcom
-
-; ----------------------------------------- 
-; a267
-	!by 0,0,0
 
 ; ----------------------------------------- 
 ; a26a
@@ -1175,20 +1176,18 @@ befbckgnds
 	stx $d023
 	jsr sgetbytc	; get 4th bkgnd
 	stx $d024
-	jmp endsmb
+--	jmp endsmb
 
 ; ----------------------------------------- bef PAUSE
 ; a7e0			recoded
 befpause	jsr chrget
 	bcc ++		; time follows?
 
-	jsr sgetstr	; no, string first
-	sta $a9		; set address
-	stx $a8
+	jsr get1str	; no, string first
 	ldy #0		; check length
 -	cpy $69
 	beq +
-	lda ($a8),y	; sys out string
+	lda ($a9),y	; sys out string
 	jsr bsout
 	iny
 	bne -
@@ -1205,17 +1204,10 @@ befpause	jsr chrget
 	cmp $65
 	bne -
 
-	beq ++
-
-; ----------------------------------------- resume?
-; a819
-	sty doflag
-	jsr chrget
-	beq ++
-	jmp whichdo
+	beq --
 
 ; ----------------------------------------- Part of FETCH
-; a824
+; a819
 showcrsr	lda fcursor,x
 	tay
 	and #$7f		; reduce
@@ -1252,11 +1244,24 @@ nrm	sta $d018		; entry for CSET
 
 ; ----------------------------------------- bef MOB OFF
 ; a85f			original
-befmoboff	jsr sgetbytn
-	lda $d015
-	and mbittabl,x
-	sta $d015
+befmoboff	jsr chkonoff	; check for ON/ OFF
+	sty helpvec	; .x=0: OFF/.x=10: ON
+	tya		; MOB ohne ON/OFF?
+	beq +		; ja, skip (.x is mob#)
+	stx helpvec
+	jsr sgetbyt1	; get mob# to .x
++	lda $d015
+	ldy helpvec	; ON or OFF?
+	beq moboff
+	ora mbittabs,x
+	bne +
+moboff	and mbittabl,x
++	sta $d015
 ++	jmp endsmb
+
+; ----------------------------------------- 
+; ac5c
+	!by 0
 
 ; ----------------------------------------- bef OFF
 ; a86e			enhanced
@@ -1509,10 +1514,6 @@ fileopen	jsr $ffbd		; sys setnam
 	tax		; .x=Error# (f.i.: 5)
 	jmp ($0300)
 +	jmp chkin1	; 9f35
-
-; ----------------------------------------- 
-
-	!by 0
 
 ; ----------------------------------------- 
 ; aa75
@@ -1782,20 +1783,12 @@ use4	sta $43		; len of ctrl string
 	bcs +		; yes, error
 	rts
 
-+	jmp err23		; error "string too large"
++	jmp err17		; error "string too long"
 
 ; ----------------------------------------- 
 ; ac56
 jsfdiv	ldy $70
 	jmp sfdiv
-
-; ----------------------------------------- 
-
-	!by 0
-
-; ----------------------------------------- 
-; ac5c
-ata	!by $41,$54,$41
 
 ; ----------------------------------------- 
 ; ac5f
