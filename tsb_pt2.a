@@ -1079,27 +1079,29 @@ fninst	jsr $aefa		; sys "("?
 +	lda strlen2	; otherwise: build newstring (62/63)
 ++	jsr neustr	; sys: set stringdescriptor
 
-	ldy #0		; copy oldstring to newstring
+; 9045
+	ldy #0
 	sty $bf
--	cpy strlen2
-	beq +
-	lda ($a9),y
-	sta ($62),y
-	iny
-	bne -
+	sty helpvec
 
-+
--	ldy $bf		; count chars in newstring
-	cpy strlen1	; until newlen
-	beq +
-	lda ($a7),y	; fetch new chars...
-	inc $bf
-	ldy pos
-	sta ($62),y	; ...and write them to newstring (from pos)
-	inc pos
-	bne -
+-	lda ($a9),y	; get char from oldstring
+	cpy pos		; at inst position?
+	bcc ++		; no
 
-+	jmp jpushstr	; create newstring on stringheap
+	ldy $bf		; yes, inststring finished?
+	cpy strlen1
+	bcs +
+	inc $bf		; no,
+	lda ($a7),y	; get char from inststring
++	ldy helpvec
+
+++	sta ($62),y	; write to newstring
+	inc helpvec
+	ldy helpvec	; all chars?
+	cpy strlen2
+	bcc -
+
+	jmp jpushstr	; yes, create new string on stringheapn (40)
 
 ; ----------------------------------------- 
 ; 906d
@@ -1186,13 +1188,13 @@ csgetarih	cpy #$7c		; CHECK?
 ; ----------------------------------------- func CHECK
 ; 90cd			recoded
 fncheck	jsr $aefa		; sys "("?
-	jsr sgetadr2	; get sprite#
-	sty pos
+	jsr getx8		; get sprite#
+	stx pos
 	lda detectart
 	bne ++
 	jsr $aefd		; sys chkcom
-	jsr sgetadr2	; get sprite# (2nd sprite)
-	sty pos1
+	jsr getx8		; get sprite# (2nd sprite)
+	stx pos1
 	jsr $aef7		; sys ")"?
 
 	ldy pos		; sprite #1

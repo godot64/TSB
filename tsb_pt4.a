@@ -1120,7 +1120,7 @@ whichdo	bcs waitkey	; "null"? (yes, if .c)
 
 ; ----------------------------------------- bef RLOCMOB
 ; a764			original
-befrlocm	jsr sgetbytn
+befrlocm	jsr getx8n
 	stx mobnr2
 	stx mobnr
 	asl mobnr2
@@ -1141,10 +1141,6 @@ befrlocm	jsr sgetbytn
 	sta ay+1
 	jsr getxyf
 	jmp mobcont
-
-; ----------------------------------------- 
-; a79d
-null	!tx "null"
 
 ; ----------------------------------------- bef CMOB
 ; a7a1			original
@@ -1207,7 +1203,7 @@ befpause	jsr chrget
 	beq --
 
 ; ----------------------------------------- Part of FETCH
-; a819
+; a815
 showcrsr	lda fcursor,x
 	tay
 	and #$7f		; reduce
@@ -1223,11 +1219,11 @@ showcrsr	lda fcursor,x
 	rts
 
 ; ----------------------------------------- bef NRM
-; a83a			enhanced
+; a82b			enhanced
 befnrm	jsr nrm00
 	jmp nrm2
 
-; a840
+; a831
 nrm00	lda #4		; video at $0400
 	sta video
 	lda #$c7		; VIC bank 0 ($0000)
@@ -1243,13 +1239,13 @@ nrm	sta $d018		; entry for CSET
 	rts
 
 ; ----------------------------------------- bef MOB OFF
-; a85f			original
+; a850			original
 befmoboff	jsr chkonoff	; check for ON/ OFF
 	sty helpvec	; .x=0: OFF/.x=10: ON
 	tya		; MOB ohne ON/OFF?
 	beq +		; ja, skip (.x is mob#)
 	stx helpvec
-	jsr sgetbyt1	; get mob# to .x
+	jsr getx8		; get mob# to .x
 +	lda $d015
 	ldy helpvec	; ON or OFF?
 	beq moboff
@@ -1260,11 +1256,11 @@ moboff	and mbittabl,x
 ++	jmp endsmb
 
 ; ----------------------------------------- 
-; ac5c
-	!by 0
+; ac72
+	!by 0,0,0,0,0
 
 ; ----------------------------------------- bef OFF
-; a86e			enhanced
+; a873			enhanced
 endflash	jsr dec7a
 befoff	ldx #0
 -	lda flashing
@@ -1278,7 +1274,7 @@ befoff	ldx #0
 	jmp bef0
 
 ; ----------------------------------------- bef ARC
-; a887			enhanced
+; a88c			enhanced
 befarc	jsr arc1
 	lda strz1
 	sta $a8
@@ -1287,7 +1283,7 @@ befarc	jsr arc1
 	jmp doarc
 
 ; ----------------------------------------- 
-; a897
+; a89c
 arc1	jsr incbasbz
 	lda #0
 	sta drehsinn
@@ -1340,7 +1336,7 @@ getrxryf	jsr sgetbytc
 	jsr sgetbytc
 	stx kry
 	jsr getpktf
-; a91e
+; a923
 kreis	lda #$13
 	sta $21
 	jsr kreis1
@@ -1348,7 +1344,7 @@ kreis	lda #$13
 	bne kreis1
 
 ; ----------------------------------------- Fallback from HIRES
-; a929
+; a92e
 nrm01	lda video
 	cmp #$cc
 	bne +
@@ -1358,20 +1354,20 @@ nrm01	lda video
 	jsr nrm02
 	
 ; ----------------------------------------- Part of CSET
-; a938
+; a93d
 csm0	ldx video
 	cpx #$cc		; is MEM active?
 	bne +
 	eor #$2c		; yes, change values accordingly
 +	jmp nrm
-; a944
+; a949
 csetmem	pha
 	jsr nrm01
 	pla
 	bne csm0
 
 ; ----------------------------------------- 
-; a94b
+; a950
 kreis1	lda $a8
 	pha
 	lda $a9
@@ -1462,7 +1458,7 @@ kreis1	lda $a8
 +	jmp kreis1
 
 ; ----------------------------------------- 
-; aa03
+; aa08
 sinmalkrx	jsr a8a9bogm
 	jsr ssin
 	jsr sfacarg
@@ -1473,17 +1469,17 @@ scm0	sta $63
 	jsr scflp
 	jsr sfmult
 	jmp sfacadr
-; aa1e
+; aa23
 cosmalkry	jsr a8a9bogm
 	jsr scos
 	jsr sfacarg
 	lda kry
 	jmp scm0
-; aa2d
+; aa32
 scflp	ldx #$90
 	sec
 	jmp sxflp
-;aa33
+;aa38
 a8a9bogm	lda $a8
 	sta $63
 	lda $a9
@@ -1503,7 +1499,7 @@ a8a9bogm	lda $a8
 	jmp jsfdiv
 
 ; ----------------------------------------- part of DIR
-; aa5c
+; aa61
 fileopen	jsr $ffbd		; sys setnam
 	ldx $ba
 	lda #1
@@ -1516,7 +1512,7 @@ fileopen	jsr $ffbd		; sys setnam
 +	jmp chkin1	; 9f35
 
 ; ----------------------------------------- 
-; aa75
+; aa79
 pkber	lda $20
 	bne +
 	jsr kmyminus
@@ -1534,7 +1530,7 @@ pkber	lda $20
 
 +	jsr kmxminus
 	jmp kmyminus
-; aa99
+; aa9d
 kmxplus	clc
 	lda $aa
 	adc kmx
@@ -1543,13 +1539,13 @@ kmxplus	clc
 	adc kmx+1
 	sta $ab
 	rts
-; aaa9
+; aaad
 kmyplus	clc
 	lda $ae
 	adc kmy
 	sta $ae
 	rts
-; aab2
+; aab6
 kmxminus	sec
 	lda kmx
 	sbc $aa
@@ -1562,7 +1558,7 @@ kmxminus	sec
 	sta $aa
 	sta $ab
 +	rts
-; aaca
+; aace
 kmyminus	sec
 	lda kmy
 	sbc $ae
@@ -1571,7 +1567,7 @@ kmyminus	sec
 	lda #0
 	sta $ae
 +	rts
-; aad9
+; aadd
 a8a9div90	lda #$5a		; 90
 	sta idivsor
 	lda #0
@@ -1592,7 +1588,7 @@ a8a9div90	lda #$5a		; 90
 	cmp #3
 	beq +
 	rts
-; ab08
+; ab0c
 +	sec
 	lda #$5a
 	sbc $a8
@@ -1601,7 +1597,7 @@ a8a9div90	lda #$5a		; 90
 	rts
 
 ; ----------------------------------------- bef ANGL
-; ab12			original
+; ab16			original
 befangl	jsr incbasbz
 	jsr sgetadr
 	sty kmx
@@ -1629,7 +1625,7 @@ doarc	lda #$0a
 	jmp endsmb
 
 ; ----------------------------------------- 
-; ab59
+; ab5d
 kreis2	jsr vglae
 	beq +
 	bcs +
@@ -1641,16 +1637,16 @@ kreis2	jsr vglae
 +	jmp kreis1
 
 ; ----------------------------------------- tokenizer
-; ab6b
+; ab6f
 zum2	jmp tok5		; continue with next char
 
 ; ----------------------------------------- 
-; ab6e
+; ab72
 zeiumw1	ldy #5		; entry point, .y=index in basic line
 zum0	lda $01fb,y	; read from $0200 (up to $00)
 	bne +
 --	rts
-; ab76
+; ab7a
 +	cmp #$22		; string?
 	bne +
 -	iny		; yes, skip string
@@ -1659,7 +1655,7 @@ zum0	lda $01fb,y	; read from $0200 (up to $00)
 	cmp #$22		; or next quote
 	bne -
 	beq zum2		; then continue
-; ab86
+; ab8a
 +	cmp #$40		; "@"? (precedes DESIGN lines)
 	bne +
 zum1	iny		; yes, skip this line
@@ -1719,7 +1715,7 @@ tok3	cmp ($20,x)	; Zeichen in Befehlswort enthalten?
 	bne -
 	inc $21
 	bne -
-; abe9
+; abed
 tok2	inc codezae	; Vergleich negativ, Tokenzähler plus 1
 	ldy zwisp2	; Index in Basiczeile holen, nicht erhöhen!
 
@@ -1775,7 +1771,7 @@ tok5	iny		; continue with next char in basic line
 	jmp zum0
 
 ; ----------------------------------------- part of USE
-; ac48
+; ac4c
 use4	sta $43		; len of ctrl string
 	stx $49		; and address
 	sty $4a
@@ -1786,7 +1782,7 @@ use4	sta $43		; len of ctrl string
 +	jmp err17		; error "string too long"
 
 ; ----------------------------------------- 
-; ac56
+; ac5a
 jsfdiv	ldy $70
 	jmp sfdiv
 

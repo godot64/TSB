@@ -535,10 +535,9 @@ l20pl40	clc
 	lda $20
 	adc #40
 	sta $20
-	lda $21
-	adc #0
-	sta $21
-	rts
+	bcc +
+	inc $21
++	rts
 
 ; ----------------------------------------- 
 ; 94dd			optimized
@@ -666,7 +665,7 @@ dir5	jsr sclose
 	jmp endsmb
 
 ; ----------------------------------------- 
-; 95b6
+; 95b4
 getkey	jsr $ffe4		; get char
 	beq +
 ; 95b9
@@ -675,7 +674,7 @@ getkey	jsr $ffe4		; get char
 +	rts
 
 ; ----------------------------------------- 
-; 95c1
+; 95bf
 dec7a	lda $7a
 	bne +
 	dec $7b
@@ -684,7 +683,7 @@ dec7a	lda $7a
 
 ; ----------------------------------------- bef MMOB
 ; 95ca			original
-befmmob	jsr sgetbytn
+befmmob	jsr getx8n
 	stx mobnr2
 	stx mobnr
 	asl mobnr2
@@ -789,10 +788,6 @@ befbflash	jsr chkonoff	; get first parameter
 	jmp endsmb
 
 ; ----------------------------------------- 
-
-	!by 0
-
-; ----------------------------------------- 
 ; 96a3			enhanced
 sirq	ldy #0
 	inc zaeirq
@@ -825,7 +820,7 @@ sq0	jmp sirq2
 
 ; ----------------------------------------- bef MOB SET
 ; 96e3			enhanced
-befmobset	jsr sgetbytn
+befmobset	jsr getx8n
 	stx $aa
 	lda $d015
 	ora mbittabs,x	; switch mob on
@@ -1211,7 +1206,6 @@ befenvelope
 	jsr x123
 	stx $a6
 	jsr get2nybc
-	lda $aa
 	sta $a8
 	jsr get2nybc
 	asl $a6
@@ -1246,11 +1240,12 @@ flinend	jsr chrget
 get2nybc	jsr iskomma
 get2nyb	jsr sgetbytn
 get2nyb2	jsr xnyb
-	stx $aa
-	asl $aa
-	asl $aa
-	asl $aa
-	asl $aa
+	txa
+	asl
+	asl
+	asl
+	asl
+	sta $aa
 	jsr sgetbytn
 	jsr xnyb
 	txa
@@ -1321,7 +1316,7 @@ bwv0	asl $aa
 ; 9a52
 sidtab	!wo $d400,$d407,$d40e
 
-; ----------------------------------------- part of RETRACE
+; ----------------------------------------- part of COLD
 ; 9a58
 dscbmout	ldy #0
 -	lda tuned,y
@@ -1333,16 +1328,19 @@ dscbmout	ldy #0
 
 ; ----------------------------------------- 
 ; 9a68
-xnyb	cpx #16
-	bcs towarm
-	rts
-
 x123	cpx #4
 	bcs towarm
 	cpx #0
 	beq towarm
 	dex
-	rts
+-	rts
+
+getx8n	jsr incbasbz
+getx8	jsr sgetbyt1
+isit8	cpx #8
+	!by $2c
+xnyb	cpx #16
+	bcc -
 
 towarm	pla
 	pla
@@ -1353,7 +1351,7 @@ towarm	pla
 setmulti	lda $f7		; color src 0?
 	bne +
 
-	jsr herase	; clear double pixel
+	jsr herase	; 0: clear double pixel
 	bne +++		; uncond. branch
 
 +	cmp #1		; 1?

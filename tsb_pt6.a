@@ -1486,10 +1486,6 @@ fnnrm	jsr $aefa		; sys check "("
 +	jmp nrm0
 
 ; ----------------------------------------- 
-
-	!by 0,0,0,0
-
-; ----------------------------------------- 
 ; c921
 ++	cmp #$24		; leading "$" in string?
 	bne +		; no
@@ -1661,10 +1657,14 @@ loadext	stx helpvec
 	jmp $f4a5		; sys LOAD
 
 ; ----------------------------------------- 
+; a79d
+null	!tx "null"
+
+; ----------------------------------------- 
 ; ca44
 version	!tx "ad86"	; Signature
 	!by $0d
-	!tx "2.20711"	; Version Number
+	!tx "2.20714"	; Version Number
 
 ; ----------------------------------------- 
 ; ca4f

@@ -32,13 +32,13 @@ isstep0	jsr basromei	; is step 0?
 	beq +
 	rts
 +	jsr basromau
-	jmp err14
+	jmp err14		; affects "tsb.mem"!
 
 ; ----------------------------------------- 
 ; cc20
 arrbreak	jsr $ffe1		; sys STOP?
 	beq stopped	; yes
-	jsr getkey	; get key
+	jsr getkey	; get key - affects "tsb.mem"!
 	jsr $ffe1
 	beq stopped
 	rts
@@ -46,6 +46,7 @@ arrbreak	jsr $ffe1		; sys STOP?
 stopped	pla
 	pla
 	jmp nrm2		; back to all normal
+			; affects "tsb.mem"!
 
 ; ----------------------------------------- 
 ; cc33
@@ -143,7 +144,7 @@ getdims	jsr inc20
 
 ; ----------------------------------------- 
 ; ccce
-endplace	jmp bef0
+endplace	jmp bef0		; affects "tsb.mem"!
 
 ; ----------------------------------------- bef PLACE
 ; ccd1			new
