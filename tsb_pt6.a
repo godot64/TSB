@@ -15,8 +15,9 @@
 ; patched on 18.07.2021 (LIST)
 ; patched on 22.11.2021 (LOCALTAB optimized)
 ; patched on 29.11.2021 (added hold DIR output on keypress)
-; patched 0n 29.12.2021 (bugfix in INST: forced PRG mode)
-; patched 0n 13.05.2022 (command SCRLD/SV DEF added)
+; patched on 29.12.2021 (bugfix in INST: forced PRG mode)
+; patched on 13.05.2022 (command SCRLD/SV DEF added)
+; patched on 16.07.2022 (command DELAY: now OFF works)
 ;
 ; ----------------------------------------- 
 
@@ -304,7 +305,7 @@ del2	rts
 
 ; ----------------------------------------- part of DO
 ; b99f
-dodo	jsr sfordo	; search for DO
+dodo	jsr sfordone	; search for DONE
 	lda progz
 	ldx progz+1
 	sta $a8
@@ -314,7 +315,7 @@ dodo	jsr sfordo	; search for DO
 	sta progz
 	stx progz+1
 
--	jsr schelse	; search for ELSE
+-	jsr skipif	; then search for ELSE
 	cmp $22
 	beq do0		; found
 	tya
@@ -1012,24 +1013,24 @@ no	jmp endsmb	; Abschluss
 ; becf
 slist3	php		; .a: current byte in BASIC code
 	sty $fe		; save .y
-	stx $c5ff		; save .x
+	stx $c5ff		; save .x (starts with 0)
 	ldy $028d		; special key pressed
 	cpy #2		; C=?
 	beq pge3		; yes, skip PAGE
 	cpy #1		; shift?
 	bne pge2
 
--	iny		; yes, DELAY
+pge8	cpx delay		; if delay=0: skip DELAY
+	beq pge2
+-	iny		; if not, perform DELAY
 	bne -
-	inx		; (.x starts randomly)
-	cpx delay
-	bne -
-	jmp pge1
--
+	inx
+	jmp pge8
+
 pge2	ldy $028d
 	beq pge1
 	cpy #4		; ctrl?
-	beq -		; yes, hold LIST
+	beq pge2		; yes, hold LIST
 
 pge1	ldy pageflag	; page active? 
 	cpy #10
@@ -1210,7 +1211,7 @@ procstack	!fill 256		; unused area
 	!by $43,$53,$45,$54,$20,$32,$3a,$00,$00,$00,$00,$00,$00,$00,$00,$00	; CSET,$2:
 	!by $44,$4f,$20,$4e,$55,$4c,$4c,$0d,$00,$32,$00,$00,$00,$00,$00,$00	; DO NULL+cr
 ; c74d
-	!by 0,0,0
+ata	!by $41,$54,$41
 
 ; ----------------------------------------- part of $$/%%
 ; c750
@@ -1664,7 +1665,7 @@ null	!tx "null"
 ; ca44
 version	!tx "ad86"	; Signature
 	!by $0d
-	!tx "2.20714"	; Version Number
+	!tx "2.20719"	; Version Number
 
 ; ----------------------------------------- 
 ; ca4f

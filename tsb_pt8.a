@@ -27,6 +27,7 @@
 	strz1		= $c518		; ARC Endwinkel
 	strz2		= $c519		; ARC Startwinkel
 	vgle		= $c51a		; word: Vergleichswert, Ende erreicht? (MOB, LINE, ARC)
+	;		  $c51c		  DO found
 	errln		= $c51d		; word: Zeile bei Fehler
 	pos		= $c51f		; Positionswert (verschiedene Befehle, z.B. INST)
 	pos1		= $c520		; dito bei DUP und CHECK
@@ -46,7 +47,7 @@
 	zwspei1		= $c57d		; Zwischenspeicher bei Prozessorport-Umschaltung
 	zn		= $c586		; ! unused (5 bytes)
 	;
-	pspeinmi		= $c58b		; Prozessorport bei NMI (wird nicht gebraucht)
+	pspeinmi		= $c58b		; Prozessorport bei NMI
 	pageflag		= $c58c		; Flag für PAGE
 	pagewert		= $c58d		; Wert für PAGE
 	;                                         ! unused (8 bytes)
@@ -58,7 +59,7 @@
 	ydiff		= $c59f		; word: Differenz bei MOB
 	diffv		= $c5a1		; word: Differenz vertikal
 	dry		= $c5a3
-	;                                         ! unused (2 bytes)
+					; word used by DUP
 	xdiff		= $c5a6		; word: Differenz horizontal
 	ey		= $c5a8		; word: Endwert y
 	ex		= $c5aa		; word: Endwert x
@@ -80,8 +81,9 @@
 	flashfl		= $c5c6		; Flag für FLASH
 	flashing		= $c5c7		; Flag: FLASH aktiv	($00-$80)
 	;                                         ! unused (3 bytes)
-	ifflag		= $c5cb		; Wahrwert der letzten IF-Abfrage
-	;                                         ! unused (9 bytes)
+	ifflag		= $c5cb		; Wahrheitswert der letzten IF-Abfrage
+	lastif		= $c5cc		; dito bei DO..DONE
+	;                                         ! unused (8 bytes)
 	lcode		= $c5d5		; part of LIST
 	inkey		= $c5d6		; Nummer der Funktionstaste
 	bflashsp		= $c5d7		; Speed bei BFLASH
@@ -231,7 +233,10 @@
 	idivrest		= $cbc2		; word: Rest bei DIV
 	;
 	kry		= $cbc5		; Kreis: Radius Y
-	;				  ! unused (59 bytes)
+	stackdo		= $cbc6		; DO-Stack (20 bytes)
+	dobools		= $cbda		; Wahrheitswerte der DO-Strukturen
+	doindex		= $cbe4		; Index in DO-Stack	(0..9)
+	;				  ! unused (27 bytes)
 
 	; 		total of 376 unused bytes between $c500 and $cc00
 

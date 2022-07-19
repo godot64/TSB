@@ -15,6 +15,7 @@
 ; patched on 13.03.2022 (bugfix in warmstart caused by ON ERROR/END)
 ; patched on 06.06.2022 (optimized, added func D!PEEK)
 ; patched on 27.06.2022 (bugfix in VERIFY)
+; patched on 14.07.2022 (bugfix in INST, optimized code)
 ;
 ; ----------------------------------------- 
 
@@ -70,7 +71,7 @@ fnjoy	ldy #$00		; set $dc00
 tabjoy	!by $6e,$66,$67,$65,$6d,$69,$6b,$6a
 
 ; ----------------------------------------- func POT
-; 8914			original
+; 8914			modified
 fnpot	jsr $aefa		; sys "("?
 	jsr sgetadr2
 	jsr $aef7		; sys ")"?
@@ -468,7 +469,7 @@ syssave	ldy drive
 ; 8c09
 loadsave	!wo sysload,syssave
 
-; ----------------------------------------- 
+; ----------------------------------------- 5
 ; 8c0d
 cold2	ldy #3
 -	lda loadsave,y
@@ -628,7 +629,7 @@ l8d02	jsr sbzply
 	ldy #5
 --	jsr sbzply
 ; 8d02
-sfordo	jsr schdo		; search for DO
+sfordone	jsr schdo		; search for DO
 	cmp #0		; found line end?
 	beq l8d02		; continue search
 -	iny		; now: .y=2
@@ -661,7 +662,7 @@ hexw	sec		; make value from digit
 +	rts
 
 ; ----------------------------------------- func EXOR
-; 8d36			original
+; 8d36			modified
 fnexor	jsr $aefa		; sys "("?
 	jsr sgetadr2
 	sty $aa
@@ -806,7 +807,7 @@ csgetari2	cpy #$10		; PLACE?
 	jmp csgetari3
 
 ; ----------------------------------------- func PLACE
-; 8e35			original
+; 8e35			modified
 fnplace	jsr $aefa		; sys "("?
 	jsr get2strs
 	jsr $aef7		; sys ")"?
@@ -1014,7 +1015,7 @@ csgetari6	cpy #$59		; LIN?
 	bne csgetari7
 
 ; ----------------------------------------- func LIN
-; 8fad			original
+; 8fad			modified
 fnlin	sec
 	jsr $fff0		; sys plot
 	txa
@@ -1027,7 +1028,7 @@ csgetari7	cpy #$58		; TEST?
 	bne csgetari8
 
 ; ----------------------------------------- func TEST
-; 8fba			original
+; 8fba			modified
 fntest	jsr $aefa		; sys "("?
 	jsr sgetadr2
 	jsr getxy2	; get X/Y
@@ -1042,16 +1043,37 @@ fntest	jsr $aefa		; sys "("?
 	cli
 	jmp sxyflp3
 
+; ----------------------------------------- Part of DO..DONE
+; 8fdc			Baustelle!
+skipif	jsr schelse	; search for single ELSE:
+	tax
+	beq +		; found end of line? (leave)
+	cmp #$47		; found ELSE?
+	bne +
+	cpy #1		; yes, single ELSE?
+	beq +
+	ldx lastif
+	beq ++
+	jsr sbzply	; no, execute command after ELSE
+	sty doflag
+	jmp endsmb
+++	jmp sfordone
+
+doiftrue	lda #0
+	sta doflag
+	jmp chrgot
+
+mkwahr	lda $61
+	ldx doindex
+	lda dobools,x
+	inc doindex
+	sta lastif
+	sty $c51c
++	rts
+
 ; ----------------------------------------- 
-; 8fdc
-	!by 0,0,0,0,0,0,0,0	; 58 bytes
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0
+; 9015 
+	!by 0
 
 ; ----------------------------------------- 
 ; 9016
@@ -1124,7 +1146,7 @@ csgetari9	cpy #$56		; INKEY?
 	bne csgetaria
 
 ; ----------------------------------------- func INKEY
-; 908d			original
+; 908d			modified
 	ldy inkey
 	jmp sxyflp3
 
@@ -1164,7 +1186,7 @@ csgetarie	cpy #$60		; SOUND?
 	bne csgetarif
 
 ; ----------------------------------------- func SOUND
-; 90b7			original
+; 90b7			modified
 fnsound	ldx #$d4		; =$d400
 	bne cga0
 

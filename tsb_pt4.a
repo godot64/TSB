@@ -17,6 +17,7 @@
 ; patched on 22.11.2021 (command LOCAL: bugfix)
 ; patched on 29.11.2021 (added hold DIR output on keypress)
 ; patched on 16.04.2022 (command FETCH: complies with RVS mode)
+; patched on 17.07.2ß22 (bugfix in DO..DONE)
 ;
 ; ----------------------------------------- 
 
@@ -153,7 +154,7 @@ outasc	ldx #0
 
 ; ----------------------------------------- part of DO
 ; a02f
-do8	jsr sfordo	; search for DO
+do8	jsr sfordone	; search for DONE
 	pla
 	pla
 	jmp do9
@@ -310,12 +311,8 @@ befrot	jsr sgetbytn
 
 ; ----------------------------------------- 
 ; a186
-	!by 0,0,0,0,0,0,0,0
-	!by 0
-
-; ----------------------------------------- 
-; a18f
-ata	!by $41,$54,$41
+	!by 0,0,0,0,0,0,0,0	; 12 bytes
+	!by 0,0,0,0
 
 ; ----------------------------------------- bef CHAR
 ; a192			original
@@ -932,7 +929,7 @@ vglae	lda vgla
 	rts
 
 ; ----------------------------------------- bef DESIGN
-; a634			original
+; a634			enhanced
 befdesign	jsr sgetbytn
 	stx $aa		; cset type (0..3)
 	cpx #8
@@ -1119,7 +1116,7 @@ whichdo	bcs waitkey	; "null"? (yes, if .c)
 	jmp dodone
 
 ; ----------------------------------------- bef RLOCMOB
-; a764			original
+; a764			modified
 befrlocm	jsr getx8n
 	stx mobnr2
 	stx mobnr
@@ -1143,7 +1140,7 @@ befrlocm	jsr getx8n
 	jmp mobcont
 
 ; ----------------------------------------- bef CMOB
-; a7a1			original
+; a79d			original
 befcmob	jsr sgetbytn
 	stx $d025
 	jsr sgetbytc
@@ -1151,7 +1148,7 @@ befcmob	jsr sgetbytn
 	jmp endsmb
 
 ; ----------------------------------------- bef BCKGNDS
-; a7b0			enhanced
+; a7ac			enhanced
 befbckgnds
 	jsr sgetbytn	; get backgrnd color
 	stx $d021
@@ -1175,7 +1172,7 @@ befbckgnds
 --	jmp endsmb
 
 ; ----------------------------------------- bef PAUSE
-; a7e0			recoded
+; a7dc			recoded
 befpause	jsr chrget
 	bcc ++		; time follows?
 
@@ -1203,7 +1200,7 @@ befpause	jsr chrget
 	beq --
 
 ; ----------------------------------------- Part of FETCH
-; a815
+; a811
 showcrsr	lda fcursor,x
 	tay
 	and #$7f		; reduce
@@ -1219,11 +1216,11 @@ showcrsr	lda fcursor,x
 	rts
 
 ; ----------------------------------------- bef NRM
-; a82b			enhanced
+; a827			enhanced
 befnrm	jsr nrm00
 	jmp nrm2
 
-; a831
+; a82d
 nrm00	lda #4		; video at $0400
 	sta video
 	lda #$c7		; VIC bank 0 ($0000)
@@ -1239,7 +1236,7 @@ nrm	sta $d018		; entry for CSET
 	rts
 
 ; ----------------------------------------- bef MOB OFF
-; a850			original
+; a850			enhanced
 befmoboff	jsr chkonoff	; check for ON/ OFF
 	sty helpvec	; .x=0: OFF/.x=10: ON
 	tya		; MOB ohne ON/OFF?
@@ -1256,7 +1253,7 @@ moboff	and mbittabl,x
 ++	jmp endsmb
 
 ; ----------------------------------------- 
-; ac72
+; a86e
 	!by 0,0,0,0,0
 
 ; ----------------------------------------- bef OFF

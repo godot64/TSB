@@ -17,7 +17,8 @@
 ; patched on 20.02.2022 (commands SCRLD/SCRSV, by H. Haberl)
 ; patched on 05.04.2022 (command CENTRE: new option)
 ; patched on 16.04.2022 (command FETCH: complies with RVS mode)
-; patched 0n 13.05.2022 (command SCRLD/SV DEF added)
+; patched on 13.05.2022 (command SCRLD/SV DEF added)
+; patched on 01.07.2022 (commands TEXT/CSET: optimized)
 ; 
 ; ----------------------------------------- 
 
@@ -25,8 +26,10 @@
 
 ; ----------------------------------------- all MOVE befs
 ; ac5f			recoded
-movebef	lda progz		; entry for: MOVE, UP,
-	sta $c1		; LEFT, DOWN, RIGHT
+			; entry for: MOVE (15), UP (17/18),
+			; LEFT (19/20), DOWN (21/22), RIGHT (23/24)
+movebef	lda progz		; get address of token
+	sta $c1
 	lda progz+1	; (INSERT)
 	sta $c2
 	lda #0
@@ -41,14 +44,14 @@ mve0	ldy $a7
 	lda $c2
 	sta progz+1
 
-mve6	tya		; .y: code# (*2)
+mve6	tya		; .y: token# (*2)
 	sta $a7
 	pha
 	jsr getrcwd	; get parameters
 	jsr toa8
 	pla
 	cmp #32		; upb?
-	bcc mve5		; no, move
+	bcc mve5		; no, move (30)
 
 ; ac8a
 	jsr mdistrb	; distribute
@@ -934,33 +937,28 @@ bmphi
 	rts
 
 ; ----------------------------------------- bef TEXT
-; b22a			original
-beftext	jsr incbasbz
-	jsr sgetadr
-	sty $09
-	sta $0a
-	jsr sgetbytc
-	stx $a4
-	jsr schkcom
+; b22a			optimized
+beftext	jsr getxy		; get X/Y
+	jsr schkcom	; get string (address in $20/$21, len in $69 and helpvec)
 	jsr sgetstr
 	sta $21
 	stx $20
 	lda $69
 	sta helpvec
-	jsr getpktf
-	jsr sgetbytc
-	stx chgr
-	cpx #0
-	bne +
-	lda #1
-	sta chgr
-+	jsr sgetbytc
+	jsr getpktf	; get mode (0=clear, 1=set...) to $f7
+	jsr sgetbytc	; get zoom factor (.x to $cb6e)
+	txa
+	bne +		; if 0: force 1!
+	inx
++	stx chgr
+	jsr sgetbytc	; get kerning (standard: 8)
 	stx krx
+
 	ldy #0
 	sty schrart
-	sty $6a
+	sty $6a		; rvs flag
 
-txloop	lda $a4
+txloop	lda $a4		; store X/Y/zoom
 	pha
 	lda $09
 	pha
@@ -968,71 +966,22 @@ txloop	lda $a4
 	pha
 	lda chgr
 	pha
-	lda ($20),y
-	cmp #$12		; rvs on?
-	bne +
-	lda #$80
-	sta $6a
-	jmp txcont
 
-+	cmp #$92		; rvs off?
-	bne +
-	lda #$00
-	sta $6a
-	jmp txcont
+	lda ($20),y	; get char from string (.y: index into string)
 
-+	cmp #1		; ctrl a?
-	bne +
+	cmp #$12		; ctrl code: rvs on?
+	beq +
+	cmp #$92		; ctrl code: rvs off?
+	bne ++
 	lda #0
-	sta schrart
-	jmp txcont
+	!by $2c
++	lda #$80
+	sta $6a		; ...set flag
 
-+	cmp #2
-	bne +
-	lda #1
-	sta schrart
-	jmp txcont
-
-+	sta $ac
-	cmp #$ff		; PI?
-	bne +
-	lda #$5e		; (changed!)
-	jmp txl0
-
-+	cmp #$e0		; convert to bcode
-	bcc +
-	sec
-	sbc #$40
-	jmp txl0
-
-+	cmp #$c0
-	bcc txl0
-	sec
-	sbc #$60
-txl0	cmp #$40
-	bcc txl1
-	cmp #$60
-	bcs +
-	and #$bf
-	jmp txl1
-
-+	cmp #$80
-	bcs +
-	and #$df
-	jmp txl1
-
-+	sec
-	sbc #$40
-txl1	eor $6a
-	sta $ac
-	lda schrart
-	sta $ad
-	tya
-	pha
-	jsr charzei
-	pla
-	tay
-	pla
+txcont1	ldx #1		; flag for ctrl codes (1: yes)
+	!by $2c
+txcont0	ldx #0		; (0: no)
+	pla		; restore X/Y/zoom
 	sta chgr
 	pla
 	sta $0a
@@ -1040,34 +989,86 @@ txl1	eor $6a
 	sta $09
 	pla
 	sta $a4
-	clc
+	txa
+	bne +
+	clc		; proceed to next X position
 	lda $09
 	adc krx
 	sta $09
 	lda $0a
 	adc #$00
 	sta $0a
-	iny
++	iny 		; and to next char in string
 	cpy helpvec
-	bne txl2
-	jmp endsmb
-txl2	jmp txloop
+	bne txloop
+	jmp endsmb	; until finished
+
+++	cmp #1		; ctrl code: ctrl a (upper-graph)?
+	beq +
+	cmp #2		; ctrl code: ctrl b (upper-lower)?
+	bne ++
+	lda #1
+	!by $2c
++	lda #0
+	sta schrart	; ...set flag
+	jmp txcont1
+
+++	sta $ac		; store char
+	cmp #$ff		; PI?
+	bne +
+	lda #$5e		; bcode for PI
+	bne txl1
+
++	cmp #$60		; convert to bcode
+	bcc +
+	and #$7f
+	ora #$40
+	bne txl1
++	and #$3f
+
+txl1	eor $6a		; care for RVS
+	sta $ac
+	lda schrart	; care for mode
+	sta $ad
+
+	tya		; output char
+	pha
+	jsr charzei
+	pla
+	tay
+
+txl2	jmp txcont0
+
+; ----------------------------------------- 
+
+	!by 0,0,0,0,0,0,0,0	; 68 bytes
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0
 
 ; ----------------------------------------- bef CSET
-; b30e			original
+; b30e			modified
 befcset	jsr sgetbytn
-	txa
+	txa		; cset 0?
 	beq +
-
-	dex
+	dex		; cset 1?
 	bne ++
+
 	lda #$17		; CSET 1: lower case chars
 	!by $2c
 +	lda #$15		; CSET 0: upper case chars
 	jsr csetmem	; check for MEM, set charset
--	jmp endsmb
+	bne +++		; uncond. branch
 
-++	lda #$3b		; CSET 2: bits for hires mode
+++	jsr nrm03		; cset 2
++++	jmp endsmb
+
+nrm03	lda #$3b		; CSET 2: bits for hires mode
 	sta $d011
 	lda #$0b		; graphics at $e000, cols at $c000
 	sta $d018
@@ -1075,28 +1076,13 @@ befcset	jsr sgetbytn
 	sta $dd00
 	lda #10		; flag for MOB SET
 	sta gmemflag
-	bne -
+	rts
 
 ; ----------------------------------------- bef VOL
 ; b338			enhanced
 befvol	jsr chkonoff
 	stx $d418
 	jmp endsmb
-
-; ----------------------------------------- 
-; b341
-txcont	pla
-	sta chgr
-	pla
-	sta $0a
-	pla
-	sta $09
-	pla
-	sta $a4
-	iny
-	cpy helpvec
-	bne txl2
-	beq +
 
 ; ----------------------------------------- bef DISK
 ; b355			recoded
@@ -1403,25 +1389,26 @@ quotetab	!by $80,$83,$80,$80,$83,$80,$08
 
 ; ----------------------------------------- part of DO
 ; b56a
+donecont	dec doindex
 docont	jsr dec7a		; it was DONE
 	jmp stofdo2
 
 ; ----------------------------------------- bef DO
-; b570			new
+; b573			new
 befdo	jsr chrget	; end of line?
 	beq docont	; yes
 	ldy #0		; no, check for "NULL"
 	jmp isnull
 
 ; ----------------------------------------- part of TRACE
-; b57a
+; b57d
 trc1	sta $22
 	stx $23
 	sty $69
 	jmp rtc1
 
 ; ----------------------------------------- bef KEY
-; b583			enhanced
+; b586			enhanced
 befkey	jsr keyget	; check for KEYGET (doesn't return if successful)
 	jsr chrgot	; get last byte
 	bne +
@@ -1429,11 +1416,11 @@ befkey	jsr keyget	; check for KEYGET (doesn't return if successful)
 	eor #10
 	sta keyflag	; set accordingly
 --	jmp endsmb	; (21)
-; b594
+; b597
 +	cpx #$11		; more than 16?
 	bcc +
 	jmp swarm		; yes, bad mode error
-; b59b
+; b59e
 +	dex
 	stx $aa		; times 16
 	lda #0
@@ -1478,16 +1465,14 @@ flashinit	lda #0
 	sta flashzae
 	jmp chkonoff	; Parameter holen
 
+; ----------------------------------------- 
+; b5ef
+	!by 0,0,0,0,0,0,0,0	; 15 bytes
+	!by 0,0,0,0,0,0,0
+
 ; ----------------------------------------- bef PAINT
-; b5ec			recoded
-befpaint	jsr sgetadrn
-	sta ax+1
-	sta $0a
-	sty ax
-	sty $09
-	jsr sgetbytc
-	stx ay
-	stx $a4
+; b5fe			recoded
+befpaint	jsr getxy
 	jsr getpktf
 	stx $66
 

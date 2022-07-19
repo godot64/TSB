@@ -185,6 +185,7 @@ prestor	sta zwspei1
 befcold	jsr basromei
 	ldx #$00
 	stx ramstart
+	stx doindex
 	ldy #$80
 	jsr $fd8c		; sys set memory top
 	jsr $e453		; sys load basic vectors ($0300..$030b)
@@ -227,36 +228,34 @@ into	jsr cold1		; set drive 8 and LOAD/SAVE vectors
 	jmp dscbmout	; set colors, show "tuned"
 
 ; ----------------------------------------- 
-; 81ab
+; 81ae
 tsbvecs	!wo warmstart,sloop,zeiumw,slist,sbasbef,sgetari
 
 ; ----------------------------------------- 
-; 81b7
+; 81ba
 tsbpudef	!by $23,$2a,$2c,$2e,$2b,$2d	; #*,.+-
 
 ; ----------------------------------------- bef DIV (Clear Video)
-; 81bd
+; 81c0
 befdiv	jsr clear		; clear screen
 	jmp bef0
 
 ; ----------------------------------------- part of USE
-; 81c3
+; 81c6
 useready	pla
 	pla
 	lda #$00
 	jsr genout
-	lda #$a7
-	ldy #$02
-	pha
 	jsr basromei
-	pla
+	lda #$a7		; address of outstring ($02a7)
+	ldy #$02
 	jsr $ab1e		; sys string out
 	jsr chrgot
 	bne +
 	jmp $aad7		; sys cr/lf out if end of command
 
 ; ----------------------------------------- 
-; 81de
+; 81df
 +	lda #$3b		; ";"?
 use6	ldy #0		; compare to running code char
 	cmp (progz),y	; if not equal: error bad mode
@@ -265,18 +264,14 @@ use6	ldy #0		; compare to running code char
 
 +	jmp swarm		; otherwise: bad mode
 
-; ----------------------------------------- part of USE
-; 81ec			recoded
+; ----------------------------------------- 
+; 81ed			recoded
 use0	jsr sgetbytn	; USE #n
 	stx $13		; .x= device #
 	jsr $e4ad		; sys: basic ckout
 	bcs use2		; on error: continue anyway
 	jsr schkcom	; comma?
 	bne use2		; uncond. branch
-
-; ----------------------------------------- 
-
-	nop
 
 ; ----------------------------------------- 
 ; 81fc
@@ -698,8 +693,15 @@ tabbef	!tx "hires@"	; 1
 	!tx "err@"
 	!tx "out@"
 
-	!by 0,0,0,0,0,0,0,0	; end of tab
-	!by 0,0,0,0
+; ----------------------------------------- 
+; 8693
+xipr3	sty doindex
+	sty sprepeat
+	rts
+
+; ----------------------------------------- 
+; 869a
+	!by 0,0,0,0,0	; 5 bytes
 
 ; ----------------------------------------- 
 ; 869f
