@@ -16,7 +16,7 @@ leave TSB compatible to any extra software possibly written for Simons' BASIC in
 completely new TSB that only uses the known commands and their parameters but internally works on its
 own which hopefully will provide faster performance.
 
-Download TSB (on a zipped D64 file) from here: [TSB on a disk][TSB] or as a [cartridge file][tsbcrt] for use with emulators like VICE.
+Download TSB (on a zipped D64 file) from here: [TSB on a disk][TSB] or as a Magic Desk and a Uniprom [cartridge file][tsbcrt] for use with emulators like VICE.
 
 Visit the most elaborate documentation [of Simons' Basic][SB Docs] and [of TSB][TSB Docs] on German C64-Wiki.
 
@@ -24,6 +24,6 @@ Arndt Dettke
 
 ---
 [TSB]: https://www.godot64.de/download/tsbdemo.zip "file about 100 KB"
-[tsbcrt]: https://www.godot64.de/download/TSB.crt.bin "file has 65 KB - remove '.bin' for use"
+[tsbcrt]: https://www.godot64.de/german/downloads.htm#tsb "remove '.bin' in the names for use!"
 [SB Docs]: https://www.c64-wiki.de/wiki/Simons_Basic
 [TSB Docs]: https://www.c64-wiki.de/wiki/TSB
