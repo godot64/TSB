@@ -306,7 +306,7 @@ del2	rts
 ; ----------------------------------------- part of DO
 ; b99f
 dodo	jsr sfordone	; search for DONE
-	lda progz
+	lda progz		; points to 1 before token of DONE
 	ldx progz+1
 	sta $a8
 	stx $a9
@@ -335,29 +335,25 @@ dodo	jsr sfordone	; search for DONE
 	sta progz
 	stx progz+1
 do9	ldy #0
-	jsr dec7a
-	jmp clrdoflg
+	sty doflag	; old: jsr dec7a
+	jmp ($0308)	; old: jmp clrdoflg
 
 do0	jmp setdoflg
 
 ; ----------------------------------------- part of RENUMBER
 ; b9df
 ren2	ldy #0		; find PRG end
-	lda ($a8),y	; get line link
+	lda ($a8),y	; get line link low
 	tax
 	iny
 	ora ($a8),y	; 0? (prg end)
 	beq +
 	jmp ren5		; ce70 (loop: next line)
 ; b9ec
-+	jmp ren3		; 94bd
++	jmp ren3		; prg end: lst line num in INT
 
 ; ----------------------------------------- 
-
-	!by 0,0,0
-
-; ----------------------------------------- 
-; b9f2
+; b9ef
 open14	jsr sclose	; ### shorter!
 	lda #1		; open 1,4
 	ldx #4
@@ -368,7 +364,7 @@ open14	jsr sclose	; ### shorter!
 	jmp $ffc9
 
 ; ----------------------------------------- bef COPY
-; ba06			recoded
+; ba03			recoded
 befcopy	jsr incbasbz
 	lda xmaxlow
 	pha
@@ -458,11 +454,11 @@ cploop1	lda #160
 	jmp endsmb
 
 ; ----------------------------------------- 
-; bab8
+; bab5
 grprntab	!by $08,$35,$31,$10,$0f,$0d
 
 ; ----------------------------------------- part of COLOUR
-; babe
+; babb
 docolor2	beq colc0		; no, set paper and border to blk
 
 	cmp #$2c		; comma?
@@ -488,15 +484,16 @@ colc1	jsr sgetbytc	; get param3
 
 ; (41)
 ; ----------------------------------------- part of DO
-; bae7
-isnull	sty $c51c		; .y=0, clear DO flag
+; bae4
+isnull	sty indoloop	; .y=0, clear DO flag
+	sty justif	; clear flag for additional IFs
 	dey
 -	iny
 	lda (progz),y
 	cmp null,y
 	beq -
 	cpy #4		; NULL when .y=4
-	jmp whichdo
+	jmp whichdo	; or DONE?
 
 ; ----------------------------------------- bef REC
 ; baf8			original
@@ -1447,8 +1444,8 @@ rnn1	lda $2b		; get start of basic prog
 ; ----------------------------------------- 
 ; c8d4
 ren4	ldy #0
-	jsr rnn1
-	jmp rbnc		; ce8d
+	jsr rnn1		; basic start to a8/9
+	jmp rbnc		; renumber in line
 
 ; ----------------------------------------- 
 
@@ -1456,7 +1453,7 @@ shwerttab	!by $00,$01,$08,$09
 
 ; ----------------------------------------- func NRM
 ; c8e0
-fnnrm	jsr $aefa		; sys check "("
+fnnrm	jsr getint	; sys check "("
 	jsr sgetstr1
 	lda #0
 	sta $0d
@@ -1499,7 +1496,7 @@ nrm0	lda $69
 	ldy $a8
 	jsr sxyflp
 +	jsr $b7e2		; sys get back progz
-	jmp schkklz	; ")"?
+	jmp intback	; ")"?
 
 ; ----------------------------------------- bef DELAY
 ; c93c			enhanced
@@ -1562,8 +1559,7 @@ stofdo2	ldy doflag	; DO active?
 do4	rts
 
 do5	tya
-	ora $c51c
-	sty $c51c
+	ora indoloop
 	beq do6
 	lda $61
 	beq do1
@@ -1577,11 +1573,13 @@ do3	tya
 	beq clrdoflg
 
 setdoflg	ldy #$d0
-clrdoflg	sty doflag
+clrdoflg	sty indoloop
+	sty doflag
 do6	jsr flinend	; find line end
 	jmp endsmb
 
-do1	jmp dodo		; b99f
+do1	jmp dodo
+
 do2	jsr basromau
 	jmp do8
 
@@ -1658,14 +1656,14 @@ loadext	stx helpvec
 	jmp $f4a5		; sys LOAD
 
 ; ----------------------------------------- 
-; a79d
+; 
 null	!tx "null"
 
 ; ----------------------------------------- 
 ; ca44
 version	!tx "ad86"	; Signature
 	!by $0d
-	!tx "2.20719"	; Version Number
+	!tx "2.20801"	; Version Number
 
 ; ----------------------------------------- 
 ; ca4f

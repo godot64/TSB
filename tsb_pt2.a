@@ -73,7 +73,7 @@ tabjoy	!by $6e,$66,$67,$65,$6d,$69,$6b,$6a
 ; ----------------------------------------- func POT
 ; 8914			modified
 fnpot	jsr $aefa		; sys "("?
-	jsr sgetadr2
+	jsr sgetadr2	; (- jsr klgetadr!)
 	jsr $aef7		; sys ")"?
 	lda $65
 	bne +
@@ -622,7 +622,7 @@ onebyte	jsr chhexchr	; hi nibble digit valid?
 
 ; ----------------------------------------- 
 ; 8cf4
-l8d02	jsr sbzply
+nxline	jsr sbzply
 	ldy #2		; found prog end?
 	lda (progz),y
 	beq +		; yes, to RTS
@@ -631,17 +631,19 @@ l8d02	jsr sbzply
 ; 8d02
 sfordone	jsr schdo		; search for DO
 	cmp #0		; found line end?
-	beq l8d02		; continue search
--	iny		; now: .y=2
+	beq nxline	; continue search
+	ldx #$ff
+-	inx
+	iny
 	lda (progz),y
-	cmp tuned+3,y	; compare against "ne" (is "done"?)
+	cmp tuned+5,x	; compare against "ne" (is "done"?)
 	beq -
-	cpy #4
+	cpx #2
 	bcc --
-	jmp sbzply
+	jmp spz2done	; set PZ to 1 before token of DONE
 
 ; ----------------------------------------- 
-; 8d18
+; 8d1b
 hex2w	inc $a5		; inc byte counter
 	jsr hexw		; convert .a und .y to byte...
 	sta zwisp2
@@ -652,7 +654,7 @@ hex2w	inc $a5		; inc byte counter
 	asl
 	asl
 	ora zwisp2	; ...return in .a
-	rts
++	rts
 
 hexw	sec		; make value from digit
 	sbc #$30
@@ -662,14 +664,13 @@ hexw	sec		; make value from digit
 +	rts
 
 ; ----------------------------------------- func EXOR
-; 8d36			modified
-fnexor	jsr $aefa		; sys "("?
-	jsr sgetadr2
+; 8d39			modified
+fnexor	jsr getexor	; check "(", get first value
 	sty $aa
 	sta $ab
 	jsr $aefd		; sys chkcom
 	jsr sgetadr2
-	jsr $aef7		; sys ")"?
+	jsr intback	; restore INT value, sys ")"
 	lda $65
 	eor $aa
 	tay
@@ -986,7 +987,7 @@ fndiv	jsr divinit
 
 ; ----------------------------------------- 
 ; 8f7b
-divinit	jsr $aefa		; sys "("?
+divinit	jsr getint	; sys "("?
 	jsr sgetadr2
 	sta idivdend+1
 	sty idivdend
@@ -994,7 +995,7 @@ divinit	jsr $aefa		; sys "("?
 	jsr sgetadr2
 	sta idivsor+1
 	sty idivsor
-	jsr $aef7		; sys ")"?
+	jsr intback	; ")"
 	jmp idiv
 
 ; ----------------------------------------- 
@@ -1029,8 +1030,7 @@ csgetari7	cpy #$58		; TEST?
 
 ; ----------------------------------------- func TEST
 ; 8fba			modified
-fntest	jsr $aefa		; sys "("?
-	jsr sgetadr2
+fntest	jsr klgetadr	; check "(", get adress value
 	jsr getxy2	; get X/Y
 	jsr $aef7		; sys ")"?
 	lda #$0b
@@ -1043,46 +1043,57 @@ fntest	jsr $aefa		; sys "("?
 	cli
 	jmp sxyflp3
 
+; ----------------------------------------- Part of EXOR
+; 8fd6
+getexor	jsr getint	; check "(", get adress value
+	jmp sgetadr2
+
+; ----------------------------------------- 
+; 8fdf
+	!by 0,0,0,0,0,0,0,0	; 11 bytes
+	!by 0,0,0
+
 ; ----------------------------------------- Part of DO..DONE
-; 8fdc			Baustelle!
-skipif	jsr schelse	; search for single ELSE:
-	tax
-	beq +		; found end of line? (leave)
-	cmp #$47		; found ELSE?
-	bne +
-	cpy #1		; yes, single ELSE?
-	beq +
-	ldx lastif
-	beq ++
-	jsr sbzply	; no, execute command after ELSE
-	sty doflag
-	jmp endsmb
-++	jmp sfordone
-
-doiftrue	lda #0
+; 8fea			
+doiftrue	lda #0		; doflag off
 	sta doflag
-	jmp chrgot
+	iny
+	jmp chrgot	; get latest byte from prg
 
-mkwahr	lda $61
+mkwahr	lda $61		; DO found: store boole value on DO stack
 	ldx doindex
-	lda dobools,x
-	inc doindex
-	sta lastif
-	sty $c51c
+	sta dobooles,x
+	inc doindex	; inc stackpointer
+	sty indoloop	; set flag for active DO
 +	rts
 
 ; ----------------------------------------- 
-; 9015 
-	!by 0
+; 9002 
+execbef	jsr basromei
+	jmp ($0308)	; sys get bef address
+
+; ----------------------------------------- Part of DO
+; 9008 
+chkelse	jsr schelse	; search for ELSE in same line
+	sty justif	; set flag for "ELSE in IF-line"
+	rts		; (then: .y>0, if no ELSE: .y=0)
 
 ; ----------------------------------------- 
-; 9016
+; 900f
+restint	ldx helpvc2	; restore INT
+	lda helpvc2+1
+	stx int
+	sta int+1
+	rts
+
+; ----------------------------------------- 
+; 9018
 csgetari8	cpy #$57		; INST?
 	beq fninst
 	jmp csgetari9
 
 ; ----------------------------------------- func INST
-; 901d			enhanced
+; 901f			enhanced
 fninst	jsr $aefa		; sys "("?
 	jsr get2strs
 	jsr getbytc	; get position ($c51f)
@@ -1101,7 +1112,7 @@ fninst	jsr $aefa		; sys "("?
 +	lda strlen2	; otherwise: build newstring (62/63)
 ++	jsr neustr	; sys: set stringdescriptor
 
-; 9045
+; 9047
 	ldy #0
 	sty $bf
 	sty helpvec
@@ -1126,7 +1137,7 @@ fninst	jsr $aefa		; sys "("?
 	jmp jpushstr	; yes, create new string on stringheapn (40)
 
 ; ----------------------------------------- 
-; 906d
+; 906f
 get2strs	jsr sgetstr1	; get string
 	sta $a8		; adr: a7/a8
 	stx $a7
@@ -1141,74 +1152,74 @@ get1str	jsr sgetstr1	; get oldstring
 	rts
 
 ; ----------------------------------------- 
-; 9089			enhanced
+; 908b			enhanced
 csgetari9	cpy #$56		; INKEY?
 	bne csgetaria
 
 ; ----------------------------------------- func INKEY
-; 908d			modified
+; 908f			modified
 	ldy inkey
 	jmp sxyflp3
 
 ; ----------------------------------------- 
-; 9093
+; 9095
 csgetaria	cpy #$5c		; POT?
 	bne csgetarib
 	jmp fnpot
 
 ; ----------------------------------------- 
-; 909a
+; 909c
 csgetarib	cpy #$5d		; PENX?
 	bne csgetaric
 	jmp fnpenx
 
 ; ----------------------------------------- 
-; 90a1
+; 90a3
 csgetaric	cpy #$5f		; PENY?
 	bne csgetarid
 	jmp fnpeny
 
 ; ----------------------------------------- 
-; 90a8
+; 90aa
 csgetarid	cpy #$61		; GRAPHICS?
 	bne csgetarie
 
 ; ----------------------------------------- func GRAPHICS
-; 90ac			original
+; 900e			original
 fngraphics
 	ldx #$d0		; =$d000
 cga0	ldy #$00
 	jmp sxyflp
 
 ; ----------------------------------------- 
-; 90b3
+; 90b5
 csgetarie	cpy #$60		; SOUND?
 	bne csgetarif
 
 ; ----------------------------------------- func SOUND
-; 90b7			modified
+; 90b9			modified
 fnsound	ldx #$d4		; =$d400
 	bne cga0
 
 ; ----------------------------------------- 
-; 90bb
+; 90bd
 csgetarif	cpy #$67		; NRM?
 	bne csgetarig
 	jmp fnnrm
 
 ; ----------------------------------------- 
-; 90c2
+; 90c4
 csgetarig	cpy #$28		; AT?
 	bne csgetarih
 	jmp fnat
 
 ; ----------------------------------------- 
-; 90c9
+; 90cb
 csgetarih	cpy #$7c		; CHECK?
 	bne csgetarii	; no
 
 ; ----------------------------------------- func CHECK
-; 90cd			recoded
+; 90cf			recoded
 fncheck	jsr $aefa		; sys "("?
 	jsr getx8		; get sprite#
 	stx pos
@@ -1232,13 +1243,13 @@ fncheck	jsr $aefa		; sys "("?
 -
 +	ldy #1
 	jmp sxyflp3
-; 90ff
+; 9101
 wdetect	lda detecterg
 	and mbittabs,y
 	rts
 
 ; -----------------------------------------
-; 9106
+; 9109
 ++	jsr $aef7		; sys ")"?
 
 	ldy pos		; sprite #x
@@ -1247,35 +1258,35 @@ wdetect	lda detecterg
 	bne --		; ja, return 0
 
 ; ----------------------------------------- 
-; 9113
+; 9115
 csgetarii	cpy #$7d		; DISPLAY?
 	bne csgetarij
 
 ; ----------------------------------------- func DISPLAY
-; 9117
+; 9119
 fndisplay	ldx video		; returns video address
 	bne cga0		; normally uncond. branch
 
 ; ----------------------------------------- 
-; 911c
+; 910e
 csgetariend		; end of FN chain
 
 ; ----------------------------------------- ERR entry
-; 911c			recoded
+; 911e			recoded
 fnerr	jsr dec7a
 	ldy #0
 	jsr errnln	; "n" (errn)?	
 	beq cerrn
 
 ; ----------------------------------------- func ERRLN
-; 9126
+; 9128
 cerrln	cmp #$4c		; no, "l" (errln)?
 	beq +
 
 -	jmp endsmb
 
 ; ----------------------------------------- func ERRN 
-; 912d
+; 912f
 cerrn	ldy errn
 	ldx #0
 	beq ++
@@ -1289,13 +1300,13 @@ cerrn	ldy errn
 	jmp sxyflp
 
 ; ----------------------------------------- 
-; 9145
+; 9147
 errnln	jsr chrget
 	cmp #$4e
 	rts
 
 ; ----------------------------------------- func D!PEEK
-; 914b			new function
+; 914d			new function
 csgetarij	cpy #$54		; Token von D!?
 	beq fndpeek
 	cpy #$7a		; Token von MEM?
@@ -1310,7 +1321,7 @@ fndpeek	jsr getpeek
 	pla
 	tay
 	jmp sxyflp	; .y/.x to float
-; 9163
+; 9165
 getpeek	ldy #0
 	lda #$c2		; PEEK following?
 	cmp (progz),y
@@ -1318,14 +1329,12 @@ getpeek	ldy #0
 	jmp swarm		; no, bad mode error
 
 +	jsr incbasbz	; yes, advance:
-	jsr $aefa		; sys: "("?, returns .y=0
+	jsr getint	; sys: "("?, returns .y=0
 	jsr sgetadr2	; get address
-	sty int
-	sta int+1
-	jmp $aef7		; sys: ")"?
+	jmp $aef7		; check ")"
 
 ; ----------------------------------------- 
-; 917e
+; 917c
 ;
 ; End of part 2
 ;

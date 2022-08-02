@@ -311,8 +311,16 @@ befrot	jsr sgetbytn
 
 ; ----------------------------------------- 
 ; a186
-	!by 0,0,0,0,0,0,0,0	; 12 bytes
-	!by 0,0,0,0
+spz2done	tya		; .y minus 5
+	sbc #5
+	tay
+	bcs +
+	dec progz+1
++	jmp sbzply	; add to PZ
+
+; ----------------------------------------- 
+; a191
+	!by 0
 
 ; ----------------------------------------- bef CHAR
 ; a192			original
@@ -484,11 +492,11 @@ fsende	inx		; programmende erreicht:
 
 ; ----------------------------------------- bef ELSE
 ; a2c8			recoded
-befelse	lda doflag
-	beq +
-	lda #$47
+befelse	jsr doelse	; is FALSE (at DO)?
+	beq +		; yes, cont. prg
+	lda #$47		; no, is TRUE, skip to DONE
 	sta doflag
-+	jmp befproc
++	jmp execbef
 
 ; ----------------------------------------- Part of DIR
 ; a2d5
@@ -1254,7 +1262,7 @@ moboff	and mbittabl,x
 
 ; ----------------------------------------- 
 ; a86e
-	!by 0,0,0,0,0
+	!by 0,0,0,0,0	; 5 bytes
 
 ; ----------------------------------------- bef OFF
 ; a873			enhanced

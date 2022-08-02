@@ -7,6 +7,7 @@
 ; part 7, extension area
 ;
 ; patched on 03.05.2021 (command PLACE: optimized)
+; patched on 21.07.2022 (bugfix in RENUMBER)
 ;
 ; ----------------------------------------- 
 
@@ -358,17 +359,17 @@ tsbfd	!tx "array not founD"
 
 ; ----------------------------------------- part of RENUMBER
 ; ce70
-ren5	lda ($a8),y
+ren5	lda ($a8),y	; get line link hi
 	pha
 	iny
-	lda ($a8),y
+	lda ($a8),y	; get line num to INT
 	sta int
 	iny
 	lda ($a8),y
 	sta int+1
 	txa
-	sta $a8
-	pla
+	sta $a8		; reget line link low
+	pla		; and hi
 	sta $a9
 	jmp ren2		; back to ren2
 
@@ -376,100 +377,105 @@ ren5	lda ($a8),y
 ; ce86
 	!by 0,0,0,0
 
-; ----------------------------------------- 
+; ----------------------------------------- RENUMBER: Scan Basic Line
 ; ce8a
 rbnb	jsr inca8a9
 rbnc	jsr inca8a9
-	lda ($a8),y
-	beq rnb2
+	lda ($a8),y	; (.y=0) get hi line num
+	beq rnb2		; (rts) leave if at prg end
 	jsr inca8a9
-	lda ($a8),y
+	lda ($a8),y	; store position to 39/a
 	sta $39
 	jsr inca8a9
 	lda ($a8),y
 	sta $3a
---	ldx #7
+--	ldx #7		; check 6 reference tokens
 rnb0	jsr inca8a9
--	lda ($a8),y
-	beq rbnb
+-	lda ($a8),y	; relevant token?
+	beq rbnb		; line end: next line
 	cmp tokens-1,x
-	beq +
+	beq +		; yes, relevant token found
 	dex
-	bne -
-	beq --
+	bne -		; next reference
+	beq --		; next byte in basic line
 
-+	cpx #6		; found one?
-	bcc rnb6
-	lda $a8		; no
++	cpx #6		; found RCOMP or RESET?
+	bcc rnb6		; no V2 token
+	lda $a8		; pre-token ($64) correct?
 	bne +
 	dec $a9
 +	dec $a8
 	lda ($a8),y
 	jsr inca8a9
-	cmp #$64		; sb token?
-	bne rnb0
-rnb6	jsr rnb1		; yes
-	beq +
+	cmp #$64
+	bne rnb0		; no, continue search
+rnb6	jsr rnb1		; yes, write new line num
+	beq +		; uncond. branch (.y=0)
+
 rnb5	jsr inca8a9
-+	cmp #0
-	beq --
++	cmp #0		; line end?
+	beq --		; yes, cont. search
 	cmp #$3a		; ":"?
-	beq --
+	beq --		; yes, cont. search
 	lda ($a8),y
-	cmp #$20		; " "?
+	cmp #$20		; skip spaces
 	beq rnb5
-	cmp #$2c		; ","?
-	beq rnb6
-	cmp #$ab		; token of "-"?
-	beq rnb6
-	ldx #7
-	bne -
+	cmp #$2c		; ","? (list after ON?)
+	beq rnb6		; yes: write line nums
+	cmp #$ab		; token of "-"? (after LIST)
+	beq rnb6		; yes: write line num
+	ldx #7		; otherwise: cont. search
+	bne -		; uncond. branch
+
 rnb2	rts
 
-; ----------------------------------------- 
+; ----------------------------------------- RENUMBER: Write New Line Nums
 ; ceed
 -	jsr inca8a9
-rnb1	lda $a8
+rnb1	lda $a8		; what is following token?
 	ldx $a9
 	sta progz
 	stx progz+1
 	jsr chrget
-	cmp #$ab		; token of "-"?
+	cmp #$ab		; token of "-"? (in LIST)
 	beq -		; yes, skip
-	jsr chrgot
-	bcs rnb2
-	jsr $a96b		; sys linenumber to adr
-	jsr enternum
-	jsr $bc49		; sys int to float
-	jsr $bddf		; sys fac to asc (in linenum)
+	jsr chrgot	; line num?
+	bcs rnb2		; no, cont. search
+
+	jsr $a96b		; sys linenumber to adr in INT
+	jsr enternum	; compute new line num
+	jsr $bc49		; sys int to float (returns .y=0)
+	jsr $bddf		; sys fac to asc (in linenum $0100, returns .a=0)
 	tax
 -	lda linenum,x
 	beq +		; end of digits
 	inx
 	bne -
 +	inx
-	stx $71
-rnb8	ldy #0
+	stx $71		; len of new line num to 71
+rnb8	ldy #0		; does it fit in old location? 
 	sec
 	lda progz
 	sbc $a8
 	cmp $71
-	bmi rnb3
-	bne rnb4
--	jsr inca8a9
-rnb7	ldx #0
-	lda linenum,y
+	bmi rnb3		; no, move prg 1 byte ahead
+	bne rnb4		; or is it shorter?
+
+-	jsr inca8a9	; no, fits
+rnb7	ldx #0		; write new line num to old position
+	lda linenum,y	; set flag for success (.a=1)
 	beq +
 	sta ($a8,x)
 	iny
 	bne -
-+	lda #1
+
++	lda #1		; return to scan of basic lines
 	ldy #0
 	rts
 
-; ----------------------------------------- 
+; ----------------------------------------- Fill up Line Num space
 ; cf3d
-rnb4	jsr inca8a9	; fill shorter nums
+rnb4	jsr inca8a9	; fill shorter nums w/ spaces
 	tax
 	dex
 	lda #$20
@@ -478,47 +484,47 @@ rnb4	jsr inca8a9	; fill shorter nums
 	dex
 	bne -
 	ldy #0
-	beq rnb7
+	beq rnb7		; now write into basic line
 
-; ----------------------------------------- 
+; ----------------------------------------- Stretch Basic PRG
 
-rnb3	jsr moveprg	; returns .a=0
+rnb3	jsr moveprg	; make prg 1 byte longer (returns .a=0)
 	dec $71
 	tax
-	beq rnb8
+	beq rnb8		; does line num fit now?
 
 ; ----------------------------------------- 
 ; cf56
 tokens	!by $9b,$a7,$8d,$89,$8a,$30,$46
 	; tokens: LIST,THEN,GOSUB,GOTO,RUN,RESET,RCOMP
 
-; ----------------------------------------- 
+; ----------------------------------------- RENUMBER: Count Basic Lines
 ; cf5d
-enternum	ldy #0
+enternum	ldy #0		; reset counter (58/9)
 	sty $59
 	sty $58
-	lda $20
+	lda $20		; get start line num (to 62/3)
 	ldx $21
 	stx $62
 	sta $63
-	lda $2b
+	lda $2b		; ge tbasic start (to 5f/60)
 	ldx $2c
 	sta $5f
 	stx $60
 -	iny
 	iny
 	iny
-	lda ($5f),y
-	cmp int+1
+	lda ($5f),y	; line num hi
+	cmp int+1		; equals refenrece line num (max prg num at 1st time)?
 	bne +
 	dey
 	lda ($5f),y
 	cmp int
-	beq rnb9
-	iny
+	beq rnb9		; yes, check limit and leave sub
+	iny		; no, now...
 +	dey
 	dey
-	inc $58
+	inc $58		; ...count lines
 	bne +
 	inc $59
 +	lda ($5f),y
@@ -527,71 +533,69 @@ enternum	ldy #0
 	lda ($5f),y
 	sta $5f
 	txa
-	sta $60
-	bne -
-	jmp $bdc2		; sys out linenumber
+	sta $60		; at prg end?
+	bne -		; no, cont. counting
+	jmp $bdc2		; yes, sys out "in linenumber", reference line not found
 
-; ----------------------------------------- 
+; ----------------------------------------- RENUMBER: Check for max line num
 ; cf9c
 --	dec $59
 -	dec $58
-rnb9	clc
-	lda $63
+rnb9	clc		; add step count times to start line num
+	lda $63		; (so getting new line num)
 	adc ay
 	sta $63
 	lda $62
 	adc ay+1
 	sta $62
-	lda $58
+	lda $58		; count down lines
 	bne -
 	lda $59
 	bne --
 	ldy $63
 	lda $62
-	cmp #$fa
-	bcs rnba
-	ldx #$90
+	cmp #$fa		; result greater than 63999?
+	bcs +		; yes (bad mode error)
+	ldx #$90		; no, start scanning
 	sec
-	rts
++	rts
 
-; ----------------------------------------- 
+; ----------------------------------------- RENUMBER: Move PRG by 1 Byte
 ; cfc3
-moveprg	lda $a8
+moveprg	lda $a8		; current position
 	ldx $a9
-	sta $58
+	sta $58		; as reference
 	stx $59
-	ldx $2d
+	ldx $2d		; start at prg end
 	ldy $2e
 	dex
 	bne +
 	dey
 +	stx $a8
 	sty $a9
-	ldy #1
+	ldy #1		; move by 1 byte larger
 	ldx #0
 -	lda ($a8,x)
 	sta ($a8),y
-	lda $a8
+	lda $a8		; count down bytes
 	bne +
 	dec $a9
 +	dec $a8
-	lda $a9
+	lda $a9		; until start position
 	cmp $59
 	bne -
 	lda $a8
 	cmp $58
 	bne -
-	jsr $a533		; sys bind lines
-	inc $2d
+	jsr $a533		; then sys bind lines (returns .a=0)
+	inc $2d		; increase prg end by 1
 	bne +
 	inc $2e
 +	rts
 
 ; ----------------------------------------- 
 ; cffd
-rnba	pla
-	pla
-	rts
+	!by 0,0,0
 
 ; ----------------------------------------- 
 ; d000 End of TSB

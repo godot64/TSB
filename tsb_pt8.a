@@ -27,7 +27,7 @@
 	strz1		= $c518		; ARC Endwinkel
 	strz2		= $c519		; ARC Startwinkel
 	vgle		= $c51a		; word: Vergleichswert, Ende erreicht? (MOB, LINE, ARC)
-	;		  $c51c		  DO found
+	indoloop		= $c51c		; DO found, flag for ELSE and DONE
 	errln		= $c51d		; word: Zeile bei Fehler
 	pos		= $c51f		; Positionswert (verschiedene Befehle, z.B. INST)
 	pos1		= $c520		; dito bei DUP und CHECK
@@ -82,7 +82,7 @@
 	flashing		= $c5c7		; Flag: FLASH aktiv	($00-$80)
 	;                                         ! unused (3 bytes)
 	ifflag		= $c5cb		; Wahrheitswert der letzten IF-Abfrage
-	lastif		= $c5cc		; dito bei DO..DONE
+	justif		= $c5cc		; Flag für IF in DO..DONE
 	;                                         ! unused (8 bytes)
 	lcode		= $c5d5		; part of LIST
 	inkey		= $c5d6		; Nummer der Funktionstaste
@@ -234,7 +234,7 @@
 	;
 	kry		= $cbc5		; Kreis: Radius Y
 	stackdo		= $cbc6		; DO-Stack (20 bytes)
-	dobools		= $cbda		; Wahrheitswerte der DO-Strukturen
+	dobooles		= $cbda		; Wahrheitswerte der DO-Strukturen
 	doindex		= $cbe4		; Index in DO-Stack	(0..9)
 	;				  ! unused (27 bytes)
 

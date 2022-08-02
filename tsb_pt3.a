@@ -37,12 +37,12 @@
 	!ct pet
 
 ; ----------------------------------------- TSB Commands
-; 917e
+; 917c
 bef0	jsr chrget
 	jmp endsmb
 
 ; ----------------------------------------- TSB Interpreter
-; 9184			recoded
+; 9182			recoded
 sbasbef	tsx
 	stx stack		; save stack pointer
 	lda onkeyflag
@@ -121,7 +121,7 @@ ipr5	jsr incbasbz	; process sb command
 	rts
 
 ; ----------------------------------------- bef HIRES
-; 920b			optimized
+; 9209			optimized
 befhires	ldy #$01
 	sty xmaxhigh
 	lda #$3f
@@ -150,14 +150,14 @@ befhires	ldy #$01
 	jsr nrm01
 	jsr nrm03
 
-; 9243
+; 9241
 	sty lowcolflag
 	lda $ac		; clear colors
 setmod	jsr clrhicols
 	beq ++
 
 ; ----------------------------------------- func MEMPEEK
-; 924d
+; 924b
 csgetarik	bne +		; MEMPEEK?
 
 fnmempeek	jsr getpeek	; yes, PEEK in overall RAM
@@ -171,21 +171,22 @@ fnmempeek	jsr getpeek	; yes, PEEK in overall RAM
 	pla
 	sta pport
 	cli
+	jsr restint
 	jmp sxyflp3
 
 ; ----------------------------------------- 
-; 9264
+; 925f
 +	jmp csgetariend	
 
 ; ----------------------------------------- bef PLOT
-; 9267			recoded
+; 9262			recoded
 befplot	jsr getxy
 	jsr getpktf	; col
 	jsr punkt		; set dot
 ++	jmp endsmb
 
 ; ----------------------------------------- 
-; 9273
+; 926e
 clrhicols	sta $c000,y	; clear video ram
 	sta $c0f9,y
 	sta $c1f3,y
@@ -196,20 +197,20 @@ clrhicols	sta $c000,y	; clear video ram
 	rts
 
 ; ----------------------------------------- part of DO
-; 9285
+; 9280
 dodone	bcs +		; DONE?
 	jmp befproc	; no, skip rest of line
 
 +	jmp donecont	; b56a
 
-; ----------------------------------------- 
-; 928d
+; -----------------------------------------  set dot
+; 9288
 -	lda #$08		; nicht plausibel
 	sta status
 	rts
 
-; ----------------------------------------- set dot
-; 9292			original
+; -----------------------------------------
+; 928d			original
 punkt	clc
 	lda $09		; plausibel?
 	sbc xmaxlow	; x>319?
@@ -260,12 +261,16 @@ punkt	clc
 	lsr
 	lsr
 	lsr
+	pha
+	and #3
 	tay		; y-pos/8
 	clc
 	lda gadrtabl,y
 	adc $63
 	adc $09
 	sta $a8
+	pla
+	tay
 	lda gadrtabh,y
 	adc $0a
 	sta $a9
@@ -306,7 +311,7 @@ herase	lda ($a8),y
 	sta ($a8),y
 	rts
 
-; 9331
+; 932e
 hinvert0	inx
 hinvert	lda ($a8),y
 	eor gbittabs,x
@@ -337,7 +342,7 @@ getxy2	sty $09
 	rts
 
 ; ----------------------------------------- 
-; 9369
+; 9379
 getxyxyf	jsr getxy		; start X/Y
 getxyf	jsr schkcom	; comma?
 gxyf0	jsr sgetadr	; end x
@@ -422,7 +427,7 @@ get	ldx #0		; ### v2.20528
 	beq -
 	jsr chrget
 	jsr pspeibe
-	jsr $ab7b   	; dann BASIC GET
+	jsr $ab7b   	; dann sys GET
 	jsr prestor
 	jmp scd5		; Stack bereinigen, Ende	
 
@@ -459,18 +464,29 @@ sgetadr	jsr sfrmnum
 
 ; ----------------------------------------- 
 ; 9434
-gadrtabl	!by $00,$40,$80,$c0,$00,$40,$80,$c0
-	!by $00,$40,$80,$c0,$00,$40,$80,$c0
-	!by $00,$40,$80,$c0,$00,$40,$80,$c0
-	!by $00
-; 944d
+gadrtabl	!by $00,$40,$80,$c0
+
+; 9438
 gadrtabh	!by $e0,$e1,$e2,$e3,$e5,$e6,$e7,$e8
 	!by $ea,$eb,$ec,$ed,$ef,$f0,$f1,$f2
 	!by $f4,$f5,$f6,$f7,$f9,$fa,$fb,$fc
 	!by $fe
 
 ; ----------------------------------------- 
-; 9466			optimized
+; 9451
+intback	jsr restint
+	jmp $aef7		; sys ")"?
+
+; ----------------------------------------- 
+; 945d
+getint	ldx int
+	lda int+1
+	stx helpvc2
+	sta helpvc2+1
+	jmp $aefa		; sys: "("?, returns .y=0
+
+; ----------------------------------------- 
+; 9468			optimized
 a4mal40	lda #0
 	asl $a4		; $a4 mal 8...
 	rol
@@ -499,7 +515,7 @@ a4mal40	lda #0
 	rts
 
 ; ----------------------------------------- bef CIRCLE
-; 948b			enhanced
+; 948d			enhanced
 befcircle	jsr incbasbz
 	lda #0
 	sta drehsinn
@@ -522,16 +538,17 @@ befcircle	jsr incbasbz
 	jmp endsmb
 
 ; ----------------------------------------- part of RENUMBER
-; 94bf
+; 94c1
 ren3	jsr basromei
-	jsr enternum	; cf5d
-	cmp #250
-	bcs +
-	jmp ren4		; c8d3
-+	jmp towarm
+	jsr enternum	; count all lines
+	cmp #$fa		; exceeded limit? (63999)
+	bcs +		; yes, bad mode
+	jmp ren4		; basic start to a8/9, then renumber in	line
+
++	jmp towarm	; bad mode error
 
 ; ----------------------------------------- 
-; 94cf
+; 94d1
 l20pl40	clc
 	lda $20
 	adc #40
@@ -541,7 +558,7 @@ l20pl40	clc
 +	rts
 
 ; ----------------------------------------- 
-; 94db			optimized
+; 94dd			optimized
 l23pl40	clc
 	lda $23
 	adc #40
@@ -551,7 +568,7 @@ l23pl40	clc
 +	rts
 
 ; ----------------------------------------- bef MULTI
-; 94e7			recoded
+; 94e9			recoded
 befmulti	lda #$2c		; set multi limits
 	sta multijn
 	lda #$9f
@@ -563,8 +580,7 @@ befmulti	lda #$2c		; set multi limits
 	jsr chrgot	; anything following?
 	beq justmulti
 
-	jsr get2nyb2	; yes, get 2 parameters
-	ldy #0
+	jsr get2nyb2	; yes, get 2 parameters, returns .y=0
 	jsr clrhicols	; set video ram
 
 	jsr sgetbytc	; get 3rd parameter
@@ -1097,7 +1113,7 @@ sirq5	lda playflag
 	jmp $ea31		; sys IRQ
 
 ; ----------------------------------------- bef PAGE
-; 98eb
+; 98eb			enhanced
 befpage	jsr chkonoff
 	txa		; OFF?
 	beq +++		; yes, set flag
@@ -1157,7 +1173,7 @@ chk4key	jsr $ffe1		; STOP?
 	jmp wanykey
 
 ; ----------------------------------------- bef CENTRE
-; 9945
+; 9945			recoded
 befcentre	jsr gcentpar
 +	sec
 	sbc helpvec+2
@@ -1404,7 +1420,7 @@ drawto	jsr get10010	; get byte after DRAW token
 	jsr gxyf0		; then get ex/ey-end and mode
 	jmp line0		; and draw line
 
-; ----------------------------------------- 
+; ----------------------------------------- Part of LOAD
 ; 9add
 bloadadr	jsr $aefd		; sys chkcom
 	jsr sgetadr	; word holen
@@ -1475,7 +1491,7 @@ befretrace
 	lda #<version	; out "ad86"
 	ldx #>version
 	ldy #12
-	jmp trc1		; retc0 
+	jmp trc1		; out version 
 
 ; ----------------------------------------- 
 ; 9b50
@@ -1503,39 +1519,42 @@ befif	jsr incbasbz
 	cmp #$89		; GOTO?
 	beq +
 
-	lda #$a7		; no, check for THEN
+	lda #$a7		; no, check for THEN (syntax error if not)
 	jsr schkzei
 ; 9b7d
-inif	jsr schdo		; then search for DO
+inif	jsr schdo		; then search for DO in same line
 	cmp $22
 	beq fnddo
 
-+	lda $61
++	jsr chkelse	; search for ELSE in same line
+	tax		; result: 0=not found, $47=found (in justif)
+
+	lda $61		; get boole
 	sta ifflag
 	bne iftrue
 
-	jsr schelse	; search for ELSE in same line
-	iny
-	cmp $22
-	beq fndelse
+	txa		; false: ELSE in same line?
+	bne fndelse	; yes
 
-	dey
 	jsr sbzply
 	jmp endsmb
 
 ; ----------------------------------------- 
 ; 9b9a
-iftrue	jsr doiftrue	; process THEN
+iftrue	jsr doiftrue	; true: process THEN
 	bcs +
-	jmp cgoto0	; sb goto
+	jmp cgoto0	; sb goto (when digits)
 
 ; ----------------------------------------- 
 
-fnddo	jsr mkwahr
+fnddo	jsr mkwahr	; found DO
 	dey
-fndelse	jsr sbzply
+	iny
+fndelse	dey
+	jsr sbzply
+
 +	jsr dec7a
-	jmp ($0308)	; sys get bef address
+	jmp execbef	; basic on, execute command
 
 ; ----------------------------------------- 
 ; 9baf
@@ -1615,7 +1634,7 @@ setsstart	clc		; start search at basic start
 	rts
 
 ; ----------------------------------------- bef EXEC
-; 9c36 (was 9cec)			recoded
+; 9c36 (was 9cec)		recoded
 befexec	lda progz		; save basic pz to stack
 	pha
 	lda progz+1

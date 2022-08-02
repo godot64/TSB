@@ -844,8 +844,8 @@ befscrld	jsr intro
 	stx $b5		; store hibyte
 	ldx $b8		; file#
 	jsr $ffc6		; chkin
-	jsr $ffcf		; skip load address
-	jsr $ffcf
+	jsr chkstate	; file exists?
+	jsr $ffcf		; yes, skip load address
 	lda #$cf		; set (ff)cf= basin to distributor
 	bne ss1
 	
@@ -1040,19 +1040,51 @@ txl1	eor $6a		; care for RVS
 txl2	jmp txcont0
 
 ; ----------------------------------------- 
+; b2da
+doelse	ldy #0
+	ldx doindex	; is DO active?
+	beq +		; no, skip ELSE, cont. prg
+	lda justif	; from ELSE: is just an IF?
+	bne +		; yes, get latest IF boole
+	sty justif
+	dex		; no, get DO-boole from stack
+	lda dobooles,x	; (if DO is true: skip to DONE)
+-	rts
 
-	!by 0,0,0,0,0,0,0,0	; 68 bytes
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0
++	pla		; if not: from most recent IF
+	pla
+	sty justif	; clear justif, cont. prg
+	lda ifflag
+	bne +
+	jmp execbef
++	jmp befproc
+
+; ----------------------------------------- 
+; b2fe
+skipif	jsr schelse	; search for single ELSE:
+	tax
+	beq -		; found line end (yes, leave)
+	iny
+	lda (progz),y	; line end behind ELsE?
+	bne  -		; no (so: single ELSE)
+	pla
+	pla
+	jmp fndelse+4
+
+; ----------------------------------------- 
+; b311
+chkstate	jsr $ffcf
+	ldx status
+	beq nrm04
+	jmp ss5
+
+; ----------------------------------------- 
+; b31b
+	!by 0,0,0,0,0,0,0,0	; 9 bytes
+	!by 0
 
 ; ----------------------------------------- bef CSET
-; b30e			modified
+; b321			modified
 befcset	jsr sgetbytn
 	txa		; cset 0?
 	beq +
@@ -1076,16 +1108,16 @@ nrm03	lda #$3b		; CSET 2: bits for hires mode
 	sta $dd00
 	lda #10		; flag for MOB SET
 	sta gmemflag
-	rts
+nrm04	rts
 
 ; ----------------------------------------- bef VOL
-; b338			enhanced
+; b34f			enhanced
 befvol	jsr chkonoff
 	stx $d418
 	jmp endsmb
 
 ; ----------------------------------------- bef DISK
-; b355			recoded
+; b358			recoded
 befdisk	jsr chkdrv	; is drive there? 
 	jsr sgetstrn	; yes, get string
 	lda $69
@@ -1112,7 +1144,7 @@ befdisk	jsr chkdrv	; is drive there?
 +	jmp endsmb	; no, end command
 
 ; ----------------------------------------- main part of USE
-; b38d			recoded
+; b390			recoded
 use7	ldx #0		; clear current
 	ldy $44
 -	cpy $43		; compare to len
@@ -1144,7 +1176,7 @@ usel1	stx $66		; save index
 	rts
 
 ; ----------------------------------------- 
-
+; b3c3
 usel2	pla
 	pla
 usel3	ldy $bd
@@ -1163,20 +1195,16 @@ usel3	ldy $bd
 	bne --
 
 ; ----------------------------------------- 
-; b3dc
+; b3df
 err11	ldx #$0b		; error "syntax"
 	jmp ($0300)
 
 ; ----------------------------------------- 
-; b3e1
+; b3e4
 use3	jsr sgetstr	; get ctrl string
 	lda $69		; len=0?
 	beq err11		; yes, syntax error
 	jsr use4		; set string parms (ac46)
-
-	nop
-	nop
-	nop
 
 ; ----------------------------------------- 
 ; b3ee
@@ -1389,9 +1417,9 @@ quotetab	!by $80,$83,$80,$80,$83,$80,$08
 
 ; ----------------------------------------- part of DO
 ; b56a
-donecont	dec doindex
-docont	jsr dec7a		; it was DONE
-	jmp stofdo2
+donecont	dec doindex	; from DONE: dec stack pointer
+docont	jsr dec7a		; from DO:
+	jmp stofdo2	; set DO (in DODO) active (if indoloop=1)
 
 ; ----------------------------------------- bef DO
 ; b573			new
@@ -1424,15 +1452,16 @@ befkey	jsr keyget	; check for KEYGET (doesn't return if successful)
 +	dex
 	stx $aa		; times 16
 	lda #0
+	asl $aa
+	rol
+	asl $aa
+	rol
+	asl $aa
+	rol
+	asl $aa
+	rol
 	sta $ab
-	asl $aa
-	rol $ab
-	asl $aa
-	rol $ab
-	asl $aa
-	rol $ab
-	asl $aa
-	rol $ab
+
 	clc		; plus $c64d (keytab)
 	lda $aa
 	adc #<keytab
@@ -1466,9 +1495,10 @@ flashinit	lda #0
 	jmp chkonoff	; Parameter holen
 
 ; ----------------------------------------- 
-; b5ef
-	!by 0,0,0,0,0,0,0,0	; 15 bytes
-	!by 0,0,0,0,0,0,0
+; b5eb 
+	!by 0,0,0,0,0,0,0,0	; 19 bytes
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0
 
 ; ----------------------------------------- bef PAINT
 ; b5fe			recoded

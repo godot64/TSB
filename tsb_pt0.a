@@ -18,6 +18,7 @@
 	progz	= $7a
 	status	= $90
 	helpvec	= $b0
+	helpvc2	= $b4
 	drive	= $be
 	numkeys	= $c6
 

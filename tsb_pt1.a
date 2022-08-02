@@ -299,12 +299,8 @@ use2	jmp use1		; no, continue normal use (9ce3)
 
 +	jmp usedrv	; change drive#
 
-; ----------------------------------------- 
-
-	!by 0
-
 ; ----------------------------------------- part of TRACE
-; 821b
+; 821a
 trace6	dex
 	txa
 	ora #$80
@@ -315,21 +311,21 @@ trace6	dex
 	jmp trace7
 
 ; ----------------------------------------- 
-; 822a
+; 8229
 endsmb	jsr kerromein
 	cli
 	jsr basromei
 	jmp $a7ae		; sys: Interpreter
 
 ; ----------------------------------------- 
-; 8234
+; 8233
 zeiumw	jsr basromau
 	jsr zeiumw1
 	jsr basromei
 	jmp $a57c		; sys: tokenizer
 
 ; ----------------------------------------- 
-; 8240
+; 823f
 slist	php
 	pha
 	jsr basromau
@@ -338,7 +334,7 @@ slist	php
 	jmp slist3
 
 ; ----------------------------------------- 
-; 824a
+; 8249
 slist1	pha
 	jsr basromei
 	pla
@@ -346,7 +342,7 @@ slist1	pha
 	jmp $a71a		; sys: detokenizer
 
 ; ----------------------------------------- 
-; 8253
+; 8252
 slist2	pha
 	jsr basromei
 	pla
@@ -354,7 +350,7 @@ slist2	pha
 	jmp $a6f6		; sys: part of LIST
 
 ; ----------------------------------------- Eingabewarteschleife
-; 825c			recoded
+; 825b			recoded
 sloop	sei
 	lda #>sirq	; change irq to tsb
 	sta irqvec+1
@@ -381,7 +377,7 @@ sloop	sei
 	jmp $a483		; sys Eingabewarteschleife
 
 ; ----------------------------------------- 
-; 8297			enhanced
+; 8296			enhanced
 auto	clc
 	lda autozi
 	adc autoinc
@@ -423,21 +419,21 @@ auto	clc
 	jmp $a486		; sys Eingabewarteschleife (ohne inc)
 
 ; ----------------------------------------- 
-; 82ec
+; 82eb
 basromau	lda pport
 	and #$fe
 	sta pport
 	rts
 
 ; ----------------------------------------- 
-; 82f3
+; 82f2
 basromei	lda pport
 	ora #$01
 	sta pport
 	rts
 
 ; ----------------------------------------- 
-; 82fa
+; 82f9
 snmi	pha
 	txa
 	pha
@@ -453,7 +449,7 @@ snmi	pha
 	bne rs232nmi
 
 ; ----------------------------------------- 
-; 8314
+; 8313
 sbrk	lda #$04
 	sta video		; video at $0400
 	jsr $fda3		; set CIAs
@@ -470,7 +466,7 @@ sbrk	lda #$04
 rs232nmi	jmp $fe72		; nmi when rs323
 
 ; ----------------------------------------- bef MERGE (TSB)
-; 8338			recoded
+; 8337			recoded
 befmerge	jsr incbasbz
 	jsr basromei
 	lda #0		; force LOAD
@@ -488,66 +484,66 @@ befmerge	jsr incbasbz
 +	jmp $e0f9		; sys no, break in...
 
 ; ----------------------------------------- 
-; 835d
+; 835c
 ++	jsr basromau
 	jsr domerge	; continue MERGE:
 endmrge	jsr $a660		; sys clear
 	jmp $a474		; sys out: ready.
 
 ; ----------------------------------------- 
-; 8369
+; 8368
 schkstr	jsr pspeibe
 	jsr $ad8f		; sys check for string
 	jmp prestor
 
-; ----------------------------------------- bef RENUMBER (TSB)
-; 8372			recoded
+; ----------------------------------------- bef RENUMBER
+; 8371			recoded
 befrenum	jsr get10010	; .a=0
 	beq +
 
 	jsr sgetadr	; get start line number
 	sty $a4		; result in .y (lo) and .a (hi)
 	sta $a5
-	jsr isstep0	; get step, is it 0? Doesn't retrurn if	yes
+	jsr isstep0	; get step, is it 0? Doesn't return if	yes
 	sty ay		; in .y (lo) and in...
 	jsr basromau
-	lda $c4
+	lda $c4		; ...c4 (hi)
 
-+	jsr renum0
-	jsr renum1
++	jsr renum0	; do renumber
 
--	lda ($a8),y
+	jsr renum1	; get start of basic (to a8/9)
+-	lda ($a8),y	; store line link to 09/a
 	sta $09
 	jsr inca8a9
 	lda ($a8),y
 	sta $0a
 	jsr inca8a9
 	iny
-	lda $a5
+	lda $a5		; in case: line num gt 63999?
 	cmp #$fa
-	bcs sbready
-	sta ($a8),y
+	bcs sbready	; yes, just leave
+	sta ($a8),y	; no, now write new line nums to basic
 	dey
 	lda $a4
 	sta ($a8),y
-	lda $09
+	lda $09		; until end of prg
 	ora $0a
 	beq sbready
-	jsr ren0
-	lda $a4
+	jsr ren0		; set link to nexr line
+	lda $a4		; add step to last line num
 	adc ay
-	sta $a4
+	sta $a4		; store new line num
 	lda $a5
 	adc ay+1
 	sta $a5
-	bcc -
+	bcc -		; cont. 
 
-; 83c4
-sbready	jsr $a659		; sys basic bef CLR
-	jmp $a474		; sys out: ready.
+; 83c3
+sbready	jsr $a659		; then: sys basic bef CLR
+	jmp $a474		; sys out: ready. RENUMBER finished
 
 ; ----------------------------------------- 
-; 83ca
+; 83c9
 tsbcols	ldx #12		; backgr: mgr
 	stx $d021
 	dex		; border: dgr
@@ -557,14 +553,14 @@ tsbcols	ldx #12		; backgr: mgr
 	rts
 
 ; ----------------------------------------- 
-; 83d9
+; 83d8
 incbasbz	inc progz
 	bne +
 	inc progz+1
 +	rts
 
 ; ----------------------------------------- Table of Commands
-; 83e0
+; 83df
 tabbef	!tx "hires@"	; 1
 	!tx "plot@"
 	!tx "line@"
@@ -694,14 +690,19 @@ tabbef	!tx "hires@"	; 1
 	!tx "out@"
 
 ; ----------------------------------------- 
-; 8693
+; 8691
 xipr3	sty doindex
 	sty sprepeat
 	rts
 
 ; ----------------------------------------- 
-; 869a
-	!by 0,0,0,0,0	; 5 bytes
+; 8699
+klgetadr	jsr $aefa		; sys "("?
+	jmp sgetadr2
+
+; ----------------------------------------- 
+
+	!by 0
 
 ; ----------------------------------------- 
 ; 869f
@@ -709,13 +710,13 @@ tuned	!tx $0e,$08," tuned", $0d	; tsb start message
 	!by 0
 
 ; ----------------------------------------- 
-; 86a9
+; 86aa
 tsbblcopy	jsr pspeibe
 	jsr $a3b8		; sys block copy
 	jmp prestor
 
 ; ----------------------------------------- 
-; 86b2 / 86b5
+; 86b3 / 86b6
 sgetstrn	jsr incbasbz
 sgetstr	jsr sfrmevl	; get string from basic
 	jsr sfrestr
@@ -725,7 +726,7 @@ sgetstr	jsr sfrmevl	; get string from basic
 	rts
 
 ; ----------------------------------------- Table of BEFs
-; 86c2
+; 86c3
 sprtab	!wo befhires-1	;   1 $9202 hires
 	!wo befplot-1	;   2 $9267 plot
 	!wo befline-1	;   3 $9350 line
@@ -855,7 +856,7 @@ vecrenum	!wo befrenum-1	; 121 $837f renumber (changed from 87b4)
 	!wo befout-1	; 127 $9ed1 out
 
 ; ----------------------------------------- 
-; 87c0 
+; 87c1 
 tsbf1	!tx "proc not founD"	; 33 / $21
 tsbf2	!tx "insert too largE"	; 34 / $22
 tsbf3	!tx "string too largE"	; 35 / $23
@@ -870,7 +871,7 @@ tsbfb	!tx "too few lineS"		; 43 / $2b
 tsbfc	!tx "bad char for a moB"	; 44 / $2c
 ;	    "array not found	; 45 / $2d (pt 7)
 tsbf0	!tx "bad modE"		; 32 / $20
-	!by 0
+
 ; ----------------------------------------- 
 ; 887d
 serrout	txa
