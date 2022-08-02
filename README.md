@@ -23,7 +23,7 @@ Visit the most elaborate documentation [of Simons' Basic][SB Docs] and [of TSB][
 Arndt Dettke
 
 ---
-[TSB]: https://www.godot64.de/download/tsbdemo.zip "file about 100 KB"
+[TSB]: https://www.godot64.de/download/tsb.zip "file about 100 KB"
 [tsbcrt]: https://www.godot64.de/german/downloads.htm#tsb "remove '.bin' in the names for use!"
 [SB Docs]: https://www.c64-wiki.de/wiki/Simons_Basic
 [TSB Docs]: https://www.c64-wiki.de/wiki/TSB
