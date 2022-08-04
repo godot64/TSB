@@ -16,6 +16,7 @@
 ; patched on 06.06.2022 (optimized, added func D!PEEK)
 ; patched on 27.06.2022 (bugfix in VERIFY)
 ; patched on 14.07.2022 (bugfix in INST, optimized code)
+; patched on 03.08.2022 (added illegal direct to INST, INSERT & PLACE)
 ;
 ; ----------------------------------------- 
 
@@ -803,17 +804,24 @@ getdouble	ldy #1
 
 ; ----------------------------------------- 
 ; 8e2e
+getstrgs	jsr $aefa		; sys "("?
+	jmp get2strs
+
+; ----------------------------------------- 
+; 8e34
 csgetari2	cpy #$10		; PLACE?
 	beq fnplace
 	jmp csgetari3
 
 ; ----------------------------------------- func PLACE
-; 8e35			modified
-fnplace	jsr $aefa		; sys "("?
-	jsr get2strs
+; 8e38			modified
+fnplace	jsr getstrgs	; check "(", get 2 strings
 	jsr $aef7		; sys ")"?
 
-	ldy #0		; search str1 in str2
+	lda $9d		; direct mode?
+	bne err15		; yes, error
+
+	tay		; search str1 in str2
 	sty plpos		; position to 0
 -	lda ($a7),y	; found 1st char?
 	cmp ($a9),y
@@ -840,32 +848,35 @@ fnplace	jsr $aefa		; sys "("?
 	beq --
 
 ; ----------------------------------------- 
-; 8e74
+; 8e7a
 csgetari3	cpy #$5b		; INSERT?
 	beq fninsert
 	jmp csgetari4
 
 ; ----------------------------------------- func INSERT
-; 8e7b			recoded
-fninsert	jsr $aefa		; sys "("?
-	jsr get2strs
+; 8e81			recoded
+fninsert	jsr getstrgs	; check "(", get 2 strings
 	jsr getbytc	; get position ($c51f)
 	stx pos
 	jsr $aef7		; sys ")"?
+
+	lda $9d		; direct mode?
+	bne err15		; yes, error
 
 	clc
 	lda strlen2	; len of result string > 255?
 	adc strlen1
 	bcc +
-; 8e93
+; 8e9a
 err22	ldx #$22		; yes, error "insert too large"
 	!by $2c
-err23	ldx #$23		; error "string mismatch"
+err15	ldx #$15		; error "illegal direct"
 	!by $2c
 err17	ldx #$17		; error "string too long"
 	jmp ($0300)
 
-+	jsr neustr	; neuen String einrichten
++	jsr neustr	; neuen String einrichten (62/3, len: 61)
+			; hier: 
 
 	ldy #0		; Zähler auf Null
 	sty $bf		; auch für den zweiten Durchgang
@@ -907,17 +918,17 @@ jpushstr	lda #$ff		; create result string
 	jmp pushstr
 
 ; ----------------------------------------- 
-; 8eed
+; 8ef4
 colsout	jsr $ff5b
 	jmp tsbcols
 
 ; ----------------------------------------- 
-; 8ef3
+; 8efa
 frominsrt	jsr sgetstrn
 	jmp basromau
 	
 ; ----------------------------------------- Part of Warmstart
-; 8ef9
+; 8f00
 endcheck	jsr basromei
 	txa		; any error?
 	bpl +
@@ -926,7 +937,7 @@ endcheck	jsr basromei
 +	rts
 
 ; ----------------------------------------- RESTORE for SCRLD/SCRSV
-; 8f05 by P. Hagemann
+; 8f0c by P. Hagemann
 scrsvrst	ldx #4
 	stx vramhi+1	; vram back to $0400
 	stx nvrbl+1	; 4 pages
@@ -941,7 +952,7 @@ scrsvrst	ldx #4
 	jmp bef0
 
 ; ----------------------------------------- 
-; 8f26
+; 8f2d
 idiv	lda #0
 	sta idivrest
 	sta idivrest+1
@@ -974,19 +985,19 @@ idiv	lda #0
 	rts
 
 ; ----------------------------------------- 
-; 8f6b
+; 8f72
 csgetari4	cpy #$53		; DIV?
 	bne csgetari5
 
 ; ----------------------------------------- func DIV
-; 8f6f			original
+; 8f76			original
 fndiv	jsr divinit
 	ldy idivdend
 	ldx idivdend+1
 	jmp sxyflp
 
 ; ----------------------------------------- 
-; 8f7b
+; 8f82
 divinit	jsr getint	; sys "("?
 	jsr sgetadr2
 	sta idivdend+1
@@ -999,24 +1010,24 @@ divinit	jsr getint	; sys "("?
 	jmp idiv
 
 ; ----------------------------------------- 
-; 8f99
+; 8fa0
 csgetari5	cpy #$52		; MOD?
 	bne csgetari6
 
 ; ----------------------------------------- func MOD
-; 8f9d			original
+; 8fa4			original
 fnmod	jsr divinit
 	ldy idivrest
 	ldx idivrest+1
 	jmp sxyflp
 
 ; ----------------------------------------- 
-; 8fa9
+; 8fb0
 csgetari6	cpy #$59		; LIN?
 	bne csgetari7
 
 ; ----------------------------------------- func LIN
-; 8fad			modified
+; 8fb4			modified
 fnlin	sec
 	jsr $fff0		; sys plot
 	txa
@@ -1024,12 +1035,12 @@ fnlin	sec
 	jmp sxyflp3
 
 ; ----------------------------------------- 
-; 8fb6
+; 8fbd
 csgetari7	cpy #$58		; TEST?
 	bne csgetari8
 
 ; ----------------------------------------- func TEST
-; 8fba			modified
+; 8fc1			modified
 fntest	jsr klgetadr	; check "(", get adress value
 	jsr getxy2	; get X/Y
 	jsr $aef7		; sys ")"?
@@ -1044,17 +1055,12 @@ fntest	jsr klgetadr	; check "(", get adress value
 	jmp sxyflp3
 
 ; ----------------------------------------- Part of EXOR
-; 8fd6
+; 8fe0
 getexor	jsr getint	; check "(", get adress value
 	jmp sgetadr2
 
-; ----------------------------------------- 
-; 8fdf
-	!by 0,0,0,0,0,0,0,0	; 11 bytes
-	!by 0,0,0
-
 ; ----------------------------------------- Part of DO..DONE
-; 8fea			
+; 8fe6			
 doiftrue	lda #0		; doflag off
 	sta doflag
 	iny
@@ -1068,18 +1074,18 @@ mkwahr	lda $61		; DO found: store boole value on DO stack
 +	rts
 
 ; ----------------------------------------- 
-; 9002 
+; 8ffe 
 execbef	jsr basromei
 	jmp ($0308)	; sys get bef address
 
 ; ----------------------------------------- Part of DO
-; 9008 
+; 9004 
 chkelse	jsr schelse	; search for ELSE in same line
 	sty justif	; set flag for "ELSE in IF-line"
 	rts		; (then: .y>0, if no ELSE: .y=0)
 
 ; ----------------------------------------- 
-; 900f
+; 900b
 restint	ldx helpvc2	; restore INT
 	lda helpvc2+1
 	stx int
@@ -1087,20 +1093,23 @@ restint	ldx helpvc2	; restore INT
 	rts
 
 ; ----------------------------------------- 
-; 9018
+; 9014
 csgetari8	cpy #$57		; INST?
 	beq fninst
 	jmp csgetari9
 
 ; ----------------------------------------- func INST
-; 901f			enhanced
-fninst	jsr $aefa		; sys "("?
-	jsr get2strs
+; 901b			enhanced
+fninst	jsr getstrgs	; check "(", get 2 strings
 	jsr getbytc	; get position ($c51f)
 	stx pos
 	jsr $aef7		; sys ")"?
 
-	clc
+	lda $9d		; direct mode?
+	beq +
+	jmp err15		; yes, error
+
++	clc
 	lda strlen1	; newlen + pos > oldlen?
 	beq +
 	adc pos
@@ -1185,7 +1194,7 @@ csgetarid	cpy #$61		; GRAPHICS?
 	bne csgetarie
 
 ; ----------------------------------------- func GRAPHICS
-; 900e			original
+; 90ae			original
 fngraphics
 	ldx #$d0		; =$d000
 cga0	ldy #$00
@@ -1249,7 +1258,7 @@ wdetect	lda detecterg
 	rts
 
 ; -----------------------------------------
-; 9109
+; 9108
 ++	jsr $aef7		; sys ")"?
 
 	ldy pos		; sprite #x
@@ -1268,7 +1277,7 @@ fndisplay	ldx video		; returns video address
 	bne cga0		; normally uncond. branch
 
 ; ----------------------------------------- 
-; 910e
+; 911e
 csgetariend		; end of FN chain
 
 ; ----------------------------------------- ERR entry
