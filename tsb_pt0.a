@@ -37,7 +37,6 @@
 	nmivec	= $0318
 	iovecs	= $0330
 
-	sbnmi	= $82ff
 	faststack	= $c400
 	settings1	= $c500
 	settings2	= $cb00

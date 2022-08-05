@@ -209,14 +209,14 @@ into	jsr cold1		; set drive 8 and LOAD/SAVE vectors
 	ldx #$81
 	stx $fffa+1	; sys nmi vector hi ($8118)
 	inx
-	stx nmivec+1	; NMI = $82fa
+	stx nmivec+1	; NMI = $82f9
 	inx
 	stx brkvec+1
 	lda #<sbrk	; SBRK = $8314!
 	sta brkvec
 	lda #$18
 	sta $fffa		; sys nmi vector lo
-	lda #$fa
+	lda #<snmi
 	sta nmivec
 	cli
 	lda $2b		; get start of basic program
@@ -439,7 +439,7 @@ snmi	pha
 	pha
 	tya
 	pha
-	jsr kerromein
+sbnmi	jsr kerromein
 	lda #$7f
 	sta $dd0d
 	ldy $dd0d

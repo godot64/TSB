@@ -18,6 +18,7 @@
 ; patched on 29.12.2021 (bugfix in INST: forced PRG mode)
 ; patched on 13.05.2022 (command SCRLD/SV DEF added)
 ; patched on 16.07.2022 (command DELAY: now OFF works)
+; patched on 04.08.2022 (bugfix in LIST)
 ;
 ; ----------------------------------------- 
 
@@ -1058,14 +1059,14 @@ pge0	jsr $ffe1		; wait: STOP?
 	tay
 	sta $d4
 	jsr clear		; clr/home
--	jsr leerzch	; space
-	lda $0244,y	; out last line number
+-	lda $0244,y	; out last line number
 	cmp #$20
 	beq +
-	sta $0400,y	; to screen
+	jsr bsout		; to screen
 	iny
 	bne -
-+	pla		; crsr back
++	jsr leerzch	; space
+	pla		; crsr back
 	sta $d4
 ++	pla		; .a back (current byte)
 
@@ -1663,7 +1664,7 @@ null	!tx "null"
 ; ca44
 version	!tx "ad86"	; Signature
 	!by $0d
-	!tx "2.20801"	; Version Number
+	!tx "2.20805"	; Version Number
 
 ; ----------------------------------------- 
 ; ca4f
