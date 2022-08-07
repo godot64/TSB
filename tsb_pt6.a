@@ -975,7 +975,7 @@ scrsvplus	jsr chrget	; DEF follows?
 	bne --
 
 ; ----------------------------------------- DEF after SCRLD/SV
-;be94 by P. Hagemann	
+; be94 by P. Hagemann	
 defscrsv	jsr sgetbytn
 	stx helpvec	; Hibyte Ziel nach helpvec
 	jsr sgetbytc	; Anzahl Pages in helpvec+1
@@ -1007,134 +1007,126 @@ defscrsv	jsr sgetbytn
 
 no	jmp endsmb	; Abschluss
 
-; ----------------------------------------- part of LIST/PAGE
-; becf
-slist3	php		; .a: current byte in BASIC code
-	sty $fe		; save .y
-	stx $c5ff		; save .x (starts with 0)
-	ldy $028d		; special key pressed
-	cpy #2		; C=?
-	beq pge3		; yes, skip PAGE
-	cpy #1		; shift?
-	bne pge2
+; ------------------------------------------------------------ 
+;  tsb detokenizer (from sys: $a717 via $0306/07)
+; ------------------------------------------------------------ 
+; bed1
+slist3	sty helpvc2	; register retten
+	stx helpvc2+1
+	pha		; laufendes zeichen retten
 
-pge8	cpx delay		; if delay=0: skip DELAY
-	beq pge2
--	iny		; if not, perform DELAY
-	bne -
-	inx
-	jmp pge8
+-	ldy $028d
+	cpy #1		; Shift (1) gedrückt?
+	beq -		; if Shift: hold
+	tya
+	and #2
+	bne sl1		; if C=: skip delay & page
+	tya
+	and #4
+	beq page
 
-pge2	ldy $028d
-	beq pge1
-	cpy #4		; ctrl?
-	beq pge2		; yes, hold LIST
+dlay	ldx #$ff		; if CTRL (4): Delay
+	bmi +
+ml0	iny		; verzögern
+	bne ml0
++	inx
+	cpx delay		; Faktor erreicht?
+	bne ml0		; ja, weiter
 
-pge1	ldy pageflag	; page active? 
-	cpy #10
-	bne pge3
+page	ldy pageflag	; is ON?
+	beq sl1		; no, skip
+	ldy pagewert	; bis zu welcher zeile?
+	beq sl1		; bei 0: skip
+	cpy $d6		; zeile erreicht?
+	bcs sl1
 
-	ldy pagewert	; yes
-	cpy $d6		; max crsr line?
-	bcs pge3
-
-	ldy #0		; yes:
-	pha		; save .a
--	lda ($d1),y	; store basic line number up to space
+	ldy #0		; ja, hold
+ml1	lda ($d1),y	; zeilennummer merken
 	sta $0244,y
-	cmp #$20
-	beq pge0
 	iny
-	bne -
+	cmp #32
+	bne ml1
 
-pge0	jsr $ffe1		; wait: STOP?
-	beq ++		; yes, break
-	jsr $ffe4		; (get key)
-	cmp #$0d		; or cr?
-	bne pge0		; no, hold PAGE at max
+wait	jsr $ffe1		; Hold, sys: stop? (Abbruch?)
+	beq sl1		; ja, cont.
+	jsr $ffe4		; sys: getkey
+	cmp #$0d		; <cr>?
+	bne wait		; nein, warten
 
-	lda $d4		; then:
+	lda $d4		; $d4, cursorphase retten
 	pha
-	lda #0		; switch off crsr
+	lda #0
 	tay
-	sta $d4
-	jsr clear		; clr/home
--	lda $0244,y	; out last line number
-	cmp #$20
-	beq +
-	jsr bsout		; to screen
+	sta $d4		; cursor aus
+	jsr clear		; clr/home ausgeben
+ml2	lda $0244,y	; zeilennummer wieder hinschreiben
+	jsr bsout
 	iny
-	bne -
-+	jsr leerzch	; space
-	pla		; crsr back
-	sta $d4
-++	pla		; .a back (current byte)
+	cmp #32
+	bne ml2
+	pla
+	sta $d4		; cursor rekonstruieren
 
-pge3	ldx #>tabbef
+sl1	pla		; aktuelles zeichen holen
+
+sl2	ldx #>tabbef	; zeiger setzen
 	stx $21
 	ldx #<tabbef
 	stx $20
-	cmp #$64		; sb token?
-	beq pge4		; yes
+	cmp #$64		; ist TSB token im .a?
+	beq listb		; ja, list tsb
 
--	ldy $fe		; no, .y back
-	ldx $c5ff		; .x back
-	jmp slist1	; to sys LIST
-; bf53
-pge4	ldx $d4		; SB token: crsr off?
-	cpx #0
-	bne -		; yes
+back	ldy helpvc2	; nein, flags für weitermachen im ROM-List
+	ldx #0
+	rts
+
+; ----------------------------------------- 
+; bf45
+listb	ldx $d4
+	bne back
+
+option	lda optflag	; OPTION aktiv?
+	beq ml3
+	lda #$12		; ja, rvs on
+	jsr bsout
+ml3	ldy helpvc2
+	iny
+	lda ($5f),y	; nächstes zeichen (Token) holen
+	tax		; als zähler (Token)
 	ldy #0
-	sty $22		; init counter
-	ldy $fe		; .y back
-	iny
-	lda ($5f),y
-	tax
-	dex
-	txa
-	ldy #0
-	sta lcode
-	pha
-	lda optflag	; OPTION active?
-	cmp #10
-	bne +
-
-	lda #$12		; yes, rvs on
-	jsr bsout
-+	pla
-	cmp #0
-	beq pge6
--	lda ($20),y
-	cmp #$40		; delimiter?
-	beq pge5		; yes, count
-pge7	inc $20		; no, proceed
-	bne +
-	inc $21
-+	jmp -
-
-pge5	inc $22
-	lda $22
-	cmp lcode
-	beq +
-	jmp pge7
-
-+	inc $20
-	bne pge6
-	inc $21
-pge6	lda ($20),y	; out command word
-	cmp #$40
-	beq +
+	cpx #1
+	beq ml7
+list1	dex		; bis zum richtigen Befehlswort...
+	beq list2
+ml5	jsr inc20
+	lda ($20),y	; ...Befehlswörter überlesen
+	bmi list1
+	bpl ml5
+list2	jsr inc20
+ml7	lda ($20),y	; dann richtiges befehlswort ausgeben
+	bmi ml8		; (bis zum geshifteten Zeichen)
 	jsr bsout
 	iny
-	jmp pge6
-
-+	lda #$92		; rvs off
+	bne ml7
+ml8	and #$7f		; geshiftetes zeichen ausgeben
 	jsr bsout
-	ldy $fe		; .y back
+	lda #$92		; und rvs off
+	jsr bsout
+
+	ldy helpvc2	; flags setzen, weiter im ROM
 	iny
-	ldx $c5ff		; .x back
-	lda #2
-	jmp slist2	; to sys LIST
+	ldx #1
+	rts
+
+; ----------------------------------------- 
+
+	!by 0,0,0,0,0,0,0,0	; 50 bytes
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0
 
 ; ----------------------------------------- bef ERROR
 ; bfba	new (code by D. Temme, 64'er 11/1984)
@@ -1664,7 +1656,7 @@ null	!tx "null"
 ; ca44
 version	!tx "ad86"	; Signature
 	!by $0d
-	!tx "2.20805"	; Version Number
+	!tx "2.20806"	; Version Number
 
 ; ----------------------------------------- 
 ; ca4f

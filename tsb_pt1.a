@@ -12,6 +12,7 @@
 ; patched on 21.04.2021 (command RENUMBER)
 ; patched on 25.08.2021 (make OPEN independent from drive number)
 ; patched on 05.10.2021 (added DIV as a command to Clear Screen)
+; patched on 05.10.2021 (new tokenizer, new detokenizer)
 ;
 ; ----------------------------------------- 
 
@@ -320,34 +321,31 @@ endsmb	jsr kerromein
 ; ----------------------------------------- 
 ; 8233
 zeiumw	jsr basromau
-	jsr zeiumw1
+	jsr tokenize
 	jsr basromei
 	jmp $a57c		; sys: tokenizer
 
 ; ----------------------------------------- 
 ; 823f
 slist	php
+
 	pha
 	jsr basromau
 	pla
-	plp
-	jmp slist3
-
-; ----------------------------------------- 
-; 8249
-slist1	pha
+	jsr slist3	; TSB-Optionen abarbeiten,
+	php		; (TSB? regelt zeroflag)
+	pha
 	jsr basromei
 	pla
-	plp
-	jmp $a71a		; sys: detokenizer
+	ldx helpvc2+1
+	plp		; dann: ROM
+	beq ma
 
-; ----------------------------------------- 
-; 8252
-slist2	pha
-	jsr basromei
-	pla
-	plp
-	jmp $a6f6		; sys: part of LIST
+	plp		; war TSB, nun:
+	jmp $a6f6		; sys: romlista (Quote, nächste zeile)
+
+ma	plp		; war nicht TSB, nun:
+	jmp $a71a		; sys: romlistb (V2-Befehle ausgeben)
 
 ; ----------------------------------------- Eingabewarteschleife
 ; 825b			recoded
@@ -561,148 +559,164 @@ incbasbz	inc progz
 
 ; ----------------------------------------- Table of Commands
 ; 83df
-tabbef	!tx "hires@"	; 1
-	!tx "plot@"
-	!tx "line@"
-	!tx "block@"
-	!tx "fchr@"
-	!tx "fcol@"
-	!tx "fill@"
-	!tx "rec@"
-	!tx "rot@"	; 9
-	!tx "draw@"
-	!tx "char@"
-	!tx "hi col@"
-	!tx "inv@"
-	!tx "frac@"
-	!tx "move@"
-	!tx "place@"
-	!tx "upb@"	; 17
-	!tx "upw@"
-	!tx "leftw@"
-	!tx "leftb@"
-	!tx "downb@"
-	!tx "downw@"
-	!tx "rightb@"
-	!tx "rightw@"
-	!tx "multi@"	; 25
-	!tx "colour@"
-	!tx "mmob@"
-	!tx "bflash@"
-	!tx "mob set@"
-	!tx "music@"
-	!tx "flash@"
-	!tx "repeat@"
-	!tx "play@"	; 33
-	!tx "do@"
-	!tx "centre@"
-	!tx "envelope@"
-	!tx "cgoto@"
-	!tx "wave@"
-	!tx "fetch@"
-	!tx "at(@"
-	!tx "until@"	; 41
-	!tx ">@"		; *
-	!tx ">@"		; +
-	!tx "use@"
-	!tx ">@"		; -
-	!tx "global@"
-	!tx ">@"		; /
-	!tx "reset@"
-	!tx "proc@"	; 49
-	!tx "call@"
-	!tx "exec@"
-	!tx "end proc@"
-	!tx "exit@"
-	!tx "end loop@"
-	!tx "on key@"
-	!tx "disable@"
-	!tx "resume@"	; 57
-	!tx "loop@"
-	!tx "delay@"
-	!tx ">@"		; <
-	!tx ">@"		; =
-	!tx ">@"		; >
-	!tx ">@"		; ?
-	!tx "secure@"
-	!tx "disapa@"	; 65
-	!tx "circle@"
-	!tx "on error@"
-	!tx "no error@"
-	!tx "local@"
-	!tx "rcomp@"
-	!tx "else@"
-	!tx "retrace@"
-	!tx "trace@"	; 73
-	!tx "dir@"
-	!tx "page@"
-	!tx "dump@"
-	!tx "find@"
-	!tx "option@"
-	!tx "auto@"
-	!tx "old@"
-	!tx "joy@"	; 81
-	!tx "mod@"
-	!tx "div@"
-	!tx "d!@"
-	!tx "dup@"
-	!tx "inkey@"
-	!tx "inst@"
-	!tx "test@"
-	!tx "lin@"	; 89
-	!tx "exor@"
-	!tx "insert@"
-	!tx "pot@"
-	!tx "penx@"
-	!tx ">@"		; ^
-	!tx "peny@"
-	!tx "sound@"
-	!tx "graphics@"	; 97
-	!tx "design@"
-	!tx "rlocmob@"
-	!tx "cmob@"
-	!tx "bckgnds@"
-	!tx "pause@"
-	!tx "nrm@"
-	!tx "mob@"
-	!tx "off@"	; 105
-	!tx "angl@"
-	!tx "arc@"
-	!tx "cold@"
-	!tx "scrsv@"
-	!tx "scrld@"
-	!tx "text@"
-	!tx "cset@"
-	!tx "vol@"	; 113
-	!tx "disk@"
-	!tx "hrdcpy@"
-	!tx "key@"
-	!tx "paint@"
-	!tx "low col@"
-	!tx "copy@"
-	!tx "merge@"
-	!tx "renumber@"	; 121
-	!tx "mem@"
-	!tx "detect@"
-	!tx "check@"
-	!tx "display@"
-	!tx "err@"
-	!tx "out@"
+tabbef	!tx "hireS"	; 1
+	!tx "ploT"
+	!tx "linE"
+	!tx "blocK"
+	!tx "fchR"
+	!tx "fcoL"
+	!tx "filL"
+	!tx "reC"
+	!tx "roT"		; 9
+	!tx "draW"
+	!tx "chaR"
+	!tx "hi coL"
+	!tx "inV"
+	!tx "fraC"
+	!tx "movE"
+	!tx "placE"
+	!tx "upB"		; 17
+	!tx "upW"
+	!tx "leftW"
+	!tx "leftB"
+	!tx "downB"
+	!tx "downW"
+	!tx "rightB"
+	!tx "rightW"
+	!tx "multI"	; 25
+	!tx "colouR"
+	!tx "mmoB"
+	!tx "bflasH"
+	!tx "mob seT"
+	!tx "musiC"
+	!tx "flasH"
+	!tx "repeaT"
+	!tx "plaY"	; 33
+	!tx "dO"
+	!tx "centrE"
+	!tx "envelopE"
+	!tx "cgotO"
+	!tx "wavE"
+	!tx "fetcH"
+	!tx "at",$a8
+	!tx "untiL"	; 41
+	!by $be		; *
+	!by $be		; +
+	!tx "usE"
+	!by $be		; -
+	!tx "globaL"
+	!by $be		; /
+	!tx "reseT"
+	!tx "proC"	; 49
+	!tx "calL"
+	!tx "exeC"
+	!tx "end proC"
+	!tx "exiT"
+	!tx "end looP"
+	!tx "on keY"
+	!tx "disablE"
+	!tx "resumE"	; 57
+	!tx "looP"
+	!tx "delaY"
+	!by $be		; <
+	!by $be		; =
+	!by $be		; >
+	!by $be		; ?
+	!tx "securE"
+	!tx "disapA"	; 65
+	!tx "circlE"
+	!tx "on erroR"
+	!tx "no erroR"
+	!tx "locaL"
+	!tx "rcomP"
+	!tx "elsE"
+	!tx "retracE"
+	!tx "tracE"	; 73
+	!tx "diR"
+	!tx "pagE"
+	!tx "dumP"
+	!tx "finD"
+	!tx "optioN"
+	!tx "autO"
+	!tx "olD"
+	!tx "joY"		; 81
+	!tx "moD"
+	!tx "diV"
+	!tx "d",$a1
+	!tx "duP"
+	!tx "inkeY"
+	!tx "insT"
+	!tx "tesT"
+	!tx "liN"		; 89
+	!tx "exoR"
+	!tx "inserT"
+	!tx "poT"
+	!tx "penX"
+	!by $be		; ^
+	!tx "penY"
+	!tx "sounD"
+	!tx "graphicS"	; 97
+	!tx "desigN"
+	!tx "rlocmoB"
+	!tx "cmoB"
+	!tx "bckgndS"
+	!tx "pausE"
+	!tx "nrM"
+	!tx "moB"
+	!tx "ofF"		; 105
+	!tx "angL"
+	!tx "arC"
+	!tx "colD"
+	!tx "scrsV"
+	!tx "scrlD"
+	!tx "texT"
+	!tx "cseT"
+	!tx "voL"		; 113
+	!tx "disK"
+	!tx "hrdcpY"
+	!tx "keY"
+	!tx "painT"
+	!tx "low coL"
+	!tx "copY"
+	!tx "mergE"
+	!tx "renumbeR"	; 121
+	!tx "meM"
+	!tx "detecT"
+	!tx "checK"
+	!tx "displaY"
+	!tx "erR"
+	!tx "ouT"
+	!by 0
 
 ; ----------------------------------------- 
-; 8691
+; 8614
 xipr3	sty doindex
 	sty sprepeat
 	rts
 
 ; ----------------------------------------- 
-; 8699
+; 861b
 klgetadr	jsr $aefa		; sys "("?
 	jmp sgetadr2
 
 ; ----------------------------------------- 
-
-	!by 0
+; 8621
+	!by 0,0,0,0,0,0,0,0	; 127 bytes
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0
 
 ; ----------------------------------------- 
 ; 869f

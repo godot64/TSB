@@ -18,6 +18,7 @@
 ; patched on 29.11.2021 (added hold DIR output on keypress)
 ; patched on 16.04.2022 (command FETCH: complies with RVS mode)
 ; patched on 17.07.2ß22 (bugfix in DO..DONE)
+; patched on 05.10.2021 (new tokenizer, new detokenizer)
 ;
 ; ----------------------------------------- 
 
@@ -1641,139 +1642,130 @@ kreis2	jsr vglae
 
 +	jmp kreis1
 
-; ----------------------------------------- tokenizer
+; ------------------------------------------------------------ 
+;  tsb tokenizer (from $a579 via $0304/05)
+; ------------------------------------------------------------ 
 ; ab6f
-zum2	jmp tok5		; continue with next char
+tokenize	ldy #4
+next	iny
+next1	lda $01fb,y
+	bne ma1
+ende	rts		; sys: tokenizer
 
-; ----------------------------------------- 
-; ab72
-zeiumw1	ldy #5		; entry point, .y=index in basic line
-zum0	lda $01fb,y	; read from $0200 (up to $00)
-	bne +
---	rts
-; ab7a
-+	cmp #$22		; string?
-	bne +
--	iny		; yes, skip string
-	lda $01fb,y	; up to line end
-	beq --
-	cmp #$22		; or next quote
-	bne -
-	beq zum2		; then continue
-; ab8a
-+	cmp #$40		; "@"? (precedes DESIGN lines)
-	bne +
-zum1	iny		; yes, skip this line
+ma1	cmp #$22		; quote? (and also: colon)
+	bne dsign
+ma4	sta helpvc2
+ma2	iny
 	lda $01fb,y
-	bne zum1
-	beq zum0		; and leave
+	beq ende
+	cmp helpvc2	; quote-ende?
+	bne ma2		; no, skip string
+	beq next		; yes, cont. scan
 
-+	cmp #$44		; "d"? (could be DATA)
-	bne ++
-	pha		; yes, "d", store to stack
+dsign	cmp #$40		; "@" (of DESIGN)?
+	beq ma3
+
+data	cmp #$44		; "d" (of DATA)?
+	bne ziffer
+	pha		; save .a and .y
 	tya
 	pha
 	ldx #$ff
--	inx		; is it DATA?
+mt10	inx
 	iny
 	lda $01fb,y
-	cmp ata,x		; "ata"?
-	bne +
+	cmp ata,x		; compare against "ata"
+	bne mt11		; not found, cont. scan
 	cpx #2
-	bne -
-	pla		; yes, restore
+	bne mt10
+	pla		; found: skip line
 	tay
 	pla
-	bne zum1		; and skip this line
-+	pla		; no, restore
-	tay
-	pla
-++	cmp #$41		; Buchstabe?
-	bcc zum2
-	cmp #$db
-	bcs zum2
+ma3	lda #$3a		; suche nach ":"
+	bne ma4
 
-	sty zwisp2	; wenn nicht: weiterscannen, store .y
-	ldx #>tabbef	; Liste der Befehlsworte ansteuern
+mt11	pla		; restore .a and .y
+	tay
+	pla
+
+ziffer	cmp #$41		; is a char?
+	bcc next
+	cmp #$db
+	bcs next
+
+	sty zwisp2	; index into line
+	ldx #>tabbef
 	stx $21
 	ldx #<tabbef
 	stx $20
 
-	ldx #0
-	stx codezae	; Tokenzähler auf null setzen
-tok3	cmp ($20,x)	; Zeichen in Befehlswort enthalten?
-	beq abee		; ja (!!! Trick: springt auf INY)
+	ldx #0		; init token counter
+	stx codezae
 
-	and #$7f		; nein, Bit 7 aus (geshiftet?)
-	cmp ($20,x)	; jetzt im Befehlswort?
-	beq tok0		; ja, Befehl gefunden
+cmpare	sec		; check chars in list against basic line
+	sbc ($20,x)
+	beq mt1		; if equal, next char
+	cmp #$80		; befehlswort gefunden?
+	beq mt6		; ja, umwandeln in Token
 
-	lda ($20,x)
-	cmp #$40		; "@"? (Ende des Befehlswortes?)
-	beq tok1
+mt5	lda ($20,x)	; end of list?
+	beq next		; yes, get next char in basic line
+	bmi mt4		; shifted?
+	jsr inc20		; no, skip command word
+	bne mt5
 
--	lda ($20,x)	; end of line?
-	beq tok5		; ja, fertig, Zeile tokenisiert
-	cmp #$40		; "@"? (Ende des Befehlswortes?)
-	beq tok2		; ja, Tokenzähler erhöhen
-	inc $20		; weiterscannen (in Befehlsliste)
-	bne -
-	inc $21
-	bne -
-; abed
-tok2	inc codezae	; Vergleich negativ, Tokenzähler plus 1
-	ldy zwisp2	; Index in Basiczeile holen, nicht erhöhen!
+mt4	inc codezae	; yes, next command word
+	ldy zwisp2
+	!by $a9
+mt1	iny		; command word still equal, so 
+	lda $01fb,y	; cont. compare
+	jsr inc20
+	bne cmpare
 
-	!by $a9		; LDA #$c8 ($abee: $c8=INY!)
-abee	iny		; (nächstes) Zeichen ansteuern
-	lda $01fb,y
-	inc $20		; Zeiger in Befehlsliste erhöhen
-	bne tok3		; nächstes Zeichen vergleichen
-	inc $21
-	bne tok3
+mt6	cpy zwisp2	; hat Zeiger sich bewegt?
+	beq tonext	; nein, weiterrücken
 
-tok0	cpy zwisp2	; Buchstabe ist geshiftet:
-	beq tok5		; nein, falsche Stelle im Befehlswort
-	iny
-tok1	ldx zwisp2
-	lda #$64		; yes, write token prefix ($64)
+token1	ldx zwisp2	; sonst:
+	lda #$64		; sim token schreiben,
 	sta $01fb,x
 	inx
-	lda codezae	; and write token counter
+token2	lda codezae	; befehlszähler als code eintragen
 	sta $01fb,x
-	inc $01fb,x	; and increase by one
+	inc $01fb,x
 
-	cmp #$40		; bef DISAPA? (Token 65)
-	bne tok4
-
-	lda #$3a		; yes, write 4 colons to DISAPA
-	ldy #0		; (results in 5 colons if one followed DISAPA
--	inx		; and in 4 if DISAPA was shifted)
+disapa	cmp #$40		; Befehl SECURE?
+	bne vor
+	lda #$3a		; ja, ":" eintragen
+	ldy #0
+mt12	inx
 	iny
-	sta $01fb,x	; (SECURE 0 writes $00 $3a to token position)
+	sta $01fb,x	; 4 mal
 	cpy #4
-	bmi -
+	bmi mt12
 	txa
 	tay
-	jmp zum0		; continue scan
+	jmp next1
 
-tok4	dey		; and move rest of line to earlier position
--	iny
+vor	iny		; Rest der Zeile aufrücken
 	inx
-	lda $01fb,y	; until end of line
+	lda $01fb,y
 	sta $01fb,x
-	bne -
+	bne vor
+mt13	inx
+	lda #0		; mit $00 dahinter löschen
+	sta $01fb,x
+	lda $01fb+1,x
+	bne mt13
 
--	inx		; then set new end of line
-	lda #0
-	sta $01fb,x
-	lda $01fc,x	; until old end of line
-	bne -
-	ldy zwisp2	; get index in moved line
+	ldy zwisp2	; nächstes Zeichen aus der Eingabezeile	holen
 	iny
+tonext	jmp next
 
-tok5	iny		; continue with next char in basic line
-	jmp zum0
+; ----------------------------------------- 
+; 
+	!by 0,0,0,0,0,0,0,0	; 24 bytes
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
 
 ; ----------------------------------------- part of USE
 ; ac4c

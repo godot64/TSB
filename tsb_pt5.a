@@ -1072,16 +1072,20 @@ skipif	jsr schelse	; search for single ELSE:
 	jmp fndelse+4
 
 ; ----------------------------------------- 
-; b311
+; b30e
 chkstate	jsr $ffcf
 	ldx status
 	beq nrm04
 	jmp ss5
 
 ; ----------------------------------------- 
-; b31b
-	!by 0,0,0,0,0,0,0,0	; 9 bytes
-	!by 0
+; b318
+jstifoff	sty justif
+	jmp chrget
+
+; ----------------------------------------- 
+; b31e
+	!by 0,0,0		; 3 bytes
 
 ; ----------------------------------------- bef CSET
 ; b321			modified
@@ -1423,10 +1427,10 @@ docont	jsr dec7a		; from DO:
 
 ; ----------------------------------------- bef DO
 ; b573			new
-befdo	jsr chrget	; end of line?
+befdo	ldy #0		; check for "NULL" if not end of line
+	jsr jstifoff	; clear justif/end of line?
 	beq docont	; yes
-	ldy #0		; no, check for "NULL"
-	jmp isnull
+	jmp isnull	; no
 
 ; ----------------------------------------- part of TRACE
 ; b57d
