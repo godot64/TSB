@@ -19,6 +19,7 @@
 ; patched on 13.05.2022 (command SCRLD/SV DEF added)
 ; patched on 16.07.2022 (command DELAY: now OFF works)
 ; patched on 04.08.2022 (bugfix in LIST)
+; patched on 14.08.2022 (command: DISPLAY able to show 16 chars)
 ;
 ; ----------------------------------------- 
 
@@ -77,22 +78,22 @@ dom0	jmp basromei
 ; ----------------------------------------- bef DUP
 ; b7b8			new
 befdup	jsr incbasbz
-	jsr sgetadr
+	jsr sgetadr	; get source x
 	sty ax
 	sta ax+1
-	jsr sgetbytc
+	jsr sgetbytc	; get source y
 	stx ay
-	jsr sgetbytc
+	jsr sgetbytc	; get width
 	stx spaltenanz
-	jsr sgetbytc
+	jsr sgetbytc	; get height
 	stx zeilenanz
-	jsr getxyf
-	jsr sgetbytc
+	jsr getxyf	; get target x, y and mode ($f7)
+	jsr sgetbytc	; get zoom factor
 	txa
-	bne +
+	bne +		; at least: 1
 	inx
-+	stx chgr
-	jsr dupit
++	stx chgr		; set zoom factor
+	jsr dupit		; process
 	jmp endsmb
 
 dupit	ldy #0
@@ -101,24 +102,25 @@ dupit	ldy #0
 	sty $ab
 	sty $ac
 	sty $ad
-	lda ax
+	lda ax		; save source x
 	sta $c5a4
 	lda ax+1
 	sta $c5a5
-	lda ex
+	lda ex		; save target x
 	sta xdiff
 	lda ex+1
 	sta xdiff+1
 	jmp dup1
 
-duploop	inc ay
+duploop	inc ay		; inc source y
 	bne dup1
-dup0	inc ax
+dup0	inc ax		; inc source x
 	bne dup1
 	inc ax+1
-dup1	ldy $f7
+
+dup1	ldy $f7		; save mode
 	sty $ab
-	ldy #11
+	ldy #11		; test pixel
 	sty $f7
 	lda ax
 	sta $09
@@ -127,11 +129,11 @@ dup1	ldy $f7
 	lda ay
 	sta $a4
 	jsr punkt
-	lda $ab
+	lda $ab		; restore mode
 	sta $f7
-	lda status
+	lda status	; test result:
 	beq dup2
-	lda ex
+	lda ex		; pixel set, so set pixel at target
 	sta $09
 	lda ex+1
 	sta $0a
@@ -139,41 +141,46 @@ dup1	ldy $f7
 	sta $a4
 	jsr punkt
 	jsr kerromein
-dup2	inc helpvec
-	lda helpvec
+
+dup2	inc helpvec	; zoom x:
+	lda helpvec	; equal to factor?
 	cmp chgr
 	beq dup3
-	jsr incex
+	jsr incex		; no, inc target x and set 1 more pixel
 	bne dup1
-dup3	jsr incex
-	lda #0
+
+dup3	jsr incex		; yes, advance target x
+	lda #0		; reset zoom counter
 	sta helpvec
-	inc $ac
+	inc $ac		; inc x-counter
 	lda $ac
-	cmp spaltenanz
-	bne dup0
-	lda #0
+	cmp spaltenanz	; is equal to width?
+	bne dup0		; no, inc source x, set pixels
+
+	lda #0		; yes, reset x-counter
 	sta $ac
-	lda $c5a4
+	lda $c5a4		; restore source x
 	sta ax
 	lda $c5a5
 	sta ax+1
-	lda xdiff
+	lda xdiff		; restore target x
 	sta ex
 	lda xdiff+1
 	sta ex+1
-	inc ey
-	inc helpvec+1
+	inc ey		; inc target y
+	inc helpvec+1	; zoom y:
 	lda helpvec+1
-	cmp chgr
-	bne dup1
-	lda #0
+	cmp chgr		; equal to factor?
+	bne dup1		; no, add 1 line
+
+	lda #0		; yes, reset zoom counter
 	sta helpvec+1
-	inc $ad
+	inc $ad		; inc y-counter
 	lda $ad
-	cmp zeilenanz
-	bne +
-	rts
+	cmp zeilenanz	; is equal to height?
+	bne +		; no, loop
+	rts		; yes, finished
+
 +	jmp duploop
 
 incex	inc ex
@@ -916,22 +923,22 @@ dpl1	ldy #0
 	ldx #$90
 	sec
 	jsr sxflp
-	jsr sfacasc
+	jsr sfacasc	; returns .y=1
 	jsr outasc
 	jsr komma		; out ","
 	jsr quote		; out quote
-	ldy #0
+	dey
 
 -	lda ($20),y	; get text of f-key
-	tax
 	beq nxkey		; is $00? (end of text)
-	cmp #$0d		; is cr?
+	cmp #$0d		; is cr? (also end of text)
 	beq crtxout	; yes, add "+chr$(13)"
 
-	txa
 	jsr bsout		; otherwise out text
 --	iny
-	bne -		; uncond. branch
+	cpy #16
+	bcc -
+	beq nxkey
 
 crtxout	jsr quote		; is cr: out quote
 	lda #$2b		; out "+"
@@ -956,7 +963,7 @@ nxkey	jsr quote		; end of text: out quote
 	cmp #17
 	bne dpl1
 
-	jmp endsmb
+	beq no		; finished
 
 ; ----------------------------------------- 
 ; be78
@@ -1577,16 +1584,16 @@ do2	jsr basromau
 	jmp do8
 
 ; ----------------------------------------- 
-; c9cf
+; c9cb
 nrm2	jsr allnrm	; here: returned from TSB.MEM
 -	jmp bef0
 
 ; ----------------------------------------- 
-; c9d5
+; c9d1
 allnrm	lda vecrenum	; vector of bef RENUMBER
 	cmp #<befrenum-1	; unchanged? (after MEM)
 	beq -		; yes, leave
-; c9dc
+; c9d8
 	lda progz+2	; chrget changed?
 	cmp #$4c
 	beq nrm3		; yes, go to tsb.ext (!changes!)
@@ -1606,7 +1613,7 @@ allnrm	lda vecrenum	; vector of bef RENUMBER
 	rts
 
 ; ----------------------------------------- 
-; c9fe
+; c9fa
 iffail	pla
 	pla
 iffail1	ldx #24		; row 24
@@ -1616,7 +1623,7 @@ iffail1	ldx #24		; row 24
 	jmp flpmsg2
 
 ; ----------------------------------------- bef INST
-; ca0d			new
+; ca09			new
 befinst	ldx #<nameext	; load "tsb.ext"
 	jsr loadext
 	bcs iffail1	; leave if fail
@@ -1656,7 +1663,7 @@ null	!tx "null"
 ; ca44
 version	!tx "ad86"	; Signature
 	!by $0d
-	!tx "2.20806"	; Version Number
+	!tx "2.20818"	; Version Number
 
 ; ----------------------------------------- 
 ; ca4f

@@ -19,6 +19,7 @@
 ; patched on 16.04.2022 (command FETCH: complies with RVS mode)
 ; patched on 13.05.2022 (command SCRLD/SV DEF added)
 ; patched on 01.07.2022 (commands TEXT/CSET: optimized)
+; patched on 14.08.2022 (command KEY able to keep 16 chars)
 ; 
 ; ----------------------------------------- 
 
@@ -1054,10 +1055,10 @@ doelse	ldy #0
 +	pla		; if not: from most recent IF
 	pla
 	sty justif	; clear justif, cont. prg
-	lda ifflag
+	lda ifflag	; id IF true?
 	bne +
-	jmp execbef
-+	jmp befproc
+	jmp execbef	; no, false
++	jmp befproc	; yes, true, skip rest of line
 
 ; ----------------------------------------- 
 ; b2fe
@@ -1486,8 +1487,9 @@ befkey	jsr keyget	; check for KEYGET (doesn't return if successful)
 	cpy $69
 	beq +
 	iny
-	cpy #$0f
+	cpy #16		; max 16 chars
 	bcc -
+	beq --
 +	lda #0
 	sta ($aa),y
 	beq --
@@ -1500,9 +1502,9 @@ flashinit	lda #0
 
 ; ----------------------------------------- 
 ; b5eb 
-	!by 0,0,0,0,0,0,0,0	; 19 bytes
+	!by 0,0,0,0,0,0,0,0	; 17 bytes
 	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0
+	!by 0
 
 ; ----------------------------------------- bef PAINT
 ; b5fe			recoded

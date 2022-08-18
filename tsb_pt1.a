@@ -302,8 +302,8 @@ use2	jmp use1		; no, continue normal use (9ce3)
 
 ; ----------------------------------------- part of TRACE
 ; 821a
-trace6	dex
-	txa
+trace6	dex		; token number: index in
+	txa		; Liste der Schlüsselwörter
 	ora #$80
 	ldx #>tabbef
 	stx $21

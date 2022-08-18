@@ -31,6 +31,7 @@
 ; patched on 21.05.2022 (new command KEYGET, enhanced on 28.05.22)
 ; patched on 10.07.2022 (optimized HIRES for new function MEMPEEK)
 ; patched on 17.07.2022 (bugfix in DO..DONE)
+; patched on 14.08.2022 (IRQ for F-keys: max len 16 chars)
 ;
 ; ----------------------------------------- 
 
@@ -1083,9 +1084,9 @@ sirq4	lda $cc
 	adc #>keytab
 	sta $ff
 	ldy #0		; out inkey text
--	lda ($fe),y	; (zero terminated)
+-	lda ($fe),y	; (zero terminated, but max 16 chars)
 	beq ams4
-	cpy #15		; (max length: 16)
+	cpy #16		; (max length: 16)
 	beq ams4
 	sta $0277,y	; write to keybuf
 	iny
@@ -1201,7 +1202,7 @@ befcentre	jsr gcentpar
 
 ; ----------------------------------------- part of TRACE
 ; 996f
-trace5	lda ($5f),y
+trace5	lda ($5f),y	; get token number ($64 number)
 	tax
 	jmp trace6
 

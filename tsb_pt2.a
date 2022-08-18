@@ -183,11 +183,12 @@ trace2	jsr $bdc9		; sys out: line # (.x/.a)
 	sty $0b
 	sty $49
 	lda #$20
+
 tr2	ldy $49
 	and #$7f
 ; 89dc
 tr1	jsr $ab47		; sys out char in .a
-	cmp #$22		; string?
+tr21	cmp #$22		; string?
 	bne tr0
 	lda $0b		; contains: 3
 	eor #$ff
@@ -222,36 +223,41 @@ tr0	iny
 	bit $0b
 	bmi tr1
 	jsr trace4
-	bmi tr2
+	bmi tr20
 ; 8a24
-trace4	ldx #$a0		; sys address of basic commands
+trace4	ldx #$a0		; sys: address of basic commands
 	stx $21
 	ldx #$9e
 	stx $20
 ; 8a2c
-trace7	sty $49
-	tax
+trace7	sty $49		; points via $5f to token number
+	tax		; .a: token number as count down
 	ldy #0
-	asl
-	beq ++
---	dex
+	asl		; times 2
+	beq ++		; was 0? (HIRES)
+--	dex		; no, count finished?
 	bpl +
--	jsr inc20
+-	jsr inc20		; yes, not found: skip keyword
 	lda ($20),y
-	bmi --
-	cmp #$40
-	bne -
-	beq --
+	bmi --		; char shifted? (delimiter): count
+	bne -		; no, proceed skipping
 -
-+	iny
++	iny		; found: out keyword
 ++	lda ($20),y
+	php
+	and #$7f
+	jsr $ab47		; no, sys: out char in  .a
+	plp
 	bmi +
-	cmp #$40
-	beq +
-	jsr $ab47		; sys out char in  .a
-	bne -
+	bne -		; uncond. branch
+
 tr3	iny
 	jmp trace5
+
+; ----------------------------------------- 
+; 8a52
+tr20	ldy $49
+	bne tr21
 
 ; ----------------------------------------- 
 ; 8a56
@@ -1081,8 +1087,8 @@ execbef	jsr basromei
 ; ----------------------------------------- Part of DO
 ; 9004 
 chkelse	jsr schelse	; search for ELSE in same line
-	sty justif	; set flag for "ELSE in IF-line"
-	rts		; (then: .y>0, if no ELSE: .y=0)
+	sta justif	; set flag for "ELSE in IF-line"
+	rts		; (then: .a>0, if no ELSE: .a=0)
 
 ; ----------------------------------------- 
 ; 900b
