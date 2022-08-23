@@ -236,7 +236,9 @@
 	stackdo		= $cbc6		; DO-Stack (20 bytes)
 	dobooles		= $cbda		; Wahrheitswerte der DO-Strukturen
 	doindex		= $cbe4		; Index in DO-Stack	(0..9)
-	;				  ! unused (27 bytes)
+	stackelse		= $cbe5		; ELSE-Stack (20 Bytes)
+	elseindex		= $cbf9		; Index in ELSE-Stack
+	;				  ! unused (6 bytes)
 
 	; 		total of 376 unused bytes between $c500 and $cc00
 

@@ -1072,6 +1072,8 @@ doiftrue	lda #0		; doflag off
 	iny
 	jmp chrgot	; get latest byte from prg
 
+; ----------------------------------------- 
+; 8fef 
 mkwahr	lda $61		; DO found: store boole value on DO stack
 	ldx doindex
 	sta dobooles,x

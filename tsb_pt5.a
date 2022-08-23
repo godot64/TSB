@@ -1055,7 +1055,7 @@ doelse	ldy #0
 +	pla		; if not: from most recent IF
 	pla
 	sty justif	; clear justif, cont. prg
-	lda ifflag	; id IF true?
+	jsr fromelstk	; fetch boole, id IF true?
 	bne +
 	jmp execbef	; no, false
 +	jmp befproc	; yes, true, skip rest of line
@@ -1495,13 +1495,13 @@ befkey	jsr keyget	; check for KEYGET (doesn't return if successful)
 	beq --
 
 ; ----------------------------------------- Part of FLASH
-
+; b5e5
 flashinit	lda #0
 	sta flashzae
 	jmp chkonoff	; Parameter holen
 
 ; ----------------------------------------- 
-; b5eb 
+; b5ed 
 	!by 0,0,0,0,0,0,0,0	; 17 bytes
 	!by 0,0,0,0,0,0,0,0
 	!by 0

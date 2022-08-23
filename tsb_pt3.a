@@ -165,7 +165,7 @@ fnmempeek	jsr getpeek	; yes, PEEK in overall RAM
 	sei
 	lda pport
 	pha
-	lda #$30		; 9b57: $31 for charset
+	lda #$30		; 9b55: $31 for charset
 	sta pport
 	lda (int),y
 	tay
@@ -1528,10 +1528,10 @@ inif	jsr schdo		; then search for DO in same line
 	beq fnddo
 
 +	jsr chkelse	; search for ELSE in same line
-	tax		; result: 0=not found, $47=found (in justif)
+	tax		; result: 0=not found, <>0=found (in justif)
 
 	lda $61		; get boole
-	sta ifflag
+	jsr toelstk	; save it
 	bne iftrue
 
 	txa		; false: ELSE in same line?

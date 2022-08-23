@@ -1656,9 +1656,9 @@ ma1	cmp #$22		; quote? (and also: colon)
 	bne dsign
 ma4	sta helpvc2
 ma2	iny
-	lda $01fb,y
-	beq ende
-	cmp helpvc2	; quote-ende?
+	lda $01fb,y	; line end?
+	beq ende		; yes, finished
+	cmp helpvc2	; quote end?
 	bne ma2		; no, skip string
 	beq next		; yes, cont. scan
 
@@ -1681,7 +1681,7 @@ mt10	inx
 	pla		; found: skip line
 	tay
 	pla
-ma3	lda #$3a		; suche nach ":"
+ma3	lda #$3a		; search for ":"
 	bne ma4
 
 mt11	pla		; restore .a and .y
@@ -1705,8 +1705,8 @@ ziffer	cmp #$41		; is a char?
 cmpare	sec		; check chars in list against basic line
 	sbc ($20,x)
 	beq mt1		; if equal, next char
-	cmp #$80		; befehlswort gefunden?
-	beq mt6		; ja, umwandeln in Token
+	cmp #$80		; found keyword?
+	beq mt6		; yes, transform to token
 
 mt5	lda ($20,x)	; end of list?
 	beq next		; yes, get next char in basic line
@@ -1722,50 +1722,58 @@ mt1	iny		; command word still equal, so
 	jsr inc20
 	bne cmpare
 
-mt6	cpy zwisp2	; hat Zeiger sich bewegt?
-	beq tonext	; nein, weiterrücken
+mt6	cpy zwisp2	; index moved?
+	beq tonext	; no, advance
 
-token1	ldx zwisp2	; sonst:
-	lda #$64		; sim token schreiben,
+token1	ldx zwisp2	; otherwise:
+	lda #$64		; write sb token,
 	sta $01fb,x
 	inx
-token2	lda codezae	; befehlszähler als code eintragen
+token2	lda codezae	; write counter as token number
 	sta $01fb,x
 	inc $01fb,x
 
-disapa	cmp #$40		; Befehl SECURE?
+disapa	cmp #$40		; command SECURE?
 	bne vor
-	lda #$3a		; ja, ":" eintragen
+	lda #$3a		; yes, enter ":"
 	ldy #0
 mt12	inx
 	iny
-	sta $01fb,x	; 4 mal
+	sta $01fb,x	; 4 times colon
 	cpy #4
 	bmi mt12
 	txa
 	tay
 	jmp next1
 
-vor	iny		; Rest der Zeile aufrücken
+vor	iny		; move up rest of line
 	inx
 	lda $01fb,y
 	sta $01fb,x
 	bne vor
 mt13	inx
-	lda #0		; mit $00 dahinter löschen
+	lda #0		; delete beyond by $00
 	sta $01fb,x
 	lda $01fb+1,x
 	bne mt13
 
-	ldy zwisp2	; nächstes Zeichen aus der Eingabezeile	holen
+	ldy zwisp2	; get next char from basic line
 	iny
 tonext	jmp next
 
+; ----------------------------------------- part of ELSE
+; ac34
+fromelstk	ldx elseindex
+	dex
+	lda stackelse,x
+	stx elseindex
+	tax
+	rts
+
 ; ----------------------------------------- 
-; 
-	!by 0,0,0,0,0,0,0,0	; 24 bytes
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
+; ac40
+	!by 0,0,0,0,0,0,0,0	; 12 bytes
+	!by 0,0,0,0
 
 ; ----------------------------------------- part of USE
 ; ac4c
