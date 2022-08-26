@@ -736,8 +736,8 @@ plus320	inc $a4
 	rts
 
 ; ----------------------------------------- part of MEM
-; bcdb			this part: new
-memplus	dey
+; bcdb			new
+memplus	dey		; .y=0
 	jsr chrget
 	lda (progz),y
 	ldx #$ff
@@ -758,33 +758,33 @@ memplus	dey
 	ora #$80
 	sta helpvec
 	lda $df01
-	and #$7c
-	ora helpvec
+	and #$6c		; Bit 0,1,4,7 aus
+	ora helpvec	
 	sta $df01
-	jmp bef0
+	jmp execdma	; to $b5ed (this part by P. Hagemann)
 
 ; ----------------------------------------- w/ Parameters
-; bd0b
-params	pha
+; bd0d
+params	sty helpvc2	; .y=0
+	tax
 	jsr chrget	; advance to parameters:
-	pla
-	cmp #$8c		; RESTORE? (set Reload addresses)
+	cpx #$8c		; RESTORE? (set Reload addresses)
 	beq param5
-	cmp #$9a		; CONT?	(set Increment type)
+	cpx #$9a		; CONT?	(set Increment type)
 	beq param6
-	cmp #$96		; DEF?	(set all)
+	cpx #$96		; DEF?	(set all)
 	beq param1
-	cmp #$c3		; LEN?	(set amount of data)
+	cpx #$c3		; LEN?	(set amount of data)
 	beq param1
-	cmp #$b0		; OR?	(set address in C64)
+	cpx #$b0		; OR?	(set address in C64)
 	beq param2
-	cmp #$b9		; POS?	(set address & bank in REU)
+	cpx #$b9		; POS?	(set address & bank in REU)
 	beq param3u4
 	ldx #32		; otherwise: error "Bad Mode",
 	jmp ($0300)
 
 ; ----------------------------------------- 
-; bd2d
+; bd2e
 param1	jsr sfrmnum	; LEN: get amount
 	jsr sfacadr
 	sty $df07
@@ -804,10 +804,10 @@ param2	jsr sfrmnum	; OR: get c64 start
 	jsr schkcom
 
 param3u4	jsr sfrmnum	; POS: get reu start (and bank)
-	jsr sfacadr
+	jsr sfacadr	; get offset
 	sty $df04
 	sta $df05
-	jsr sgetbytc
+	jsr sgetbytc	; get bank 
 	stx $df06
 
 	jsr chrgot	; more parameters?
@@ -815,11 +815,10 @@ param3u4	jsr sfrmnum	; POS: get reu start (and bank)
 	jsr schkcom
 
 param5	jsr sgetbyt1	; RESTORE: get autoinc flag
-	ldy $df01
-	txa
-	beq +
+	jsr cramdma	; get flag for color RAM DMA
+	beq +		; if autoinc=0: off
 	tya
-	ora #$20		; set ON
+	ora #$20		; else set ON
 	bne ++
 +	tya		; set OFF
 	and #$df
@@ -1126,14 +1125,21 @@ ml8	and #$7f		; geshiftetes zeichen ausgeben
 	rts
 
 ; ----------------------------------------- 
+; bf88
+	!by 0,0,0,0,0,0,0,0	; 41 bytes
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0
 
-	!by 0,0,0,0,0,0,0,0	; 50 bytes
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0
+; ----------------------------------------- Part of MEM
+; bfb1
+cramdma	ldy $df01		; get autoinc register
+	stx helpvc2	; store dma flag (pos/neg)
+	txa
+	and #1		;  0 or 1?
+	rts
 
 ; ----------------------------------------- bef ERROR
 ; bfba	new (code by D. Temme, 64'er 11/1984)
@@ -1663,7 +1669,7 @@ null	!tx "null"
 ; ca44
 version	!tx "ad86"	; Signature
 	!by $0d
-	!tx "2.20821"	; Version Number
+	!tx "2.20826"	; Version Number
 
 ; ----------------------------------------- 
 ; ca4f

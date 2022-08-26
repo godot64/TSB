@@ -20,6 +20,7 @@
 ; patched on 13.05.2022 (command SCRLD/SV DEF added)
 ; patched on 01.07.2022 (commands TEXT/CSET: optimized)
 ; patched on 14.08.2022 (command KEY able to keep 16 chars)
+; patched on 25.08.2022 (commands MEM..., by P. Hagemann
 ; 
 ; ----------------------------------------- 
 
@@ -1500,14 +1501,24 @@ flashinit	lda #0
 	sta flashzae
 	jmp chkonoff	; Parameter holen
 
-; ----------------------------------------- 
-; b5ed 
-	!by 0,0,0,0,0,0,0,0	; 17 bytes
-	!by 0,0,0,0,0,0,0,0
-	!by 0
+; ----------------------------------------- Part of MEMLOAD/SAVE
+; b5ed 			by P. Hagemann
+execdma	lda pport		; (is $36)
+	pha
+	ldx helpvc2	; want access to Color RAM?
+	bmi +		; yes, set $36
+	lda #$30		; no, set $30
++	sei
+	sta pport
+	lda #0
+	sta $ff00		; execute DMA by writing to $ff00
+	pla 
+	sta pport		; switch back to previous config
+	cli
+	jmp bef0
 
 ; ----------------------------------------- bef PAINT
-; b5fe			recoded
+; b605			recoded
 befpaint	jsr getxy
 	jsr getpktf
 	stx $66
@@ -1522,7 +1533,7 @@ befpaint	jsr getxy
 	jsr pnt0
 +	jmp endsmb
 
-; b61b
+; b622
 pnt0	lda ax
 	sta $5c
 	lda ax+1
@@ -1537,7 +1548,7 @@ pnt0	lda ax
 	sta pdot
 	tsx
 	stx pstack
-; b63c
+; b643
 recurs	tsx		; now go!
 	cpx #20		; stack runs low?
 	bcc pntend	; yes, end
@@ -1590,7 +1601,7 @@ recurs	tsx		; now go!
 	rts
 
 ; ----------------------------------------- 
-; b69d
+; b6a4
 pnext	pla
 	sta $5d
 	pla
@@ -1602,7 +1613,7 @@ pnext	pla
 pntend	rts
 
 ; ----------------------------------------- 
-; b6aa
+; b6b1
 pset	lda $fd
 	sta $5b
 	lda $fe
@@ -1634,7 +1645,7 @@ pset	lda $fd
 	rts
 
 ; ----------------------------------------- 
-; b6e5
+; b6ec
 pnt3	inc $5b
 	lda pdot
 	cmp $5b
@@ -1642,7 +1653,7 @@ pnt3	inc $5b
 	rts
 
 ; ----------------------------------------- 
-; b6ef
+; b6f6
 pnt2	lda $f9
 pnt1	and #1
 	beq pnt4
@@ -1657,7 +1668,7 @@ pnt1	and #1
 	rts
 
 ; ----------------------------------------- 
-; b705
+; b70c
 pnt4	lda multijn
 	bne pnt5
 	lda $5d
@@ -1679,7 +1690,7 @@ pnt7	clc
 	rts
 
 ; ----------------------------------------- 
-; b724
+; b72b
 testfrei	lda $5c
 	ldx $5d
 	ldy $5b
@@ -1694,11 +1705,6 @@ testfrei	lda $5c
 	sta $f7
 	lda status
 	cmp $6a
-	beq +
-	lda #1
-	rts
-
-+	lda #0
 	rts
 
 ; ----------------------------------------- 
