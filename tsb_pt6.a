@@ -761,10 +761,13 @@ memplus	dey		; .y=0
 	and #$6c		; Bit 0,1,4,7 aus
 	ora helpvec	
 	sta $df01
+	lda pport
+	pha
+	ldx helpvc2
 	jmp execdma	; to $b5ed (this part by P. Hagemann)
 
 ; ----------------------------------------- w/ Parameters
-; bd0d
+; bd10
 params	sty helpvc2	; .y=0
 	tax
 	jsr chrget	; advance to parameters:
@@ -784,9 +787,8 @@ params	sty helpvc2	; .y=0
 	jmp ($0300)
 
 ; ----------------------------------------- 
-; bd2e
-param1	jsr sfrmnum	; LEN: get amount
-	jsr sfacadr
+; bd33
+param1	jsr sgetadr	; LEN: get amount
 	sty $df07
 	sta $df08
 
@@ -794,8 +796,7 @@ param1	jsr sfrmnum	; LEN: get amount
 	beq ready		; no
 	jsr schkcom
 
-param2	jsr sfrmnum	; OR: get c64 start
-	jsr sfacadr
+param2	jsr sgetadr	; OR: get c64 start
 	sty $df02
 	sta $df03
 
@@ -803,9 +804,8 @@ param2	jsr sfrmnum	; OR: get c64 start
 	beq ready		; no
 	jsr schkcom
 
-param3u4	jsr sfrmnum	; POS: get reu start (and bank)
-	jsr sfacadr	; get offset
-	sty $df04
+param3u4	jsr sgetadr	; POS: get reu start (and bank)
+	sty $df04		; get offset
 	sta $df05
 	jsr sgetbytc	; get bank 
 	stx $df06
@@ -837,6 +837,10 @@ param6	jsr sgetbyt1	; CONT: get fix reu flag
 	ror
 	sta $df0a
 ready	jmp endsmb
+
+; ----------------------------------------- 
+; bd97
+	!by 0,0,0,0
 
 ; ----------------------------------------- part of COLOUR
 ; bd9b
@@ -1011,7 +1015,7 @@ defscrsv	jsr sgetbytn
 	sta skipslo	; BIT: ohne Startadresse
 	sta skipshi
 
-no	jmp endsmb	; Abschluss
+no	jmp leave2	; Abschluss
 
 ; ------------------------------------------------------------ 
 ;  tsb detokenizer (from sys: $a717 via $0306/07)
@@ -1600,13 +1604,19 @@ allnrm	lda vecrenum	; vector of bef RENUMBER
 	cmp #<befrenum-1	; unchanged? (after MEM)
 	beq -		; yes, leave
 ; c9d8
-	lda progz+2	; chrget changed?
+	lda progz+2	; chrget changed? (DOS 5.1)
 	cmp #$4c
-	beq nrm3		; yes, go to tsb.ext (!changes!)
+	beq nrm3		; yes, go to "tsb.ext" (!changes!)
 
-	ldx #<nammem	; load "tsb.mem"
+!if uniprom {		; if for Uniprom CRT:
+	ldx #4
+	ldy #$cc
+	jsr $7f80		; load "tsb.mem" from there
+} else {
+	ldx #<nammem	; else load "tsb.mem" from disk
 	jsr loadext
 	bcs iffail	; leave if fail
+}
 
 	lda #<befrenum-1	; repair RENUM vector
 	sta vecrenum	; 87b4
@@ -1669,7 +1679,7 @@ null	!tx "null"
 ; ca44
 version	!tx "ad86"	; Signature
 	!by $0d
-	!tx "2.20826"	; Version Number
+	!tx "2.20829"	; Version Number
 
 ; ----------------------------------------- 
 ; ca4f

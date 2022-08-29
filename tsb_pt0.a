@@ -51,6 +51,10 @@
 	pushstr	= $b4ca
 	getbytc	= $e200
 
+; ----------------------------------------- 
+
+	uniprom	= 0
+
 	!src "tsb_pt1.a"
 	!src "tsb_pt2.a"
 	!src "tsb_pt3.a"

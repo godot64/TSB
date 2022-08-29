@@ -21,6 +21,7 @@
 ; patched on 01.07.2022 (commands TEXT/CSET: optimized)
 ; patched on 14.08.2022 (command KEY able to keep 16 chars)
 ; patched on 25.08.2022 (commands MEM..., by P. Hagemann
+; patched on 29.08.2022 (all SCR and MEM commands)
 ; 
 ; ----------------------------------------- 
 
@@ -1078,16 +1079,18 @@ skipif	jsr schelse	; search for single ELSE:
 chkstate	jsr $ffcf
 	ldx status
 	beq nrm04
+	pla
+	pla
 	jmp ss5
 
 ; ----------------------------------------- 
-; b318
+; b31a
 jstifoff	sty justif
 	jmp chrget
 
 ; ----------------------------------------- 
-; b31e
-	!by 0,0,0		; 3 bytes
+; b320
+	!by 0		; 1 byte
 
 ; ----------------------------------------- bef CSET
 ; b321			modified
@@ -1503,19 +1506,18 @@ flashinit	lda #0
 
 ; ----------------------------------------- Part of MEMLOAD/SAVE
 ; b5ed 			by P. Hagemann
-execdma	lda pport		; (is $36)
-	pha
-	ldx helpvc2	; want access to Color RAM?
-	bmi +		; yes, set $36
-	lda #$30		; no, set $30
-+	sei
+execdma	bmi +		; carries FF00 flag
+	lda #$30		; no color ram access wanted
+	bne ++
++	lda #$35		; color ram access wanted
+++	sei
 	sta pport
-	lda #0
-	sta $ff00		; execute DMA by writing to $ff00
-	pla 
-	sta pport		; switch back to previous config
+	lda $ff00		; save byte
+	sta $ff00		; activate DMA
+	pla		; restore IO config
+	sta pport
 	cli
-	jmp bef0
+	jmp bef0		; finished
 
 ; ----------------------------------------- bef PAINT
 ; b605			recoded

@@ -955,7 +955,7 @@ scrsvrst	ldx #4
 	stx skipvr
 	stx skipslo
 	stx skipshi
-	jmp bef0
+	jmp leave1	; finish
 
 ; ----------------------------------------- 
 ; 8f2d
