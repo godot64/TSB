@@ -176,18 +176,18 @@ fnmempeek	jsr getpeek	; yes, PEEK in overall RAM
 	jmp sxyflp3
 
 ; ----------------------------------------- 
-; 925f
+; 9265
 +	jmp csgetariend	
 
 ; ----------------------------------------- bef PLOT
-; 9262			recoded
+; 9268			recoded
 befplot	jsr getxy
 	jsr getpktf	; col
 	jsr punkt		; set dot
 ++	jmp endsmb
 
 ; ----------------------------------------- 
-; 926e
+; 9274
 clrhicols	sta $c000,y	; clear video ram
 	sta $c0f9,y
 	sta $c1f3,y
@@ -198,20 +198,20 @@ clrhicols	sta $c000,y	; clear video ram
 	rts
 
 ; ----------------------------------------- part of DO
-; 9280
+; 9286
 dodone	bcs +		; DONE?
 	jmp befproc	; no, skip rest of line
 
 +	jmp donecont	; b56a
 
 ; -----------------------------------------  set dot
-; 9288
+; 928e
 -	lda #$08		; nicht plausibel
 	sta status
 	rts
 
 ; -----------------------------------------
-; 928d			original
+; 9293			original
 punkt	clc
 	lda $09		; plausibel?
 	sbc xmaxlow	; x>319?
@@ -283,13 +283,13 @@ punkt	clc
 	rts		; yes, leave
 
 ; ----------------------------------------- set dots
-; 9308
+; 930e
 +	lda multijn	; now set dots, hires?
 	beq sethires
 	jmp setmulti	; no, go to multi (9a7a)
 
 ; ----------------------------------------- set hires dots
-; 9310
+; 9316
 sethires	lda $f7		; hires, get color source
 	beq herase
 	cmp #1
@@ -298,21 +298,21 @@ sethires	lda $f7		; hires, get color source
 	beq hinvert
 	jmp ptest1	; a261	
 
-; 931f
+; 9325
 hset0	inx		; inx: for multi double pixels
 hset	lda ($a8),y
 	ora gbittabs,x
 	sta ($a8),y
 	rts
 
-; 9328
+; 932e
 herase0	inx
 herase	lda ($a8),y
 	and gbittabl,x
 	sta ($a8),y
 	rts
 
-; 932e
+; 9337
 hinvert0	inx
 hinvert	lda ($a8),y
 	eor gbittabs,x
@@ -320,18 +320,18 @@ hinvert	lda ($a8),y
 	rts
 
 ; ----------------------------------------- 
-; 933a
+; 9340
 gbittabs	!by $80,$40,$20,$10,$08,$04,$02,$01
 gbittabl	!by $7f,$bf,$df,$ef,$f7,$fb,$fd,$fe
 
 ; ----------------------------------------- bef LINE
-; 934a			original
+; 9350			original
 befline	jsr getxyxyf
 line0	jsr linzei
 	jmp endsmb
 
 ; ----------------------------------------- 
-; 9353
+; 9359
 getxy	jsr sgetadrn	; X
 getxy2	sty $09
 	sta $0a
@@ -343,7 +343,7 @@ getxy2	sty $09
 	rts
 
 ; ----------------------------------------- 
-; 9379
+; 936f
 getxyxyf	jsr getxy		; start X/Y
 getxyf	jsr schkcom	; comma?
 gxyf0	jsr sgetadr	; end x
@@ -356,7 +356,7 @@ getpktf	jsr sgetbytc	; draw mode
 	rts
 
 ; ----------------------------------------- 
-; 9384			optimized
+; 938a			optimized
 farbset	jsr kerromein
 	lda $09		; x-pos/8 ( -> Kacheloffset in Zeile )
 	lsr
@@ -383,7 +383,7 @@ farbset	jsr kerromein
 	adc $0a
 	sta $a9
 	sta $ab
-; 93b4
+; 93ac
 	clc		; Low Col: Farben 1 und 2
 	lda $a9
 	adc #$c0		; in $c000
@@ -404,7 +404,7 @@ farbset	jsr kerromein
 +	rts
 
 ; ----------------------------------------- bef LOW COL
-; 93d3			optimized
+; 93d9			optimized
 beflowcol	jsr get2nyb
 	sta lcfarb12
 	lda #10
@@ -414,14 +414,14 @@ beflowcol	jsr get2nyb
 	jmp endsmb
 
 ; ----------------------------------------- bef KEYGET
-; 93e7	KEYGET by P. Hagemann, v2.20521
+; 93ed	KEYGET by P. Hagemann, v2.20521
 keyget	jsr chrget	; nächstes Zeichen holen
 	cmp #$a1		; GET-Token?
 	beq get
 	ldx #10		; no, continue KEY
 	jsr chkonoff+5
-	jmp befkey+3
-;93f6
+	jmp chrgot	; get last byte
+;93fc
 get	ldx #0		; ### v2.20528
 	stx numkeys
 -	ldx numkeys	; yes, Taste gedrückt?
@@ -433,7 +433,7 @@ get	ldx #0		; ### v2.20528
 	jmp scd5		; Stack bereinigen, Ende	
 
 ; ----------------------------------------- 
-; 940d
+; 9413
 kerromaus	sei
 	lda pport
 	and #$fd
@@ -441,14 +441,14 @@ kerromaus	sei
 	rts
 
 ; ----------------------------------------- 
-; 9415
+; 941b
 kerromein	lda pport
 	ora #2
 	sta pport
 	rts
 
 ; ----------------------------------------- 
-; 941c
+; 9422
 sgetadr2	lda portspei
 	pha
 	jsr sgetadr
@@ -459,22 +459,22 @@ sgetadr2	lda portspei
 	rts
 
 ; ----------------------------------------- 
-; 942e
+; 9434
 sgetadr	jsr sfrmnum
 	jmp sfacadr
 
 ; ----------------------------------------- 
-; 9434
+; 943a
 gadrtabl	!by $00,$40,$80,$c0
 
-; 9438
+; 943e
 gadrtabh	!by $e0,$e1,$e2,$e3,$e5,$e6,$e7,$e8
 	!by $ea,$eb,$ec,$ed,$ef,$f0,$f1,$f2
 	!by $f4,$f5,$f6,$f7,$f9,$fa,$fb,$fc
 	!by $fe
 
 ; ----------------------------------------- 
-; 9451
+; 9457
 intback	jsr restint
 	jmp $aef7		; sys ")"?
 

@@ -137,7 +137,7 @@
 
 ; ----------------------------------------- 
 
-	; 		  $c74d		  ! unused (3 bytes)
+	; 		  $c74d		; "ata" (string to compare w/ DATA)
 	pxhtab		= $c751		; unused (instead: code starts at $c750...)
 	pxltab		= $c850 		; unused
 	pytab		= $c94f		; unused
@@ -240,7 +240,7 @@
 	elseindex		= $cbf9		; Index in ELSE-Stack
 	;				  ! unused (6 bytes)
 
-	; 		total of 376 unused bytes between $c500 and $cc00
+	; 		total of 373 unused bytes between $c500 and $cc00
 
 ; ----------------------------------------- 
 ;

@@ -22,6 +22,7 @@
 ; patched on 14.08.2022 (command KEY able to keep 16 chars)
 ; patched on 25.08.2022 (commands MEM..., by P. Hagemann
 ; patched on 29.08.2022 (all SCR and MEM commands)
+; patched on 30.08.2022 (bugfix: crash if KEY 0 was followed by parameter)
 ; 
 ; ----------------------------------------- 
 
@@ -1447,18 +1448,18 @@ trc1	sta $22
 ; ----------------------------------------- bef KEY
 ; b586			enhanced
 befkey	jsr keyget	; check for KEYGET (doesn't return if successful)
-	jsr chrgot	; get last byte
-	bne +
-	txa
+	bne +		; last byte is delimiter?
+	txa		; yes, set flag
 	eor #10
-	sta keyflag	; set accordingly
+	sta keyflag	; (10: tap f-key is off)
 --	jmp endsmb	; (21)
-; b597
+; b594
 +	cpx #$11		; more than 16?
 	bcc +
-	jmp swarm		; yes, bad mode error
-; b59e
-+	dex
+-	jmp swarm		; yes, bad mode error
+; b59b
++	dex		; parameter after KEY 0?
+	bmi -		; yes, bad mode (### v2.20830)
 	stx $aa		; times 16
 	lda #0
 	asl $aa
@@ -1497,6 +1498,10 @@ befkey	jsr keyget	; check for KEYGET (doesn't return if successful)
 +	lda #0
 	sta ($aa),y
 	beq --
+
+; ----------------------------------------- 
+; b5e4
+	!by 0
 
 ; ----------------------------------------- Part of FLASH
 ; b5e5
