@@ -820,7 +820,7 @@ csgetari2	cpy #$10		; PLACE?
 	jmp csgetari3
 
 ; ----------------------------------------- func PLACE
-; 8e38			modified
+; 8e3b			modified
 fnplace	jsr getstrgs	; check "(", get 2 strings
 	jsr $aef7		; sys ")"?
 

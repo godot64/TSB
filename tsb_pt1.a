@@ -507,7 +507,7 @@ befrenum	jsr get10010	; .a=0
 	jsr basromau
 	lda $c4		; ...c4 (hi)
 
-+	jsr renum0	; do renumber
++	jsr isprg		; do renumber
 
 	jsr renum1	; get start of basic (to a8/9)
 -	lda ($a8),y	; store line link to 09/a
@@ -701,8 +701,8 @@ xipr3	sty doindex
 	rts
 
 ; ----------------------------------------- 
-; 8621
-	!by 0,0,0,0,0,0,0,0	; 100 bytes
+; 8624
+	!by 0,0,0,0,0,0,0,0	; 83 bytes
 	!by 0,0,0,0,0,0,0,0
 	!by 0,0,0,0,0,0,0,0
 	!by 0,0,0,0,0,0,0,0
@@ -712,9 +712,20 @@ xipr3	sty doindex
 	!by 0,0,0,0,0,0,0,0
 	!by 0,0,0,0,0,0,0,0
 	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0
+	!by 0,0,0
+
+
+; ----------------------------------------- Part of RENUMBER
+; 8677 
+isprg	tax		; save .a
+	ldy #0		; is there any PRG?
+	lda ($2b),y
+	iny
+	ora ($2b),y
+	bne +
+	jmp scd5		; no, finished
++	txa		; restore .a
+	jmp renum0	; yes, process it
 
 ; ----------------------------------------- Part of IF
 ; 868d 
