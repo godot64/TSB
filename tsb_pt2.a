@@ -259,7 +259,7 @@ tr3	iny
 tr20	ldy $49
 	bne tr21
 
-; ----------------------------------------- 
+; ----------------------------------------- Part of PLAY
 ; 8a56
 sirqplay	lda musicz4	; from sirq5
 	beq sip0
@@ -275,48 +275,50 @@ sip1	dec musicz4
 	sta musicz2
 	rts
 
-sip0	lda musicadr
+sip0	lda musicadr	; get adr of music string
 	sta $fc
 	lda musicadr+1
 	sta $fd
-	ldy musicz1
+	ldy musicz1	; get pointer into string
+	cpy musiclen	; at end of string?
+	bcs sip2		; yes, end PLAY
+
 	lda ($fc),y
-	cmp #$8d		; beyond f8?
-	bcs sip9
-	cmp #$85		; below f1?
-	bcc sip9
-	sbc #$84		; make value
+	cmp #$8d		; beyond f8? (code for longest note)
+	bcs sip9		; yes
+	cmp #$85		; below f1? (code for shortest note)
+	bcc sip9		; yes
+	sbc #$84		; code valid, set individ. note duration
 	sta musicz2
 	sta musicz3
 	lda musicdau
 	sta musicz4
-	jmp sip4
+	bne sip4		; uncond. branch
 
-sip2	sty musicz5
-	jsr notesuch
-	jsr svmregadr
+sip2	sty musicz5	; store pointer into string
+	jsr notesuch	; search note, result in .a and .x
 	ldy #1
 	sta ($fe),y
 	txa
 	dey
 	sta ($fe),y
-	jsr stimmein
-	ldy musicz5
+	jsr stimmein	; play on
+	ldy musicz5	; re-get pointer
 
-sip4	cpy musiclen
-	bcs playend
-	iny
+sip4	cpy musiclen	; at end of music string?
+	bcs playend	; yes
+	iny		; no, advance
 	sty musicz1
 	rts
 
-playend	lda #0
+playend	lda #0		; clear play flag
 	sta musicz1
 	sta playflag
 	rts
 
-sip9	cmp #$93		; clr (choose voice)
-	bne sip2
-	iny
+sip9	cmp #$93		; clr (code for select voice)?
+	bne sip2		; no, note?
+	iny		; yes, get voice number
 	lda ($fc),y
 	ldx #$00
 	stx musicz4
@@ -328,13 +330,13 @@ sip9	cmp #$93		; clr (choose voice)
 	tax
 	dex
 	lda #$d4		; set $d4xx (from voice)
-	sta mregadr+1
-	lda mregs,x
+	sta mregadr+1	; 
+	lda mregs,x	; pointer to voice 1..3
 	sta mregadr
 	stx stimmenr
--	jmp sip4
+-	jmp sip4		; advance in music string
 
-sip5	cmp #$47		; "g" voice off
+sip5	cmp #$47		; code "g": voice off?
 	bne sip3
 	tya
 	pha
@@ -342,13 +344,13 @@ sip5	cmp #$47		; "g" voice off
 	ldy stimmenr
 	lda wavetab,y
 	and #$fe
-	ldy #4
+	ldy #4		; same code as below!
 	sta ($fe),y
 	pla
 	tay
-	bne -
+	bne -		; advance
 
-sip3	cmp #$54		; "t" sync bit
+sip3	cmp #$54		; code "t": sync bit?
 	bne sip6
 	tya
 	pha
@@ -362,7 +364,7 @@ sip3	cmp #$54		; "t" sync bit
 	tay
 	bne -
 
-sip6	cmp #$43		; "c" waveform
+sip6	cmp #$43		; code "c": clear waveform
 	bne sip7
 	tya
 	pha
@@ -370,19 +372,15 @@ sip6	cmp #$43		; "c" waveform
 	lda #0
 	beq --
 
-sip7	cmp #$52		; "r" repeat
+sip7	cmp #$52		; code "r": repeat music
 	bne -
 	ldy #0
 	sty musicz1
 	sty musicz4
 	rts
 
-svmregadr	ldy mregadr
-	sty $fe
-	ldy mregadr+1
-	sty $ff
-	rts
-
+; ----------------------------------------- 
+;
 notesuch	ldy #$13		; search in 20 notes
 -	cmp nottab,y
 	beq sip8
@@ -390,7 +388,7 @@ notesuch	ldy #$13		; search in 20 notes
 	bpl -
 	lda #0		; not found
 	tax
-	rts
+	beq svmregadr
 
 sip8	lda frqtabh,y	; found, set frequency
 	sta mfreq+1
@@ -399,7 +397,6 @@ sip8	lda frqtabh,y	; found, set frequency
 	inc musicz5
 	ldy musicz5
 	lda ($fc),y
-	sec
 	sbc #$30
 	tax
 	beq sip10
@@ -410,6 +407,10 @@ sip8	lda frqtabh,y	; found, set frequency
 
 sip10	lda mfreq+1
 	ldx mfreq
+svmregadr	ldy mregadr
+	sty $fe
+	ldy mregadr+1
+	sty $ff
 	rts
 
 ; ----------------------------------------- 
@@ -437,7 +438,7 @@ stimmein	ldy #6
 	lda adtab,x	; attack/decay
 	sta ($fe),y
 	dey
-	lda wavetab,x	; waveform
+	lda wavetab,x	; set waveform data
 	and #$fe		; clear key bit
 	sta ($fe),y
 	ora #1

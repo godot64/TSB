@@ -1596,13 +1596,13 @@ do2	jsr basromau
 ; ----------------------------------------- 
 ; c9cb
 nrm2	jsr allnrm	; here: returned from TSB.MEM
--	jmp bef0
+	jmp bef0
 
 ; ----------------------------------------- 
 ; c9d1
 allnrm	lda vecrenum	; vector of bef RENUMBER
 	cmp #<befrenum-1	; unchanged? (after MEM)
-	beq -		; yes, leave
+	beq +		; yes, leave
 ; c9d8
 	lda progz+2	; chrget changed? (DOS 5.1)
 	cmp #$4c
@@ -1626,7 +1626,7 @@ allnrm	lda vecrenum	; vector of bef RENUMBER
 	sta vecplace	; 86e2
 	lda #>befplace
 	sta vecplace+1
-	rts
++	rts
 
 ; ----------------------------------------- 
 ; c9fa
@@ -1679,7 +1679,7 @@ null	!tx "null"
 ; ca44
 version	!tx "ad86"	; Signature
 	!by $0d
-	!tx "2.20902"	; Version Number
+	!tx "2.20904"	; Version Number
 
 ; ----------------------------------------- 
 ; ca4f

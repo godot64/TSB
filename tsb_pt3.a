@@ -900,14 +900,14 @@ msk0	jsr sgetbytc
 ; ----------------------------------------- bef MUSIC
 ; 975f			original
 befmusic	jsr sgetbytn
-	stx musicdau
+	stx musicdau	; set tempo (0 isn't caught!)
 	jsr schkcom
 	jsr sgetstr
-	stx musicadr
+	stx musicadr	; set address of notes string
 	sta musicadr+1
 	ldy #0
 	sty musicz1
-	lda $69
+	lda $69		; and its length
 	sta musiclen
 bms0	jmp endsmb
 
@@ -1281,18 +1281,18 @@ cgoto0	jsr sfrmnum
 
 ; ----------------------------------------- bef WAVE
 ; 99ee			original
-befwave	jsr sgetbytn
-	jsr x123
+befwave	jsr sgetbytn	; get voice number
+	jsr x123		; only 1 to 3!
 	stx $aa
 	jsr schkcom
-	jsr bincon
+	jsr bincon	; get switch panel
 	jmp bwv0
 
 ; ----------------------------------------- 
 ; 99ff
 bincon	lda #0
-	sta $a6
-	sta $a8
+	sta $a6		; pointer into panel
+	sta $a8		; init result byte
 -	ldy #0
 	lda (progz),y
 	cmp #$30		; "0"?
@@ -1302,9 +1302,9 @@ bincon	lda #0
 	ldx #$24		; no, error "not binary char"
 	jmp ($0300)
 
-+	ldy $a6
++	ldy $a6		; if digit="1":
 	lda $a8
-	ora gbittabs,y
+	ora gbittabs,y	; enter value to result
 	sta $a8
 ++	inc $a6
 	jsr incbasbz
@@ -1315,19 +1315,19 @@ bincon	lda #0
 
 ; ----------------------------------------- 
 ; 9a2b
-bwv0	asl $aa
+bwv0	asl $aa		; voice number times 2
 	ldy $aa
-	lda sidtab,y
-	sta $20
+	lda sidtab,y	; address SID control reg
+	sta $20		; in $20/1
 	iny
 	lda sidtab,y
 	sta $21
 	ldy #4
-	lda $a8
+	lda $a8		; set waveform/sync to SID...
 	sta ($20),y
-	lsr $aa
+	lsr $aa		; (re-get voice number)
 	ldy $aa
-	sta wavetab,y
+	sta wavetab,y	; ...and to buffer
 	jmp endsmb
 
 ; ----------------------------------------- 
