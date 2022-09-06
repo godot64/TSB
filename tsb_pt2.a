@@ -395,7 +395,7 @@ sip8	lda frqtabh,y	; found, set frequency
 	lda frqtabl,y
 	sta mfreq
 	inc musicz5
-	ldy musicz5
+	ldy musicz5	; set octave
 	lda ($fc),y
 	sbc #$30
 	tax
@@ -430,18 +430,18 @@ frqtabh	!by $01,$01,$01,$01,$01,$01,$01,$01
 
 ; ----------------------------------------- 
 ; 8bbc
-stimmein	ldy #6
+stimmein	ldy #6		; index to SID register 6
 	ldx stimmenr
-	lda srtab,x	; sustain/release
+	lda srtab,x	; get sustain/release values from buffer
+	sta ($fe),y	; write to register
+	dey		; register 5
+	lda adtab,x	; get attack/decay values from buffer
 	sta ($fe),y
-	dey
-	lda adtab,x	; attack/decay
-	sta ($fe),y
-	dey
+	dey		; register 4
 	lda wavetab,x	; set waveform data
 	and #$fe		; clear key bit
 	sta ($fe),y
-	ora #1
+	ora #1		; and set it (activate voice)
 	sta ($fe),y
 	rts
 

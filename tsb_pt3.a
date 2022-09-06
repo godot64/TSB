@@ -1145,7 +1145,7 @@ befplay	jsr chkonoff
 	beq ++		; yes
 
 			; no, PLAY 1 (PRG waits)
--	lda playflag	; gets cleared in IRQ
+-	lda playflag	; flag gets cleared in sirqplay (IRQ)
 	cmp #10		; wait until cleared
 	beq -
 
@@ -1220,30 +1220,30 @@ cold1	lda #8
 ; ----------------------------------------- bef ENVELOPE
 ; 9981			original
 befenvelope
-	jsr sgetbytn
-	jsr x123
+	jsr sgetbytn	; get voice number
+	jsr x123		; (check if in 1..3)
 	stx $a6
-	jsr get2nybc
+	jsr get2nybc	; get attack and decay values
 	sta $a8
-	jsr get2nybc
-	asl $a6
+	jsr get2nybc	; get sustain and release values
+	asl $a6		; voice number times 2 as index
 	ldx $a6
-	lda sidtab,x
+	lda sidtab,x	; set oscillator address
 	sta $20
 	inx
 	lda sidtab,x
 	sta $21
-	lsr $a6
-	ldy #$06
-	lda $aa
-	sta ($20),y
+	lsr $a6		; back to voice number
+	ldy #$06		; index to sust/release register
+	lda $aa		
+	sta ($20),y	; set value to SID
 	ldy $a6
-	sta srtab,y
-	ldy #5
+	sta srtab,y	; and to buffer
+	ldy #5		; index to atck/decay register
 	lda $a8
-	sta ($20),y
+	sta ($20),y	; set value to SID
 	ldy $a6
-	sta adtab,y
+	sta adtab,y	; and to buffer
 	jmp endsmb
 
 ; ----------------------------------------- 
@@ -1255,20 +1255,20 @@ flinend	jsr chrget
 
 ; ----------------------------------------- 
 ; 99c3
-get2nybc	jsr iskomma
-get2nyb	jsr sgetbytn
-get2nyb2	jsr xnyb
+get2nybc	jsr iskomma	; comma?
+get2nyb	jsr sgetbytn	; get value
+get2nyb2	jsr xnyb		; is below 16?
 	txa
+	asl		; times 16
 	asl
 	asl
 	asl
-	asl
-	sta $aa
-	jsr sgetbytn
-	jsr xnyb
+	sta $aa		; store
+	jsr sgetbytn	; get next value
+	jsr xnyb		; is below 16?
 	txa
-	ora $aa
-	sta $aa
+	ora $aa		; combine and 
+	sta $aa		; store
 	rts
 
 ; ----------------------------------------- bef CGOTO
