@@ -417,8 +417,9 @@ svmregadr	ldy mregadr
 ; 8b7d
 mregs	!by $00,$07,$0e
 ; 8b80
-nottab	!by $43,$c3,$44,$c4,$45,$46,$c6,$47,$c7,$41,$c1,$42,$5a
-	!by $ac,$b1,$bb,$a5,$b0,$bf,$bc
+nottab	!by $43,$c3,$44,$c4,$45,$46,$c6,$47
+	!by $c7,$41,$c1,$42,$5a,$ac,$b1,$bb
+	!by $a5,$b0,$bf,$bc
 ; 8b94
 frqtabl	!by $12,$23,$34,$46,$5a,$6e,$84,$9b
 	!by $b3,$cd,$e9,$06,$00,$23,$46,$5a

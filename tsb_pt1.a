@@ -702,19 +702,38 @@ xipr3	sty doindex
 
 ; ----------------------------------------- 
 ; 8624
-	!by 0,0,0,0,0,0,0,0	; 83 bytes
+	!by 0,0,0,0,0,0,0,0	; 41 bytes
 	!by 0,0,0,0,0,0,0,0
 	!by 0,0,0,0,0,0,0,0
 	!by 0,0,0,0,0,0,0,0
 	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0
+	!by 0
 
+; ----------------------------------------- bef SOUND
+; 864d
+befsound	jsr sgetbytn	; get voice number
+	jsr x123		; is in 1..3?
+	jsr setsid	; set SID base address
+	jsr schkcom	; comma?
+	jsr sgetadr	; get frequency value
+	ldy #1
+	jsr optp1		; write to SID
+	jmp endsmb
 
+; ----------------------------------------- 
+; 8664
+optpulse	jsr schkcom
+	jsr sgetadr	; returns .a=hi, .y=lo from INT
+	ldy $aa
+	iny
+	iny
+	iny
+optp1	sta ($20),y
+	dey
+	lda int
+	sta ($20),y
+	rts
+	
 ; ----------------------------------------- Part of RENUMBER
 ; 8677 
 isprg	tax		; save .a
@@ -765,133 +784,133 @@ sgetstr	jsr sfrmevl	; get string from basic
 
 ; ----------------------------------------- Table of BEFs
 ; 86c3
-sprtab	!wo befhires-1	;   1 $9202 hires
-	!wo befplot-1	;   2 $9267 plot
-	!wo befline-1	;   3 $9350 line
-	!wo befblock-1	;   4 $bbcc block
-	!wo movebef-1	;   5 $ac5d fchr
-	!wo movebef-1	;   6 $ac5d fcol
-	!wo movebef-1	;   7 $ac5d fill
-	!wo befrec-1	;   8 $baf8 rec
-	!wo befrot-1	;   9 $a15e rot
-	!wo befdraw-1	;  10 $a057 draw
-	!wo befchar-1	;  11 $a186 char
-	!wo befhicol-1	;  12 $a270 hi col
-	!wo movebef-1	;  13 $ac5d inv
-	!wo swarm-1	;     $9e9a bad mode (fn frac)
-	!wo movebef-1	;  15 $ac5d move
-vecplace	!wo befplace-1	;  16 $ccd7 place    (changed from 86e2)
-	!wo movebef-1	;  17 $ac5d upb
-	!wo movebef-1	;  18 $ac5d upw
-	!wo movebef-1	;  19 $ac5d leftw
-	!wo movebef-1	;  20 $ac5d leftb
-	!wo movebef-1	;  21 $ac5d downb
-	!wo movebef-1	;  22 $ac5d downw
-	!wo movebef-1	;  23 $ac5d rightb
-	!wo movebef-1	;  24 $ac5d rightw
-	!wo befmulti-1	;  25 $94e9 multi
-	!wo befcolour-1	;  26 $952d colour
-	!wo befmmob-1	;  27 $95c8 mmob
-	!wo befbflash-1	;  28 $966d bflash
-	!wo befmobset-1	;  29 $96da mob set
-	!wo befmusic-1	;  30 $9759 music
-	!wo befflash-1	;  31 $9790 flash
-	!wo befrepeat-1	;  32 $9af7 repeat
-	!wo befplay-1	;  33 $9918 play
-	!wo befdo-1	;  34 $b570 do, done, do null
-	!wo befcentre-1	;  35 $9947 centre
-	!wo befenvelope-1	;  36 $9979 envelope
-	!wo befcgoto-1	;  37 $99e8 cgoto
-	!wo befwave-1	;  38 $99f7 wave
-	!wo beffetch-1	;  39 $b004 fetch
-	!wo befat-1	;  40 $b8b4 at       (fn at)
-	!wo befuntil-1	;  41 $9b15 until
+sprtab	!wo befhires-1	;   1 hires
+	!wo befplot-1	;   2 plot
+	!wo befline-1	;   3 line
+	!wo befblock-1	;   4 block
+	!wo movebef-1	;   5 fchr
+	!wo movebef-1	;   6 fcol
+	!wo movebef-1	;   7 fill
+	!wo befrec-1	;   8 rec
+	!wo befrot-1	;   9 rot
+	!wo befdraw-1	;  10 draw
+	!wo befchar-1	;  11 char
+	!wo befhicol-1	;  12 hi col
+	!wo movebef-1	;  13 inv
+	!wo swarm-1	;     bad mode (fn frac)
+	!wo movebef-1	;  15 move
+vecplace	!wo befplace-1	;  16 place    (changed from 86e2)
+	!wo movebef-1	;  17 upb
+	!wo movebef-1	;  18 upw
+	!wo movebef-1	;  19 leftw
+	!wo movebef-1	;  20 leftb
+	!wo movebef-1	;  21 downb
+	!wo movebef-1	;  22 downw
+	!wo movebef-1	;  23 rightb
+	!wo movebef-1	;  24 rightw
+	!wo befmulti-1	;  25 multi
+	!wo befcolour-1	;  26 colour
+	!wo befmmob-1	;  27 mmob
+	!wo befbflash-1	;  28 bflash
+	!wo befmobset-1	;  29 mob set
+	!wo befmusic-1	;  30 music
+	!wo befflash-1	;  31 flash
+	!wo befrepeat-1	;  32 repeat
+	!wo befplay-1	;  33 play
+	!wo befdo-1	;  34 do, done, do null
+	!wo befcentre-1	;  35 centre
+	!wo befenvelope-1	;  36 envelope
+	!wo befcgoto-1	;  37 cgoto
+	!wo befwave-1	;  38 wave
+	!wo beffetch-1	;  39 fetch
+	!wo befat-1	;  40 at       (fn at)
+	!wo befuntil-1	;  41 until
 	!wo swarm-1	;     (*)
 	!wo swarm-1	;     (+)
-	!wo befuse-1	;  44 $820b use
+	!wo befuse-1	;  44 use
 	!wo swarm-1	;     (-)
-	!wo befglobal-1	;  46 $a341 global
+	!wo befglobal-1	;  46 global
 	!wo swarm-1	;     (/)
-	!wo befreset-1	;  48 $9c05 reset
-	!wo befproc-1	;  49 $9e33 proc
-	!wo befcall-1	;  50 $9c64 call
-	!wo befexec-1	;  51 $9ce4 exec
-	!wo befendproc-1	;  52 $9d11 end proc
-	!wo befexit-1	;  53 $9d2f exit
-	!wo befendloop-1	;  54 $c97e end loop
-	!wo befonkey-1	;  55 $9d70 on key
-	!wo befdisable-1	;  56 $9da2 disable
-	!wo befresume-1	;  57 $9df7 resume
-	!wo befloop-1	;  58 $9e55 loop
-	!wo befdelay-1	;  59 $c947 delay
+	!wo befreset-1	;  48 reset
+	!wo befproc-1	;  49 proc
+	!wo befcall-1	;  50 call
+	!wo befexec-1	;  51 exec
+	!wo befendproc-1	;  52 end proc
+	!wo befexit-1	;  53 exit
+	!wo befendloop-1	;  54 end loop
+	!wo befonkey-1	;  55 on key
+	!wo befdisable-1	;  56 disable
+	!wo befresume-1	;  57 resume
+	!wo befloop-1	;  58 loop
+	!wo befdelay-1	;  59 delay
 	!wo swarm-1	;     (<)
 	!wo swarm-1	;     (=)
 	!wo swarm-1	;     (>)
 	!wo swarm-1	;     (?)
-	!wo befsecure-1	;  64 $c950 secure
-	!wo bef0-1	;  65 $9174 disapa
-	!wo befcircle-1	;  66 $9489 circle
-	!wo befonerror-1	;  67 $9e71 on error
-	!wo befnoerr-1	;  68 $9e93 no error
-	!wo beflocal-1	;  69 $a2fa local
-	!wo befrcomp-1	;  70 $9f1f rcomp
-	!wo befelse-1	;  71 $a2c6 else
-	!wo befretrace-1	;  72 $9b48 retrace
-	!wo beftrace-1	;  73 $9b5a trace
-	!wo befdir-1	;  74 $9544 dir
-	!wo befpage-1	;  75 $9836 page
-	!wo befdump-1	;  76 $9f3a dump
-	!wo beffind-1	;  77 $a594 find
-	!wo befoption-1	;  78 $9b63 option
-	!wo befauto-1	;  79 $9bd6 auto
-	!wo befold-1	;  80 $9eda old
-	!wo swarm-1	;     $9e9a bad mode (fn joy)
-	!wo befmod-1	;  82 $bfe3 mod      (fn mod)
-	!wo befdiv-1	;     $81bd div	 (fn div)
-	!wo befdelete-1	;  84 $b8ea d!
-	!wo befdup-1	;  85 $b7b8 dup      (fn dup)
-	!wo swarm-1	;     $9e9a bad mode (fn inkey)
-	!wo befinst-1	;  87 $ca1a inst     (fn inst)
-	!wo swarm-1	;     $9e9a bad mode (fn test)
-	!wo beflin-1	;  89 $c83d lin      (fn lin)
-	!wo swarm-1	;     $9e9a bad mode (fn exor)
-	!wo befinsert-1	;  91 $af42 insert   (fn insert)
-	!wo swarm-1	;     $9e9a bad mode (fn pot)
-	!wo swarm-1	;     $9e9a bad mode (fn penx)
+	!wo befsecure-1	;  64 secure
+	!wo bef0-1	;  65 disapa
+	!wo befcircle-1	;  66 circle
+	!wo befonerror-1	;  67 on error
+	!wo befnoerr-1	;  68 no error
+	!wo beflocal-1	;  69 local
+	!wo befrcomp-1	;  70 rcomp
+	!wo befelse-1	;  71 else
+	!wo befretrace-1	;  72 retrace
+	!wo beftrace-1	;  73 trace
+	!wo befdir-1	;  74 dir
+	!wo befpage-1	;  75 page
+	!wo befdump-1	;  76 dump
+	!wo beffind-1	;  77 find
+	!wo befoption-1	;  78 option
+	!wo befauto-1	;  79 auto
+	!wo befold-1	;  80 old
+	!wo swarm-1	;     bad mode (fn joy)
+	!wo befmod-1	;  82 mod      (fn mod)
+	!wo befdiv-1	;     div	 (fn div)
+	!wo befdelete-1	;  84 d!
+	!wo befdup-1	;  85 dup      (fn dup)
+	!wo swarm-1	;     bad mode (fn inkey)
+	!wo befinst-1	;  87 inst     (fn inst)
+	!wo swarm-1	;     bad mode (fn test)
+	!wo beflin-1	;  89 lin      (fn lin)
+	!wo swarm-1	;     bad mode (fn exor)
+	!wo befinsert-1	;  91 insert   (fn insert)
+	!wo swarm-1	;     bad mode (fn pot)
+	!wo swarm-1	;     bad mode (fn penx)
 vecbmode	!wo swarm-1	;     (^)
-	!wo swarm-1	;     $9e9a bad mode (fn peny)
-	!wo swarm-1	;     $9e9a bad mode (fn sound)
-	!wo befgraphics-1	;  97 $8bea graphics (fn graphics)
-	!wo befdesign-1	;  98 $a62e design
-	!wo befrlocm-1	;  99 $a768 rlocmob
-	!wo befcmob-1	; 100 $a7a6 cmob
-	!wo befbckgnds-1	; 101 $a7b5 bckgnds
-	!wo befpause-1	; 102 $a7e2 pause
-	!wo befnrm-1	; 103 $a831 nrm      (fn nrm, 90df)
-	!wo befmoboff-1	; 104 $a856 mob off
-	!wo befoff-1	; 105 $a865 off
-	!wo befangl-1	; 106 $ab10 angl
-	!wo befarc-1	; 107 $a876 arc
-	!wo befcold-1	; 108 $8147 cold
-	!wo befscrsv-1	; 109 $b191 scrsv
-	!wo befscrld-1	; 110 $b1dd scrld
-	!wo beftext-1	; 111 $b229 text
-	!wo befcset-1	; 112 $b30d cset
-	!wo befvol-1	; 113 $b33a vol
-	!wo befdisk-1	; 114 $b358 disk
-	!wo befhrdcpy-1	; 115 $b4b8 hrdcpy
-	!wo befkey-1	; 116 $b583 key
-	!wo befpaint-1	; 117 $b5ec paint
-	!wo beflowcol-1	; 118 $93dc low col
-	!wo befcopy-1	; 119 $b9f1 copy
-	!wo befmerge-1	; 120 $8344 merge
-vecrenum	!wo befrenum-1	; 121 $837f renumber (changed from 87b4)
-	!wo befmem-1	; 122 $bdad mem
-	!wo befdetect-1	; 123 $bdf7 detect
-	!wo befcheck-1	; 124 $a278 check    (fn check)
-	!wo befdisplay-1	; 125 $be13 display
-	!wo beferror-1	; 126 $bfbb error    (fn err)
-	!wo befout-1	; 127 $9ed1 out
+	!wo swarm-1	;     bad mode (fn peny)
+	!wo befsound-1	;  96 sound    (fn sound)
+	!wo befgraphics-1	;  97 graphics (fn graphics)
+	!wo befdesign-1	;  98 design
+	!wo befrlocm-1	;  99 rlocmob
+	!wo befcmob-1	; 100 cmob
+	!wo befbckgnds-1	; 101 bckgnds
+	!wo befpause-1	; 102 pause
+	!wo befnrm-1	; 103 nrm      (fn nrm, 90df)
+	!wo befmoboff-1	; 104 mob off
+	!wo befoff-1	; 105 off
+	!wo befangl-1	; 106 angl
+	!wo befarc-1	; 107 arc
+	!wo befcold-1	; 108 cold
+	!wo befscrsv-1	; 109 scrsv
+	!wo befscrld-1	; 110 scrld
+	!wo beftext-1	; 111 text
+	!wo befcset-1	; 112 cset
+	!wo befvol-1	; 113 vol
+	!wo befdisk-1	; 114 disk
+	!wo befhrdcpy-1	; 115 hrdcpy
+	!wo befkey-1	; 116 key
+	!wo befpaint-1	; 117 paint
+	!wo beflowcol-1	; 118 low col
+	!wo befcopy-1	; 119 copy
+	!wo befmerge-1	; 120 merge
+vecrenum	!wo befrenum-1	; 121 renumber
+	!wo befmem-1	; 122 mem
+	!wo befdetect-1	; 123 detect
+	!wo befcheck-1	; 124 check    (fn check)
+	!wo befdisplay-1	; 125 display
+	!wo beferror-1	; 126 error    (fn err)
+	!wo befout-1	; 127 out
 
 ; ----------------------------------------- 
 ; 87c1 

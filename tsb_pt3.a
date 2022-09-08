@@ -808,11 +808,11 @@ befbflash	jsr chkonoff	; get first parameter
 ; ----------------------------------------- 
 ; 96a0			enhanced
 sirq	ldy #0
-	inc zaeirq
+	inc zaeirq	; count 60 jiffies
 	lda zaeirq
-	cmp #60		; count 60 passes (seconds)
+	cmp #60
 	bne +
-	inc zaesec
+	inc zaesec	; 60 jiffies = 1 sec
 	sty zaeirq
 
 +	lda bflashjn
@@ -1226,35 +1226,29 @@ befenvelope
 	jsr get2nybc	; get attack and decay values
 	sta $a8
 	jsr get2nybc	; get sustain and release values
-	asl $a6		; voice number times 2 as index
-	ldx $a6
-	lda sidtab,x	; set oscillator address
-	sta $20
-	inx
-	lda sidtab,x
-	sta $21
-	lsr $a6		; back to voice number
-	ldy #$06		; index to sust/release register
-	lda $aa		
+	ldx $a6		; get voice number
+	jsr setsid
+	ldy #6		; .y=index to sust/release register
+	lda $aa		; re-get sustain/release
 	sta ($20),y	; set value to SID
 	ldy $a6
 	sta srtab,y	; and to buffer
-	ldy #5		; index to atck/decay register
-	lda $a8
+	dey		; index to atck/decay register
+	lda $a8		; re-get attack/decay
 	sta ($20),y	; set value to SID
 	ldy $a6
 	sta adtab,y	; and to buffer
 	jmp endsmb
 
 ; ----------------------------------------- 
-; 99bb
+; 99ae
 flinend	jsr chrget
 	cmp #0
 	bne flinend
 	rts
 
 ; ----------------------------------------- 
-; 99c3
+; 99b6
 get2nybc	jsr iskomma	; comma?
 get2nyb	jsr sgetbytn	; get value
 get2nyb2	jsr xnyb		; is below 16?
@@ -1272,7 +1266,7 @@ get2nyb2	jsr xnyb		; is below 16?
 	rts
 
 ; ----------------------------------------- bef CGOTO
-; 99df			original
+; 99d2			original
 befcgoto	jsr incbasbz
 cgoto0	jsr sfrmnum
 	jsr sfacadr
@@ -1280,59 +1274,68 @@ cgoto0	jsr sfrmnum
 	jmp endsmb
 
 ; ----------------------------------------- bef WAVE
-; 99ee			original
+; 99e1			optimized
 befwave	jsr sgetbytn	; get voice number
 	jsr x123		; only 1 to 3!
 	stx $aa
-	jsr schkcom
-	jsr bincon	; get switch panel
-	jmp bwv0
+	jsr getpanel
+	jsr bincon	; get switch panel value
+bwv0	ldx $aa		; get voice number
+	jsr setsid
+	ldy #4
+	lda $a8		; set waveform/sync to SID...
+	sta ($20),y
+	ldy $aa
+	sta wavetab,y	; ...and to buffer
+	jsr chrgot	; anything following?
+	beq +
+	jsr optpulse	; yes, get pulse value
++	jmp endsmb
 
 ; ----------------------------------------- 
-; 99ff
-bincon	lda #0
-	sta $a6		; pointer into panel
-	sta $a8		; init result byte
--	ldy #0
-	lda (progz),y
+; 9a02
+bincon	ldy #0		; pointer into panel
+	sty $a8		; init result byte
+-	lda (progz),y
 	cmp #$30		; "0"?
 	beq ++
 	cmp #$31		; "1"?
 	beq +
-	ldx #$24		; no, error "not binary char"
+err24	ldx #$24		; no, error "not binary char"
 	jmp ($0300)
 
-+	ldy $a6		; if digit="1":
-	lda $a8
++	lda $a8
 	ora gbittabs,y	; enter value to result
 	sta $a8
-++	inc $a6
-	jsr incbasbz
-	lda $a6
-	cmp #8
+++	iny
+	cpy #8
 	bne -
+	jmp sbzply
+
+; ----------------------------------------- 
+; 9a2e
+setsid	lda mregs,x	; set oscillator address
+	sta $20
+	lda #$d4
+	sta $21
 	rts
 
-; ----------------------------------------- 
-; 9a2b
-bwv0	asl $aa		; voice number times 2
-	ldy $aa
-	lda sidtab,y	; address SID control reg
-	sta $20		; in $20/1
-	iny
-	lda sidtab,y
-	sta $21
-	ldy #4
-	lda $a8		; set waveform/sync to SID...
-	sta ($20),y
-	lsr $aa		; (re-get voice number)
-	ldy $aa
-	sta wavetab,y	; ...and to buffer
-	jmp endsmb
+; ----------------------------------------- part of WAVE
+; 9a38
+getpanel	jsr schkcom	; comma? digit following?
+	bcc +
+-	jsr sgetbyt1	; no, get expression
+	stx $a8
+	pla
+	pla
+	bne bwv0
 
-; ----------------------------------------- 
-; 9a4a
-sidtab	!wo $d400,$d407,$d40e
++	cmp #$32		; yes,1st digit 0 or 1?
+	bcs -		; no, is expression
+	jsr snexttr	; yes, check if 8 digits
+	cpy #8
+	bcc -		; no, less: expression
+	rts
 
 ; ----------------------------------------- part of COLD
 ; 9a50
