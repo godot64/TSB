@@ -1102,6 +1102,7 @@ option	lda optflag	; OPTION aktiv?
 ml3	ldy helpvc2
 	iny
 	lda ($5f),y	; nächstes zeichen (Token) holen
+	and #$7f		; auf 0..127 begrenzen
 	tax		; als zähler (Token)
 	ldy #0
 	cpx #1
@@ -1126,15 +1127,30 @@ ml8	and #$7f		; geshiftetes zeichen ausgeben
 	ldy helpvc2	; flags setzen, weiter im ROM
 	iny
 	ldx #1
-	rts
+lr1	rts
 
-; ----------------------------------------- 
-; bf88
-	!by 0,0,0,0,0,0,0,0	; 41 bytes
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
+; ----------------------------------------- Part of USE
+; bf8a
+roundup	inc helpvec	; now: 1
+-	ldx $02a6,y	; no, get digits from last to first
+	cpx #$30		; is comma or period?
+	bcc +++		; yes, skip rounding
+	cpx #$39		; digit: is 9?
+	bne +
+	inc helpvec
+	ldx #$2f		; yes, produce 0
++	inx		; increment digit
+++	txa
+	dec helpvec
+	bmi lr1
+	sta $02a6,y	; and write back
+	beq lr1
++++	cpx #$20		; is char prefix of value?
+	beq +		; yes, leave to set leading 1
+	dey		; no, check next char
+	bpl -
++	jmp userr		; leave to error routine
+
 	!by 0
 
 ; ----------------------------------------- Part of MEM
@@ -1191,7 +1207,7 @@ usel9	sta helpvec
 
 ; ----------------------------------------- 
 ; c400
-procstack	!fill 256		; unused area
+procstack	!fill 256		; stack area for exec
 
 ; ----------------------------------------- 
 ; c500
@@ -1679,7 +1695,7 @@ null	!tx "null"
 ; ca44
 version	!tx "ad86"	; Signature
 	!by $0d
-	!tx "2.20908"	; Version Number
+	!tx "2.20915"	; Version Number
 
 ; ----------------------------------------- 
 ; ca4f

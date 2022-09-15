@@ -111,6 +111,7 @@ ipr3	jsr xipr3		; clear stacks
 ipr5	jsr incbasbz	; process sb command
 	jsr basromau
 	lda (progz),y
+	and #$7f
 	asl
 	tay
 	dey
@@ -122,7 +123,7 @@ ipr5	jsr incbasbz	; process sb command
 	rts
 
 ; ----------------------------------------- bef HIRES
-; 9209			optimized
+; 920b			optimized
 befhires	ldy #$01
 	sty xmaxhigh
 	lda #$3f
@@ -133,8 +134,7 @@ befhires	ldy #$01
 	lda #$e0
 	sta $a7
 	jsr g2nsafe	; ca79, get2nyb (farben), even after MEM
-	ldx $aa
-	stx $ac
+	sta $ac
 
 	lda #0		; clear bitmap
 -	sta ($a6),y

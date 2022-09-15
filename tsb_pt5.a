@@ -1191,7 +1191,7 @@ usel2	pla
 	pla
 usel3	ldy $bd
 --	cpy $43		; len of ctrl string
-	beq use5		; reached, cont in use3
+toul3	beq use5		; reached, cont in use3
 	lda ($49),y	; get char from ctrl string
 	ldx #6
 -	cmp tsbpudef-1,x	; is a ctrl char?
@@ -1273,7 +1273,7 @@ usel4	ldy $44
 	ldx $44
 	inc $02a6,x
 
-usel5	jsr usel6
+usel5	jsr longround
 	jmp useloop
 
 ; ----------------------------------------- 
