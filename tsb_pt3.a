@@ -32,18 +32,14 @@
 ; patched on 10.07.2022 (optimized HIRES for new function MEMPEEK)
 ; patched on 17.07.2022 (bugfix in DO..DONE)
 ; patched on 14.08.2022 (IRQ for F-keys: max len 16 chars)
+; patched on 17.09.2022 (de/tokenizer: added CLS token and keyword)
 ;
 ; ----------------------------------------- 
 
 	!ct pet
 
-; ----------------------------------------- TSB Commands
-; 917c
-bef0	jsr chrget
-	jmp endsmb
-
 ; ----------------------------------------- TSB Interpreter
-; 9182			recoded
+; 917c			recoded
 sbasbef	tsx
 	stx stack		; save stack pointer
 	lda onkeyflag
@@ -82,7 +78,7 @@ ipr1	cmp #$64		; sb token?
 	beq ipr3
 
 	lda (progz),y	; reget char:
-	bmi ipr4		; standard token?
+	bmi ipr4		; standard v2 token?
 
 	cmp #$3a		; no, ":"? (end of command)
 	beq ipr0		; yes, continue with next 
@@ -94,7 +90,7 @@ ipr1	cmp #$64		; sb token?
 	cpy $22		; beyond ":"?
 	bcs ipr2		; yes, so this is EXEC w/o EXEC
 
-ipr4	jsr chrgot	; reget standard token
+ipr4	jsr chrgot	; no, reget standard token
 	jmp $a7e7		; and process
 
 ipr0	jmp $a7ae		; sys interpreter
@@ -107,29 +103,31 @@ ipr3	jsr xipr3		; clear stacks
 	sty sploop
 	sty prstack
 	beq ipr4		; (uncond. branch)
-
-ipr5	jsr incbasbz	; process sb command
+; 91ee
+ipr5	jsr incbasbz	; process tsb command:
 	jsr basromau
-	lda (progz),y
-	and #$7f
+	lda (progz),y	; get token
+	bpl +		; v2 token?
+	eor #$8f		; yes, convert
++	tax		; use as index into command address table
+	dex
+	txa
 	asl
 	tay
-	dey
-	dey
-	lda sprtab+1,y
+	lda sprtab+1,y	; get comm. address
 	pha
 	lda sprtab,y
 	pha
-	rts
+	rts		; execute command
 
 ; ----------------------------------------- bef HIRES
-; 920b			optimized
-befhires	ldy #$01
+; 9208			optimized
+befhires	ldy #$01		; x-limit: 319
 	sty xmaxhigh
 	lda #$3f
 	sta xmaxlow
 	dey
-	sty $a6
+	sty $a6		; $a6/7: $e000 (bitmap)
 	sty lowcolflag
 	lda #$e0
 	sta $a7
@@ -140,25 +138,25 @@ befhires	ldy #$01
 -	sta ($a6),y
 	jsr inca6a7
 	ldx $a6
-	cpx #$40
+	cpx #$40		; up to $ff3f
 	bne -
 	ldx $a7
 	cpx #$ff
 	bne -
 
-	tay
+	tay		; .y=0
 	sty multijn
 	jsr nrm01
 	jsr nrm03
 
-; 9241
-	sty lowcolflag
+; 923e
+	sty lowcolflag	; .y= still 0
 	lda $ac		; clear colors
 setmod	jsr clrhicols
 	beq ++
 
 ; ----------------------------------------- func MEMPEEK
-; 924b
+; 9248
 csgetarik	bne +		; MEMPEEK?
 
 fnmempeek	jsr getpeek	; yes, PEEK in overall RAM
@@ -176,15 +174,19 @@ fnmempeek	jsr getpeek	; yes, PEEK in overall RAM
 	jmp sxyflp3
 
 ; ----------------------------------------- 
-; 9265
+; 9262
 +	jmp csgetariend	
 
 ; ----------------------------------------- bef PLOT
-; 9268			recoded
+; 9265			recoded
 befplot	jsr getxy
 	jsr getpktf	; col
 	jsr punkt		; set dot
 ++	jmp endsmb
+
+; ----------------------------------------- 
+; 9271
+	!by 0,0,0
 
 ; ----------------------------------------- 
 ; 9274
@@ -873,29 +875,36 @@ msk0	jsr sgetbytc
 	lda $d01b		; set priority
 	ldx $aa
 	ora mbittabs,x
-	sta $d01b
-	jmp ++
+	bne ++
 
 +	lda $d01b
 	ldx $aa
 	and mbittabl,x
-	sta $d01b
+++	sta $d01b
 
-++	jsr sgetbytc
+	jsr sgetbytc
 	cpx #1
 	bne +
 
 	lda $d01c		; set mob type (multi/hires)
 	ldx $aa
 	ora mbittabs,x
-	sta $d01c
-	jmp endsmb
+	bne ++
 
 +	ldx $aa
 	lda $d01c
 	and mbittabl,x
-	sta $d01c
-	jmp endsmb
+++	sta $d01c
+	bne +
+
+; ----------------------------------------- 
+; 9756
+	!by 0,0,0		; 3 bytes
+
+; ----------------------------------------- End SB command
+; 9759
+bef0	jsr chrget
++	jmp endsmb
 
 ; ----------------------------------------- bef MUSIC
 ; 975f			original
@@ -2100,18 +2109,13 @@ befrcomp	jsr incbasbz
 	sta $61
 	jmp inif
 
-; ----------------------------------------- bef PROC (!!!Kopie!!!)
-; 9f32
-befproc1	jsr flinend
-	beq swm0
-
 ; ----------------------------------------- 
-; 9f37
+; 9f32
 chkin1	ldx #1
 	jmp $ffc6		; sys chkin 1
 
 ; ----------------------------------------- 
-; 9f3c
+; 9f37
 ;
 ; End of part 3
 ;

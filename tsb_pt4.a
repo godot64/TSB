@@ -25,7 +25,9 @@
 	!ct pet
 
 ; ----------------------------------------- 
-; 9f3c			new
+; 9f37			new
+rvsoff	lda #$92		; RVS off
+	!by $2c
 outeql	lda #$3d		; =
 	!by $2c
 komma	lda #$2c		; ,
@@ -39,6 +41,10 @@ quote	lda #$22		; "
 return	lda #$0d		; Return
 	jmp bsout
 	
+; ----------------------------------------- 
+; 9f4e
+	!by 0,0
+
 ; ----------------------------------------- bef DUMP
 ; 9f50			enhanced
 befdump	lda $2d		; get start of vars

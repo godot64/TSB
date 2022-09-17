@@ -20,6 +20,7 @@
 ; patched on 16.07.2022 (command DELAY: now OFF works)
 ; patched on 04.08.2022 (bugfix in LIST)
 ; patched on 14.08.2022 (command: DISPLAY able to show 16 chars)
+; patched on 17.09.2022 (de/tokenizer: added CLS token and keyword)
 ;
 ; ----------------------------------------- 
 
@@ -1057,7 +1058,7 @@ ml1	lda ($d1),y	; zeilennummer merken
 	cmp #32
 	bne ml1
 
-wait	jsr $ffe1		; Hold, sys: stop? (Abbruch?)
+wait	jsr $ffe1		; Hold, sys: stop? (Abbruch)
 	beq sl1		; ja, cont.
 	jsr $ffe4		; sys: getkey
 	cmp #$0d		; <cr>?
@@ -1101,18 +1102,21 @@ option	lda optflag	; OPTION aktiv?
 	jsr bsout
 ml3	ldy helpvc2
 	iny
-	lda ($5f),y	; nächstes zeichen (Token) holen
-	and #$7f		; auf 0..127 begrenzen
-	tax		; als zähler (Token)
+	lda ($5f),y	; nächstes Zeichen (Token) holen
+	bpl +
+	eor #$8f		; umwandeln und auf 0..127 begrenzen
++	tax		; Token als zähler
 	ldy #0
-	cpx #1
-	beq ml7
-list1	dex		; bis zum richtigen Befehlswort...
+	cpx #1		; ist HIRES?
+	beq ml7		; ja, skip Suche
+
+list1	dex		; bis zum richtigen Befehlswort blättern...
 	beq list2
 ml5	jsr inc20
-	lda ($20),y	; ...Befehlswörter überlesen
-	bmi list1
-	bpl ml5
+	lda ($20),y	; ...überlesen:
+	bpl ml5		; normale Zeichen: skip
+	bmi list1		; bei geshiftetem Zeichen: nächstes Befehlswort
+
 list2	jsr inc20
 ml7	lda ($20),y	; dann richtiges befehlswort ausgeben
 	bmi ml8		; (bis zum geshifteten Zeichen)
@@ -1121,8 +1125,7 @@ ml7	lda ($20),y	; dann richtiges befehlswort ausgeben
 	bne ml7
 ml8	and #$7f		; geshiftetes zeichen ausgeben
 	jsr bsout
-	lda #$92		; und rvs off
-	jsr bsout
+	jsr rvsoff	; und rvs off (falls OPTION aktiv ist)
 
 	ldy helpvc2	; flags setzen, weiter im ROM
 	iny
@@ -1151,6 +1154,8 @@ roundup	inc helpvec	; now: 1
 	bpl -
 +	jmp userr		; leave to error routine
 
+; ----------------------------------------- 
+; bfb0
 	!by 0
 
 ; ----------------------------------------- Part of MEM
@@ -1695,7 +1700,7 @@ null	!tx "null"
 ; ca44
 version	!tx "ad86"	; Signature
 	!by $0d
-	!tx "2.20915"	; Version Number
+	!tx "2.20917"	; Version Number
 
 ; ----------------------------------------- 
 ; ca4f

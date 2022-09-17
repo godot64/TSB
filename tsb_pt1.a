@@ -13,6 +13,7 @@
 ; patched on 25.08.2021 (make OPEN independent from drive number)
 ; patched on 05.10.2021 (added DIV as a command to Clear Screen)
 ; patched on 05.10.2021 (new tokenizer, new detokenizer)
+; patched on 17.09.2022 (de/tokenizer: added CLS token and keyword)
 ;
 ; ----------------------------------------- 
 
@@ -65,9 +66,10 @@ sfrestr	jsr pspeibe
 	jsr $b6a3		; retrieve string parameters
 	jmp prestor
 ; 804c
-sintout	jsr pspeibe
-	jsr $bdd1		; out digits in .a (hi) and .x (lo)
-	jmp prestor
+noround	jsr usel3		; restore format string
+	lda #$25
+	sta toul3+1
+	rts		; and out, finish
 ; 8055
 sgoto1	jsr pspeibe
 	jsr $a8a3		; bef GOTO (to line in INT)
@@ -618,7 +620,7 @@ tabbef	!tx "hireS"	; 1
 	!tx "resumE"	; 57
 	!tx "looP"
 	!tx "delaY"
-	!by $be		; <
+	!tx "clS"		; <
 	!by $be		; =
 	!by $be		; >
 	!by $be		; ?
@@ -688,20 +690,25 @@ tabbef	!tx "hireS"	; 1
 	!tx "ouT"
 	!by 0
 
+
 ; ----------------------------------------- 
-; 8614
+; 8616
+	!by 0,0,0,0
+
+; ----------------------------------------- 
+; 861a
 klgetadr	jsr $aefa		; sys "("?
 	jmp sgetadr2
 
 ; ----------------------------------------- 
-; 861a
+; 8620
 xipr3	sty doindex
 	sty elseindex	; ### 2.20821
 	sty sprepeat
 	rts
 
 ; ----------------------------------------- Part of USE
-; 8624
+; 862a
 userr	bmi +		; ### 2.20915
 	pla
 	pla
@@ -713,10 +720,7 @@ userr	bmi +		; ### 2.20915
 	pla
 	lda #$f7		; value does not fit format
 	sta toul3+1
-	jsr usel3		; restore format string
-	lda #$25
-	sta toul3+1
-	rts		; and out, finish
+	jmp noround
 
 longround	ldy $44
 	lda linenum+2,x	; get digit right after last format char (#)
@@ -726,7 +730,7 @@ longround	ldy $44
 lr0	jmp usel6
 
 ; ----------------------------------------- bef SOUND
-; 864d
+; 864d			new
 befsound	jsr sgetbytn	; get voice number
 	jsr x123		; is in 1..3?
 	jsr setsid	; set SID base address
@@ -736,8 +740,8 @@ befsound	jsr sgetbytn	; get voice number
 	jsr optp1		; write to SID
 	jmp endsmb
 
-; ----------------------------------------- 
-; 8664
+; ----------------------------------------- part of WAVE
+; 8664			new
 optpulse	jsr schkcom
 	jsr sgetadr	; returns .a=hi, .y=lo from INT
 	ldy $aa
@@ -859,7 +863,7 @@ vecplace	!wo befplace-1	;  16 place    (changed from 86e2)
 	!wo befresume-1	;  57 resume
 	!wo befloop-1	;  58 loop
 	!wo befdelay-1	;  59 delay
-	!wo swarm-1	;     (<)
+	!wo befdiv-1	;  60 cls (<)
 	!wo swarm-1	;     (=)
 	!wo swarm-1	;     (>)
 	!wo swarm-1	;     (?)
@@ -882,7 +886,7 @@ vecplace	!wo befplace-1	;  16 place    (changed from 86e2)
 	!wo befold-1	;  80 old
 	!wo swarm-1	;     bad mode (fn joy)
 	!wo befmod-1	;  82 mod      (fn mod)
-	!wo befdiv-1	;     div	 (fn div)
+	!wo befdiv-1	;     div	     (fn div)
 	!wo befdelete-1	;  84 d!
 	!wo befdup-1	;  85 dup      (fn dup)
 	!wo swarm-1	;     bad mode (fn inkey)
@@ -967,7 +971,7 @@ serrout	txa
 	sta $23
 	jmp $a447		; sys out: (tsb) error
 
-; ----------------------------------------- Table Error Addresses
+; ----------------------------------------- Table of Error Addresses
 ; 88a0
 fehlmtab	!wo tsbf0,tsbf1,tsbf2,tsbf3,tsbf4,tsbf5,tsbf6,tsbf7
 	!wo tsbf8,tsbf9,tsbfa,tsbfb,tsbfc,tsbfd
