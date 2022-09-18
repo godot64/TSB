@@ -33,6 +33,7 @@
 ; patched on 17.07.2022 (bugfix in DO..DONE)
 ; patched on 14.08.2022 (IRQ for F-keys: max len 16 chars)
 ; patched on 17.09.2022 (de/tokenizer: added CLS token and keyword)
+; patched on 18.09.2022 (bugfix im command MOB SET)
 ;
 ; ----------------------------------------- 
 
@@ -863,43 +864,43 @@ ifmem	txa
 ifnrm	txa
 	sta $07f8,y	; move mobs accordingly
 
-msk0	jsr sgetbytc
+msk0	jsr sgetbytc	; set mob color
 	ldy $aa
 	txa
-	sta $d027,y	; set mob color
+	sta $d027,y
 
-	jsr sgetbytc
+	jsr sgetbytc	; set priority
 	cpx #1
 	bne +
 
-	lda $d01b		; set priority
+	lda $d01b		; 1
 	ldx $aa
 	ora mbittabs,x
 	bne ++
 
-+	lda $d01b
++	lda $d01b		; 0
 	ldx $aa
 	and mbittabl,x
 ++	sta $d01b
 
-	jsr sgetbytc
+	jsr sgetbytc	; set mob type (multi/hires)
 	cpx #1
 	bne +
 
-	lda $d01c		; set mob type (multi/hires)
-	ldx $aa
+	ldx $aa		; 1 (multi)
+	lda $d01c	
 	ora mbittabs,x
 	bne ++
 
-+	ldx $aa
++	ldx $aa		; 0 (hires)
 	lda $d01c
 	and mbittabl,x
 ++	sta $d01c
-	bne +
+	jmp endsmb
 
 ; ----------------------------------------- 
 ; 9756
-	!by 0,0,0		; 3 bytes
+	!by 0,0		; 2 bytes
 
 ; ----------------------------------------- End SB command
 ; 9759
