@@ -693,22 +693,18 @@ tabbef	!tx "hireS"	; 1
 
 ; ----------------------------------------- 
 ; 8616
-	!by 0,0,0,0
-
-; ----------------------------------------- 
-; 861a
 klgetadr	jsr $aefa		; sys "("?
 	jmp sgetadr2
 
 ; ----------------------------------------- 
-; 8620
+; 8624
 xipr3	sty doindex
 	sty elseindex	; ### 2.20821
 	sty sprepeat
 	rts
 
 ; ----------------------------------------- Part of USE
-; 862a
+; 862e
 userr	bmi +		; ### 2.20915
 	pla
 	pla
@@ -721,11 +717,13 @@ userr	bmi +		; ### 2.20915
 	lda #$f7		; value does not fit format
 	sta toul3+1
 	jmp noround
-
+; 8612
 longround	ldy $44
 	lda linenum+2,x	; get digit right after last format char (#)
 	cmp #$35		; lower than 5?
-	bcc lr0		; yes, don't round 
+	bcc lr0		; yes, don't round
+	lda $65
+	beq lr0
 	jsr roundup	; equal/higher, so round up
 lr0	jmp usel6
 
