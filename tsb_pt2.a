@@ -17,6 +17,7 @@
 ; patched on 27.06.2022 (bugfix in VERIFY)
 ; patched on 14.07.2022 (bugfix in INST, optimized code)
 ; patched on 03.08.2022 (added illegal direct to INST, INSERT & PLACE)
+; patched on 01.10.2022 (added error message to command DO..DONE)
 ;
 ; ----------------------------------------- 
 
@@ -294,7 +295,7 @@ sip0	lda musicadr	; get adr of music string
 	lda musicdau
 	sta musicz4
 	bne sip4		; uncond. branch
-
+; 8a9f
 sip2	sty musicz5	; store pointer into string
 	jsr notesuch	; search note, result in .a and .x
 	ldy #1
@@ -310,7 +311,7 @@ sip4	cpy musiclen	; at end of music string?
 	iny		; no, advance
 	sty musicz1
 	rts
-
+; 8abd
 playend	lda #0		; clear play flag
 	sta musicz1
 	sta playflag
@@ -335,7 +336,7 @@ sip9	cmp #$93		; clr (code for select voice)?
 	sta mregadr
 	stx stimmenr
 -	jmp sip4		; advance in music string
-
+; 8aef
 sip5	cmp #$47		; code "g": voice off?
 	bne sip3
 	tya
@@ -345,11 +346,11 @@ sip5	cmp #$47		; code "g": voice off?
 	lda wavetab,y
 	and #$fe
 	ldy #4		; same code as below!
-	sta ($fe),y
+sip11	sta ($fe),y
 	pla
 	tay
 	bne -		; advance
-
+; 8b08
 sip3	cmp #$54		; code "t": sync bit?
 	bne sip6
 	tya
@@ -358,12 +359,9 @@ sip3	cmp #$54		; code "t": sync bit?
 	ldy stimmenr
 	lda wavetab,y
 	eor #$02
---	ldy #4		; ### shorter!
-	sta ($fe),y
-	pla
-	tay
-	bne -
-
+--	ldy #4
+	bne sip11		; advance
+; 8b1d
 sip6	cmp #$43		; code "c": clear waveform
 	bne sip7
 	tya
@@ -380,7 +378,7 @@ sip7	cmp #$52		; code "r": repeat music
 	rts
 
 ; ----------------------------------------- 
-;
+; 8b37
 notesuch	ldy #$13		; search in 20 notes
 -	cmp nottab,y
 	beq sip8
@@ -389,22 +387,31 @@ notesuch	ldy #$13		; search in 20 notes
 	lda #0		; not found
 	tax
 	beq svmregadr
-
-sip8	lda frqtabh,y	; found, set frequency
-	sta mfreq+1
-	lda frqtabl,y
+; 8b46
+sip8	lda frqtabl,y	; found, set frequency
 	sta mfreq
+	tya		; hi byte:
+	ldy #0
+	cmp #12		; 12=0
+	beq ++
+	cmp #19		; 19=2
+	beq +
+	cmp #11		; 11=2
+	bne ++
++	iny
+++	iny		; all others=1
+	sty mfreq+1
 	inc musicz5
 	ldy musicz5	; set octave
 	lda ($fc),y
-	sbc #$30
+	and #15		; (0..max 9)
 	tax
 	beq sip10
 -	asl mfreq
 	rol mfreq+1
 	dex
 	bne -
-
+; 8b76
 sip10	lda mfreq+1
 	ldx mfreq
 svmregadr	ldy mregadr
@@ -414,23 +421,19 @@ svmregadr	ldy mregadr
 	rts
 
 ; ----------------------------------------- 
-; 8b7d
+; 8b87
 mregs	!by $00,$07,$0e
-; 8b80
+; 8b8a
 nottab	!by $43,$c3,$44,$c4,$45,$46,$c6,$47
 	!by $c7,$41,$c1,$42,$5a,$ac,$b1,$bb
 	!by $a5,$b0,$bf,$bc
-; 8b94
+; 8b9e
 frqtabl	!by $12,$23,$34,$46,$5a,$6e,$84,$9b
 	!by $b3,$cd,$e9,$06,$00,$23,$46,$5a
 	!by $84,$b3,$e9,$06
-; 8ba8
-frqtabh	!by $01,$01,$01,$01,$01,$01,$01,$01
-	!by $01,$01,$01,$02,$00,$01,$01,$01
-	!by $01,$01,$01,$02
 
 ; ----------------------------------------- 
-; 8bbc
+; 8bb2
 stimmein	ldy #6		; index to SID register 6
 	ldx stimmenr
 	lda srtab,x	; get sustain/release values from buffer
@@ -447,7 +450,7 @@ stimmein	ldy #6		; index to SID register 6
 	rts
 
 ; ----------------------------------------- bef GRAPHICS
-; 8bd9			new
+; 8bcf			new
 befgraphics
 	ldx #<namehsg	; load high speed graphics
 	ldy #>namehsg
@@ -461,7 +464,7 @@ befgraphics
 +	jmp iffail1
 
 ; ----------------------------------------- New LOAD/SAVE
-; 8bf1			new
+; 8be7			new
 sysload	ldy drive
 	sty $ba
 	jsr chrgot	; more?
@@ -469,17 +472,17 @@ sysload	ldy drive
 	jsr bloadadr	; yes, get bload adr
 +	lda $0a		; ### 2.20627 (VERIFY-Patch)
 	jmp $f4a5		; sys LOAD
-; 8c02
+; 8bf8
 syssave	ldy drive
 	sty $ba
 	jmp $f5ed		; sys SAVE
 
 ; ----------------------------------------- 
-; 8c09
+; 8bff
 loadsave	!wo sysload,syssave
 
 ; ----------------------------------------- 5
-; 8c0d
+; 8c03
 cold2	ldy #3
 -	lda loadsave,y
 	sta $0330,y	; sys set vectors
@@ -488,7 +491,7 @@ cold2	ldy #3
 	rts
 
 ; ----------------------------------------- Check Drive Presence
-; 8c21
+; 8c0f
 chkdrv	lda #$0f		; open 15, dr, 15
 	tay
 	ldx drive
@@ -503,7 +506,7 @@ chkdrv	lda #$0f		; open 15, dr, 15
 -	rts
 
 ; ----------------------------------------- 
-; 8c33
+; 8c29
 safeopen	jsr sopen
 	bcc -
 
@@ -511,26 +514,37 @@ err05	ldx #5		; drive not ready
 	jmp ($0300)
 
 ; ----------------------------------------- 
-; 8c3d
+; 8c33
 mobexs	lda $d01d
 	ora mbittabs,x
-	sta $d01d
-	rts
+	bne +
 
 mobeys	lda $d017
 	ora mbittabs,x
-	sta $d017
-	rts
+	bne ++
 
 mobexl	lda $d01d
 	and mbittabl,x
-	sta $d01d
++	sta $d01d
 	rts
 
 mobeyl	lda $d017
 	and mbittabl,x
-	sta $d017
+++	sta $d017
 	rts
+
+; ----------------------------------------- 
+; 8c57
+chkdost	lda doindex	; stack pointer DO
+	cmp #2
+	bcs faildo
+	jmp dec7a
+
+faildo	jmp err2a		; "stack too large"
+
+; ----------------------------------------- 
+; 8c64
+	!by 0
 
 ; ----------------------------------------- 
 ; 8c65

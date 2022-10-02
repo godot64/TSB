@@ -1223,22 +1223,25 @@ use5	sty $44		; current char in ctrl string
 useloop	jsr mkoutstr
 	jsr use7
 	bne +
+
 	ldx $66
 	beq usel4
 	jsr use8		; generate outstring (a5f9)
-	jsr use9		; out generated string (bfe9)
+	jsr use9		; generated string to out (bfe9)
 	ldy $44
 	lda #$30		; "0"
 	sta $02a6,y
 	bne ++
+
 +	lda $66
 	sec
 	sbc $65
 	beq +
 	bcc usel3
-	jsr use8-1	; generate outstring (a5f8)
-+	jsr use9		; out this string
+	jsr use8-1	; init outstring (a5f8)
++	jsr use9		; generate string
 usel4	ldy $44
+
 ++	cpy $43
 	beq useloop
 	ldx $61
@@ -1257,10 +1260,10 @@ usel4	ldy $44
 	beq usel5
 	cmp $66
 	bcs +
-	jsr use9		; out this string
+	jsr use9		; generate string
 	lda $66
 	sec
-	sbc $65
+	sbc $65		; result: Anzahl Nachkommastellen
 	jsr use9a
 	beq usel5
 +	txa
@@ -1428,7 +1431,7 @@ quotetab	!by $80,$83,$80,$80,$83,$80,$08
 ; ----------------------------------------- part of DO
 ; b56a
 donecont	dec doindex	; from DONE: dec stack pointer
-docont	jsr dec7a		; from DO:
+docont	jsr chkdost	; from DO:
 	jmp stofdo2	; set DO (in DODO) active (if indoloop=1)
 
 ; ----------------------------------------- bef DO
