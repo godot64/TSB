@@ -643,7 +643,7 @@ fetchit	jsr fgetkey	; gather input chars
 	lda #$2c
 	sta (helpvec),y
 
-++	jmp endsmb
+++	jmp endsmb	; end of fetch
 
 ; ----------------------------------------- 
 
@@ -1327,19 +1327,19 @@ usel0	txa
 
 ; ----------------------------------------- Part of CENTRE
 ; b4b6
-gcentpar	jsr sgetstrn
-	stx helpvec
+gcentpar	jsr sgetstrn	; get string to be centered
+	stx helpvec	; address
 	sta helpvec+1
-	lda $69
+	lda $69		; len (unsused!)
 	sta helpvec+2
-	ldx #40
-	jsr chrgot
+	ldx #40		; 40: width of screen line
+	jsr chrgot	; anything following?
 	beq +
-	jsr sgetbytc
+	jsr sgetbytc	; yes, get new width
 +	txa
-	cmp #40
-	bne +
-	sbc $d3
+	cmp #40		; is (still) 40?
+	bne +		; no, so use that width
+	sbc $d3		; otherwise: subtract pos from 40
 +	rts
 
 ; ----------------------------------------- bef HRDCPY

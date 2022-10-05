@@ -393,14 +393,14 @@ sip8	lda frqtabl,y	; found, set frequency
 	tya		; hi byte:
 	ldy #0
 	cmp #12		; 12=0
-	beq ++
+	beq +++
 	cmp #19		; 19=2
 	beq +
 	cmp #11		; 11=2
 	bne ++
 +	iny
 ++	iny		; all others=1
-	sty mfreq+1
++++	sty mfreq+1
 	inc musicz5
 	ldy musicz5	; set octave
 	lda ($fc),y
@@ -759,7 +759,7 @@ fndup	jsr $aefa		; sys "("?
 ; ----------------------------------------- 
 ; 8dbf
 err14	ldx #$0e		; error "illegal quantity"
-	jmp ($0300)
+	jmp ($0300)	; (affects "tsb.mem"!)
 jerr17	jmp err17		; error "string too long"
 
 ; ----------------------------------------- 

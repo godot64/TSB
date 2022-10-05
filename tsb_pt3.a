@@ -687,7 +687,7 @@ dir5	jsr sclose
 
 ; ----------------------------------------- 
 ; 95b4
-getkey	jsr $ffe4		; get char
+getkey	jsr $ffe4		; get char (affects "tsb.mem"!)
 	beq +
 ; 95b9
 -	jsr $ffe4		; warten
@@ -904,7 +904,7 @@ msk0	jsr sgetbytc	; set mob color
 
 ; ----------------------------------------- End SB command
 ; 9759
-bef0	jsr chrget
+bef0	jsr chrget	; (affects "tsb.mem"!)
 +	jmp endsmb
 
 ; ----------------------------------------- bef MUSIC

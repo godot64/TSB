@@ -1381,9 +1381,9 @@ outx	jsr chrget	; anything following?
 	iny
 	pla
 	bpl -
-	lda #$69
+	lda #$6a
 	ldy #$a3
-	jsr $ab1e		; sys out string " error"
+	jsr nocrlfstr	; sys out string " error"
 outx0	jmp endsmb
 
 ; ----------------------------------------- bef LIN
@@ -1617,7 +1617,7 @@ do2	jsr basromau
 ; ----------------------------------------- 
 ; c9cb
 nrm2	jsr allnrm	; here: returned from TSB.MEM
-	jmp bef0
+	jmp bef0		; (affects "tsb.mem"!)
 
 ; ----------------------------------------- 
 ; c9d1
@@ -1700,7 +1700,7 @@ null	!tx "null"
 ; ca44
 version	!tx "ad86"	; Signature
 	!by $0d
-	!tx "2.21001"	; Version Number
+	!tx "2.21005"	; Version Number
 
 ; ----------------------------------------- 
 ; ca4f

@@ -1184,7 +1184,7 @@ befbckgnds
 	stx $d023
 	jsr sgetbytc	; get 4th bkgnd
 	stx $d024
---	jmp endsmb
+	jmp endsmb
 
 ; ----------------------------------------- bef PAUSE
 ; a7dc			recoded
@@ -1199,23 +1199,22 @@ befpause	jsr chrget
 	jsr bsout
 	iny
 	bne -
-+	jsr return	; and <return>
-	jsr schkcom	; comma?
++	jsr schkcom	; comma?
 
 ++	jsr sgetadr	; get time value to $65/$14
 	sta zaesec	; .a=0 (normally)
 	sta zaeirq
 -	jsr $ffe4		; sys getin keyboard
 	cmp #$0d		; <return>?
-	beq ++
+	beq +
 	lda zaesec	; check timer
 	cmp $65
 	bne -
 
-	beq --
++	jmp chkscolon	; semicolon?
 
 ; ----------------------------------------- Part of FETCH
-; a811
+; a80f
 showcrsr	lda fcursor,x
 	tay
 	and #$7f		; reduce
@@ -1231,11 +1230,11 @@ showcrsr	lda fcursor,x
 	rts
 
 ; ----------------------------------------- bef NRM
-; a827			enhanced
+; a825			enhanced
 befnrm	jsr nrm00
 	jmp nrm2
 
-; a82d
+; a82b
 nrm00	lda #4		; video at $0400
 	sta video
 	lda #$c7		; VIC bank 0 ($0000)
@@ -1251,7 +1250,7 @@ nrm	sta $d018		; entry for CSET
 	rts
 
 ; ----------------------------------------- bef MOB OFF
-; a850			enhanced
+; a84a			enhanced
 befmoboff	jsr chkonoff	; check for ON/ OFF
 	sty helpvec	; .x=0: OFF/.x=10: ON
 	tya		; MOB ohne ON/OFF?
@@ -1268,8 +1267,8 @@ moboff	and mbittabl,x
 ++	jmp endsmb
 
 ; ----------------------------------------- 
-; a86e
-	!by 0,0,0,0,0
+; a86c
+	!by 0,0,0,0,0,0,0	; 7 bytes
 
 ; ----------------------------------------- bef OFF
 ; a873			enhanced

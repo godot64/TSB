@@ -30,10 +30,6 @@ modultext	!tx "CBM80"
 
 ; ----------------------------------------- 
 
-	!by $ad
-
-; ----------------------------------------- 
-
 sstart	jmp befcold
 
 ; ----------------------------------------- Calls to BASIC ROM
@@ -170,18 +166,24 @@ sopen	jsr pspeibe
 
 ; ----------------------------------------- 
 ; 812c
-pspeibe	sta zwspei1
+pspeibe	pha		; save .a
 	lda pport
-	sta portspei
+	sta portspei	; save $01
 	jsr basromei
-	lda zwspei1
+	pla		; restore .a
 	rts
-; 813b
-prestor	sta zwspei1
-	lda portspei
+; 8137
+prestor	pha		; save .a
+	lda portspei	; restore $01
 	sta pport
-	lda zwspei1
+	pla		; restore .a
 	rts
+
+; ----------------------------------------- Out Control
+; 813f
+chkscolon	jsr basromei	; uses ROM routines:
+	jsr nocrlf	; check if semicolon (returns .e flag)
+	jmp endsmb
 
 ; ----------------------------------------- Bef COLD (TSB)
 ; 8147			recoded
@@ -252,10 +254,10 @@ useready	pla
 	jsr basromei
 	lda #$a7		; address of outstring ($02a7)
 	ldy #$02
-	jsr $ab1e		; sys string out
-	jsr chrgot
+nocrlfstr	jsr $ab1e		; sys string out
+nocrlf	jsr chrgot	; semicolon?
 	bne +
-	jmp $aad7		; sys cr/lf out if end of command
+	jmp $aad7		; no, sys cr/lf out
 
 ; ----------------------------------------- 
 ; 81df
@@ -263,9 +265,9 @@ useready	pla
 use6	ldy #0		; compare to running code char
 	cmp (progz),y	; if not equal: error bad mode
 	bne +
-	jmp chrget	; and get next if equal
+	jmp chrget	; otherwise: get next char
 
-+	jmp swarm		; otherwise: bad mode
++	jmp swarm		; bad mode
 
 ; ----------------------------------------- 
 ; 81ed			recoded
@@ -288,7 +290,7 @@ sgetbytn	jsr incbasbz
 
 ; ----------------------------------------- 
 ; 8208
-	jsr incbasbz	; USE?
+	jsr incbasbz	; unused
 
 ; ----------------------------------------- bef USE
 ; 820b			recoded
