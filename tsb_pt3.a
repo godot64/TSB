@@ -187,18 +187,20 @@ befplot	jsr getxy
 
 ; ----------------------------------------- 
 ; 9271
-	!by 0,0,0
+tsberrs	ldy #0		; set standard input device
+	sty $13
+-	lda ($22),y	; out error text
+	php
+	and #$7f
+	jsr bsout
+	iny
+	plp
+	bpl -
+	rts
 
 ; ----------------------------------------- 
-; 9274
-clrhicols	sta $c000,y	; clear video ram
-	sta $c0f9,y
-	sta $c1f3,y
-	sta $c2ed,y
-	iny
-	cpy #$fb
-	bne clrhicols
-	rts
+; 
+	!by 0,0,0,0
 
 ; ----------------------------------------- part of DO
 ; 9286
@@ -704,42 +706,42 @@ dec7a	lda $7a
 
 ; ----------------------------------------- bef MMOB
 ; 95c8			modified
-befmmob	jsr getx8n
+befmmob	jsr getx8n	; get sprite number (0..7)
 	stx mobnr2
 	stx mobnr
-	asl mobnr2
+	asl mobnr2	; and as index into registers
 	jsr schkcom
 	jsr dec7a
-	jsr getxyxyf
+	jsr getxyxyf	; get start and target coordinates
 ; 95dd
 mobcont	ldx mobnr
-	lda $f7
+	lda $f7		; get mob size
 	bne mmb0
-	jsr mobexl
+	jsr mobexl	; 0: not expanded
 	jsr mobeyl
 	jmp mmb1
 
 mmb0	cmp #1
 	bne mmb2
-	jsr mobexs
+	jsr mobexs	; 1: x-expanded
 	jsr mobeyl
 	jmp mmb1
 
 mmb2	cmp #2
 	bne mmb3
-	jsr mobexl
+	jsr mobexl	; 2: y-expanded
 	jsr mobeys
 	jmp mmb1
 
-mmb3	jsr mobexs
+mmb3	jsr mobexs	; 3: x-y-expanded
 	jsr mobeys
 
-mmb1	jsr sgetbytc
+mmb1	jsr sgetbytc	; get motion speed
 	stx mobspeed
-	lda #$f0
+	lda #$f0		; (set mob flag)
 	sta mobbew
-	jsr mobbeweg
-	sta mobbew
+	jsr mobbeweg	; move the mob
+	sta mobbew	; (clear mob flag)
 	beq mmb4		; uncond. branch
 
 ; ----------------------------------------- part of USE
@@ -751,9 +753,8 @@ mmb4	jmp endsmb
 
 ; ----------------------------------------- 
 ; 962c
-mobposs	lda $09
-	ldx #0
-mmb6	cpx mobspeed
+mobposs	ldx #0
+mmb6	cpx mobspeed	; first slowdown
 	beq mmb5
 	inx
 	ldy #0
@@ -761,13 +762,15 @@ mmb7	cpy #10
 	beq mmb6
 	iny
 	bne mmb7
+
 mmb5	ldy mobnr2
+	lda $09		; x position lo
 	sta $d000,y
-	lda $0a
-	cmp #1
+	lda $0a		; x position hi
+	cmp #1		; > 256?
 	bne mmb8
 
-	ldy mobnr
+	ldy mobnr		; yes, set accordingly
 	lda $d010
 	ora mbittabs,y
 mmb9	sta $d010
@@ -776,7 +779,7 @@ mmb9	sta $d010
 	sta $d001,y
 	rts
 
-mmb8	ldy mobnr
+mmb8	ldy mobnr		; no, set accordingly
 	lda $d010
 	and mbittabl,y
 	jmp mmb9

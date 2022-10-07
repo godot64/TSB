@@ -182,8 +182,8 @@ prestor	pha		; save .a
 ; ----------------------------------------- Out Control
 ; 813f
 chkscolon	jsr basromei	; uses ROM routines:
-	jsr nocrlf	; check if semicolon (returns .e flag)
-	jmp endsmb
+	jsr $aa9d		; check if more (part of PRINT)
+	jmp basromau
 
 ; ----------------------------------------- Bef COLD (TSB)
 ; 8147			recoded

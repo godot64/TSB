@@ -924,9 +924,9 @@ dpl1	ldy #0
 +	sta $62 		; .a=0 (hi)
 	lda $a6		; out number of f-key
 	sta $63		; (lo)
-	ldx #$90
-	sec
-	jsr sxflp
+	ldx #$90		; look at scflp!
+	sec		; (4 bytes gain)
+	jsr sxflp		; 
 	jsr sfacasc	; returns .y=1
 	jsr outasc
 	jsr komma		; out ","
@@ -1296,12 +1296,10 @@ mkhex	pha		; get upper nibble
 ; c7a2
 mkbin	ldx #16		; len of result
 	stx helpvec
-	dex
 	lda #$30		; "0"
--	sta linenum,x	; fill
+-	sta+2 linenum-1,x	; fill
 	dex
-	bpl -
-	inx		; .x=0
+	bne -
 	lda int+1		; hibyte=0?
 	bne bin0
 	lsr helpvec	; yes, halve result
@@ -1329,62 +1327,62 @@ bin0	asl
 	beq mkstrng	; uncond. branch
 
 ; ----------------------------------------- 
-; c7de
+; c7dc
 iskomma	jsr schkcom
 	jmp dec7a
 
 ; ----------------------------------------- 
-; c7e4
-wanykey	lda $cb		; any key?
-	cmp #$40
+; c7e2
+wanykey	ldx $cb		; any key?
+	cpx #$40
 	bne wanykey	; yes, loop
-	lda #1
+	inx
 +	rts
 
 ; ----------------------------------------- part of OUT
-; c7ed
-outx	jsr chrget	; anything following?
+; c7ea
+outx	lda #0
+-	sta helpvec
+	jsr chrget	; anything following?
 	beq +		; no
+	cmp #$3b		; semicolon?
+	beq -
 
-	jsr sgetbyt1	; yes, number of error
+	jsr sgetbyt1	; then, number of error
 	cpx #$2e		; wrong number?
 	bcc +
 	ldx #$80		; yes, indicate as wrong
 +	txa
-	bmi outx0		; and skip
-	beq outx0		; also when error is 0
-
-	cmp #$20		; no, 32 or more?
-	bcs +
-	asl		; no, sys errors
+	asl
 	tax
+	beq outx0		; skip when no error
+
+	cpx #$40		; no, 32 or more?
+	bcs +		; if no, sys errors
 	lda $a326,x	; sys: addresses of sys errors
 	sta $22
 	lda $a327,x
 	sta $23
 	bne ++		; uncond. branch
 
-+	and #$1f		; tsb errors
-	asl
++	and #$1f
 	tax
 	lda fehlmtab,x	; addresses of tsb errors
 	sta $22
 	lda fehlmtab+1,x
 	sta $23
 
-++	ldy #0
-	sty $13
--	lda ($22),y	; out error text
-	pha
-	and #$7f
-	jsr bsout
-	iny
-	pla
-	bpl -
+++	jsr tsberrs
 	lda #$6a
 	ldy #$a3
-	jsr nocrlfstr	; sys out string " error"
-outx0	jmp endsmb
+	jsr $ab1e		; sys out string " error"
+	lda helpvec
+	beq outx0
+	jsr dec7a
+outx0	jsr chkscolon
+	jmp endsmb
+
+	!by 0,0,0
 
 ; ----------------------------------------- bef LIN
 ; c83a			new
@@ -1417,14 +1415,13 @@ beflin	jsr chkdrv	; is drive present?
 	lda $ae
 	ora $af
 	bne +
+	sty helpvec
+	sty helpvec+1
 	lda $2d
 	ldx $2e
 	sta $ae
 	stx $af
-	tya
-	sta helpvec
-	sta helpvec+1
-	beq ++
+	bne ++
 +	tya
 	sta ($ae),y
 	iny
@@ -1443,15 +1440,14 @@ beflin	jsr chkdrv	; is drive present?
 
 	lda helpvec
 	ora helpvec+1
-	beq +
-	lda helpvec
-	ldx helpvec+1
+	beq bl01
 	ldy #0
+	lda helpvec
 	sta ($fb),y
-	txa
+	lda helpvec+1
 	iny
 	sta ($fb),y
-+	jmp endsmb
+bl01	jmp endsmb
 
 ; ----------------------------------------- 
 ; c8b5
@@ -1700,7 +1696,7 @@ null	!tx "null"
 ; ca44
 version	!tx "ad86"	; Signature
 	!by $0d
-	!tx "2.21005"	; Version Number
+	!tx "2.21007"	; Version Number
 
 ; ----------------------------------------- 
 ; ca4f

@@ -660,32 +660,16 @@ vergl	lda diffv
 vergl1	jsr ynext
 	jmp vloop
 
-+	lda ax+1
-	sta vgla+1
-	lda ax
-	sta vgla
-	lda ex+1
-	sta vgle+1
-	lda ex
-	sta vgle
-	jsr vglae
++	jsr cmpax
 	bne diff
-	lda ay+1
-	sta vgla+1
-	lda ay
-	sta vgla
-	lda ey+1
-	sta vgle+1
-	lda ey
-	sta vgle
-	jsr vglae
+	jsr cmpay
 	beq +
 	jsr ynext
 	jmp vloop
 +	rts
 
 ; ----------------------------------------- 
-; a43a
+; a40a
 diff	sec
 	lda ey
 	sbc ay
@@ -741,7 +725,7 @@ diff	sec
 	sta xdiff+1
 	lda #0
 	sta diffv+1
-; a4a2
+; a472
 -	sta diffv
 	sec
 	lda ydiff
@@ -762,18 +746,10 @@ diff	sec
 	inc diffv+1
 +	lda diffv
 	jmp -
-; a4ce
+; a49e
 ++	pla
 	pla
-	lda ax+1
-	sta vgla+1
-	lda ax
-	sta vgla
-	lda ex+1
-	sta vgle+1
-	lda ex
-	sta vgle
-	jsr vglae
+	jsr cmpax
 	beq +++
 	bcc ++
 	lda ax
@@ -791,7 +767,7 @@ diff	sec
 +	jmp vergl1
 
 ; ----------------------------------------- 
-; a513
+; a4cb
 ynext	lda diffv
 	ora diffv+1
 	beq ++
@@ -799,15 +775,7 @@ ynext	lda diffv
 	bne +
 	dec diffv+1
 +	dec diffv
-++	lda ay+1
-	sta vgla+1
-	lda ay
-	sta vgla
-	lda ey+1
-	sta vgle+1
-	lda ey
-	sta vgle
-	jsr vglae
+++	jsr cmpay
 	beq +++
 	bcs ++
 	inc ay
@@ -820,6 +788,45 @@ ynext	lda diffv
 	dec ay+1
 +	dec ay
 +++	rts
+
+; ----------------------------------------- 
+; a4fa
+cmpax	lda ax+1
+	sta vgla+1
+	lda ax
+	sta vgla
+	lda ex+1
+	sta vgle+1
+	lda ex
+	sta vgle
+	jmp vglae
+; a515
+cmpay	lda ay+1
+	sta vgla+1
+	lda ay
+	sta vgla
+	lda ey+1
+	sta vgle+1
+	lda ey
+	sta vgle
+	jmp vglae
+
+; ----------------------------------------- 
+; a530
+	!by 0,0,0,0,0,0,0,0	; 24 bytes
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+
+; ----------------------------------------- 
+; a548
+clrhicols	sta $c000,y	; clear video ram
+	sta $c0f9,y
+	sta $c1f3,y
+	sta $c2ed,y
+	iny
+	cpy #$fb
+	bne clrhicols
+	rts
 
 ; ----------------------------------------- 
 ; a55a
@@ -835,9 +842,9 @@ tofind	lda $a6
 	lda $a7
 	sta $62
 	sta $a9
-	ldx #$90
-	sec
-	jsr sxflp
+	ldx #$90		; look at scflp!
+	sec		; (4 bytes gain)
+	jsr sxflp		; 
 	jsr sfacasc
 	jsr outasc
 	sec
@@ -1202,19 +1209,26 @@ befpause	jsr chrget
 +	jsr schkcom	; comma?
 
 ++	jsr sgetadr	; get time value to $65/$14
-	sta zaesec	; .a=0 (normally)
+	jsr chkscolon	; semicolon? (yes, PRINT)
+
+	lda #0		; now pause
+	sta zaesec
 	sta zaeirq
 -	jsr $ffe4		; sys getin keyboard
 	cmp #$0d		; <return>?
 	beq +
 	lda zaesec	; check timer
-	cmp $65
+	cmp int
 	bne -
 
-+	jmp chkscolon	; semicolon?
++	jmp endsmb
+
+; ----------------------------------------- 
+; a80f
+	!by 0,0
 
 ; ----------------------------------------- Part of FETCH
-; a80f
+; a816
 showcrsr	lda fcursor,x
 	tay
 	and #$7f		; reduce
@@ -1230,11 +1244,11 @@ showcrsr	lda fcursor,x
 	rts
 
 ; ----------------------------------------- bef NRM
-; a825			enhanced
+; a82a			enhanced
 befnrm	jsr nrm00
 	jmp nrm2
 
-; a82b
+; a832
 nrm00	lda #4		; video at $0400
 	sta video
 	lda #$c7		; VIC bank 0 ($0000)
@@ -1250,7 +1264,7 @@ nrm	sta $d018		; entry for CSET
 	rts
 
 ; ----------------------------------------- bef MOB OFF
-; a84a			enhanced
+; a851			enhanced
 befmoboff	jsr chkonoff	; check for ON/ OFF
 	sty helpvec	; .x=0: OFF/.x=10: ON
 	tya		; MOB ohne ON/OFF?
@@ -1260,18 +1274,14 @@ befmoboff	jsr chkonoff	; check for ON/ OFF
 +	lda $d015
 	ldy helpvec	; ON or OFF?
 	beq moboff
-	ora mbittabs,x
+	ora mbittabs,x	; ON
 	bne +
-moboff	and mbittabl,x
+moboff	and mbittabl,x	; OFF
 +	sta $d015
-++	jmp endsmb
-
-; ----------------------------------------- 
-; a86c
-	!by 0,0,0,0,0,0,0	; 7 bytes
+	jmp endsmb
 
 ; ----------------------------------------- bef OFF
-; a873			enhanced
+; a87a			enhanced
 endflash	jsr dec7a
 befoff	ldx #0
 -	lda flashing
