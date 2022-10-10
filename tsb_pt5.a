@@ -23,6 +23,7 @@
 ; patched on 25.08.2022 (commands MEM..., by P. Hagemann
 ; patched on 29.08.2022 (all SCR and MEM commands)
 ; patched on 30.08.2022 (bugfix: crash if KEY 0 was followed by parameter)
+; patched on 09.10.2022 (bugfix: possible crash in FETCH)
 ; 
 ; ----------------------------------------- 
 
@@ -593,9 +594,9 @@ cfreset	lda #0
 ; ----------------------------------------- bef FETCH
 ; b001			recoded
 
-beffetch	jsr sgetstrn	; get ctrl string and its len
+beffetch	jsr frominsrt	; get ctrl string and its len
 	stx $20
-	sta $21
+	sty $21
 	lda $69
 	sta fetchlen	; store len of ctrl string
 	jsr chkfchlen	; get (and check) len
@@ -657,8 +658,8 @@ fgetkey	ldx #0		; .x=0: start length of input
 
 floop	jsr $ffe4		; sys get key
 	sta joywert	; merken
-	lda joywert	; nothing typed?
-	beq floop
+	lda joywert
+	beq floop		; nothing typed?
 
 	cmp #$0d		; cr?
 	beq jfoa

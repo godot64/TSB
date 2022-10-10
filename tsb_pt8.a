@@ -31,59 +31,59 @@
 	errln		= $c51d		; word: Zeile bei Fehler
 	pos		= $c51f		; Positionswert (verschiedene Befehle, z.B. INST)
 	pos1		= $c520		; dito bei DUP und CHECK
-	;
+					; ! unused (2 bytes)
 	vgla		= $c523		; word: Vergleichswert, Anfang
-	;
+					; ! unused (4 bytes)
 	savecont		= $c529		; word: Programmzeiger bei RESUME
-	hilffl1		= $c52b		; ! unused
-	hilfflag		= $c52c		; ! unused
+	hilffl1		= $c52b		; ! unused (1 byte)
+	hilfflag		= $c52c		; ! unused (1 byte)
 	xmaxlow		= $c52d		; Maximalwert X (lo) bei Grafik
 	xmaxhigh		= $c52e		; Maximalwert X (hi) bei Grafik
 	ueberdreh		= $c52f		; Flag bei Kreisberechnungen
 	prstack		= $c530		; Zeiger in den PROC-Stack
-	tracetab		= $c531		; ! unused in TSB (75 Bytes)
-	;
+	tracetab		= $c531		; ! unused in TSB:
+					; (75 Bytes)
 	drehsinn		= $c57c		; Flag bei Kreisberechnungen	
 	zwspei1		= $c57d		; Zwischenspeicher bei Prozessorport-Umschaltung
-	zn		= $c586		; ! unused (5 bytes)
-	;
+	zn		= $c586		; ! unused
+					; (5 bytes)
 	pspeinmi		= $c58b		; Prozessorport bei NMI
 	pageflag		= $c58c		; Flag für PAGE
 	pagewert		= $c58d		; Wert für PAGE
-	;                                         ! unused (8 bytes)
+					; ! unused (8 bytes)
 	portspei		= $c596		; Zwischenspeicher bei Prozessorport-Umschaltung
 	ax		= $c597		; word: X-Anfangswert
 	procnffl		= $c598		; PROC NOT FOUND (changed from $c597, doesn't interfere with AX)
 	mfreq		= $c599		; word: Frequenz für PLAY
-	;                                         ! unused (4 bytes)
+					; ! unused (4 bytes)
 	ydiff		= $c59f		; word: Differenz bei MOB
 	diffv		= $c5a1		; word: Differenz vertikal
-	dry		= $c5a3
-					; word used by DUP
+	dry		= $c5a3		; word used by DUP
+					; ! unused (1 byte)
 	xdiff		= $c5a6		; word: Differenz horizontal
 	ey		= $c5a8		; word: Endwert y
 	ex		= $c5aa		; word: Endwert x
 	ay		= $c5ac		; word: Anfangswert y
 	gflag		= $c5ae		; Flag für BLOCK
-	;
+					; ! unused (1 byte)
 	multijn		= $c5b0		; flag für Multi-Modus
 	autoinc		= $c5b1		; Inkrement bei AUTO
 	autoflag		= $c5b2		; Flag für AUTO
 	gmemflag		= $c5b3		; Flag für Grafik/MOB
 	mobbew		= $c5b4		; Flag bei MOB-Bewegungen
 	mobspeed		= $c5b5		; Speed bei MOB-Bewegungen
-	;                                         ! unused (5 bytes)
+					; ! unused (5 bytes)
 	mobnr2		= $c5bb		; Index in $d000
 	mobnr		= $c5bc		; MOB-Nummer
-	;                                         ! unused (7 Bytes)
+					; ! unused (7 Bytes)
 	flashsp		= $c5c4		; Speed für FLASH
 	flashzae		= $c5c5		; Counter bei FLASH
 	flashfl		= $c5c6		; Flag für FLASH
 	flashing		= $c5c7		; Flag: FLASH aktiv	($00-$80)
-	;                                         ! unused (3 bytes)
+					; ! unused (3 bytes)
 	ifflag		= $c5cb		; Wahrheitswert der letzten IF-Abfrage
 	justif		= $c5cc		; Flag für IF in DO..DONE
-	;                                         ! unused (8 bytes)
+					; ! unused (8 bytes)
 	lcode		= $c5d5		; part of LIST
 	inkey		= $c5d6		; Nummer der Funktionstaste
 	bflashsp		= $c5d7		; Speed bei BFLASH
@@ -94,20 +94,20 @@
 	optflag		= $c5dc		; Flag: OPTION aktiv (10)
 	pendflag		= $c5dd		; Flag für Programmende bei FIND
 	bflashing		= $c5de		; BFLASH:	ursprüngliche Borderfarbe
-	;                                         ! unused (3 bytes)
+					; ! unused (3 bytes)
 	copbyte		= $c5e2		; ! unused (2 bytes)
 	codezae		= $c5e4		; Zähler bei Tokenisierung
-	;
+					; ! unused (1 byte)
 	copzaey		= $c5e6		; ! unused
 	onkeypos		= $c5e7		; ON KEY: Taste in Control-String?
 	onkeyzeig		= $c5e8		; word: Zeiger auf ON-KEY-Befehl
 	onkeyflag		= $c5ea		; Flag: ON KEY aktiv (10)
-	;
+					; ! unused (1 byte)
 	keyon		= $c5ec		; gedrückte Taste bei ON KEY
 	okstring		= $c5ed		; word: Zeiger auf ON-KEY-Control-String
 	okstrlen		= $c5ef		; Länge ON-KEY-Control-String
 	basbzk		= $c5f0		; word: enthält Basic-Programmzeiger
-	; 				  ! unused (6 bytes)
+					; ! unused (6 bytes)
 	delay		= $c5f8		; Verzögerungswert bei LIST (DELAY)
 	onerrzeig		= $c5f9		; word: Zeiger auf ON-ERROR-Befehl
 	onerrorflag	= $c5fb		; Flag: ON ERROR aktiv (10)
@@ -129,28 +129,28 @@
 	sploop		= $c641		; Stackpointer für LOOP
 	lastkey		= $c642		; zuletzt gedrückte Taste
 	execflag		= $c643		; Flag für EXEC ohne EXEC-Befehlswort (>0)
-	; 				  ! unused (2 bytes)
+					; ! unused (2 bytes)
 	keyflag		= $c646		; Flag: F-Tasten aktiv (10)
-	; 				  ! unused (3 bytes)
+					; ! unused (3 bytes)
 	wavetab		= $c64a		; Teil von WAVE
 	keytab		= $c64d		; F-Tasten-Belegung (bis $c74c)
 
 ; ----------------------------------------- 
 
 	; 		  $c74d		; "ata" (string to compare w/ DATA)
-	pxhtab		= $c751		; unused (instead: code starts at $c750...)
-	pxltab		= $c850 		; unused
-	pytab		= $c94f		; unused
+	pxhtab		= $c751		; (unused, instead: code starts at $c750...)
+	pxltab		= $c850 		; (unused)
+	pytab		= $c94f		; (unused)
 
 ; ----------------------------------------- 
 
-	pzeig		= $ca4e		; unused (...code here...)
-	pymerk		= $ca4f		; unused
-	pyalt		= $ca50		; unused
-	pakty		= $ca51		; unused
-	flag1		= $ca52		; unused (...up to $caa7)
+	pzeig		= $ca4e		; (unused ...code here...)
+	pymerk		= $ca4f		; (unused)
+	pyalt		= $ca50		; (unused)
+	pakty		= $ca51		; (unused)
+	flag1		= $ca52		; (unused ...up to $caa7)
 
-	; 				  ! unused from $caa9 to $cb1a (113 bytes)
+					; ! unused from $caa9 to $cb1a (113 bytes)
 
 ; ----------------------------------------- 
 
@@ -166,49 +166,49 @@
 	drstrz		= $cb4f		; Zeiger in String bei DRAW
 	drstatus		= $cb50		; Status bei DRAW (9: Ende erreicht)
 	dryanf		= $cb51		; Startwert Y bei DRAW
-	; 				  ! unused (2 bytes)
+					; ! unused (2 bytes)
 	zwisp2		= $cb54
-	; 				  ! unused (4 bytes)
+					; ! unused (4 bytes)
 	drawtabx		= $cb59		; DRAW: 4 Bytes (gesetzt durch ROT)
 	drawtaby		= $cb5d		; DRAW: 4 Bytes (gesetzt durch ROT)
 	drricht		= $cb61		; DRAW: Richtung (aus ROT)
-	; 				 ! unused (3 bytes)
+					; ! unused (3 bytes)
 	drincx		= $cb65		; DRAW
-	; 				 ! unused (3 bytes)
+					; ! unused (3 bytes)
 	drincy		= $cb69		; DRAW 
-	; 				 ! unused (3 bytes)
+					; ! unused (3 bytes)
 	drx		= $cb6d		; word: Startwert X bei DRAW
 	chgr		= $cb6e		; CHAR: Zeichengröße
 	fetchanz		= $cb6f
 	joywert		= $cb70
 	zwisp4		= $cb71
 	fetchlen		= $cb72		; Eingabelänge bei FETCH (max 88)
-	; 				 ! unused (3 bytes)
+					; ! unused (3 bytes)
 	zeileanf		= $cb76		; Startzeile bei MOVE-Befehlen
 	spalteanf		= $cb77		; Startspalte bei MOVE-Befehlen
 	spaltenanz	= $cb78		; Anzahl Spalten bei MOVE-Befehlen
 	zeilenanz		= $cb79		; Anzahl Zeilen bei MOVE-Befehlen
 
-	zaehler		= $cb7a		; ! unused (aber gesetzt in MOVE-Befehlen)
-	;				  ! unused (10 bytes)
+	zaehler		= $cb7a		; ! unused (aber gesetzt in MOVE-Befehlen!)
+					; ! unused (10 bytes)
 	richtz		= $cb7c		; ! unused
-	;				  ! unused
+					; ! unused (1 byte)
 	zaehlm1		= $cb7e		; ! unused
 	zaehlm2		= $cb80		; ! unused
 	bwflag		= $cb82		; ! unused
 	zwisp3		= $cb84		; ! unused
-	;				  ! unused
+					; ! unused (1 byte)
 	musicz2		= $cb86		; Dauer: Noten
 	musicz3		= $cb88		; Dauer: Noten
-	;
+					; ! unused (1 byte)
 	musicz4		= $cb8a		; Dauer: Noten
-	;
+					; ! unused (1 byte)
 	mregadr		= $cb8c		; word: Adresse der Musikregister
-	;				  ! unused (4 bytes)
+					; ! unused (4 bytes)
 	playflag		= $cb91		; Flag: PLAY aktiv (10)
-	;				  ! unused (4 bytes)
+					; ! unused (4 bytes)
 	musicdau		= $cb96		; Dauer von Musik
-	;				  ! unused (4 bytes)
+					; ! unused (4 bytes)
 	musicadr		= $cb9b		; word: Adresse des MUSIC-Strings
 	musicz1		= $cb9d		; Zeiger in MUSIC-String
 	musiclen		= $cb9e		; Länge des MUSIC-Strings
@@ -216,31 +216,31 @@
 	srtab		= $cba0		; word: Tabelle für Sustain/Release (4 Bytes)
 	adtab		= $cba4		; word: Tabelle für Attack/Decay (4 Bytes)
 	stimmenr		= $cba8
-	;				  ! unused (2 bytes)
+					; ! unused (2 bytes)
 	str1		= $cbab		; word: Adresse String 1 bei DUP
-	;
+					; ! unused (1 byte)
 	dwert		= $cbae		; Zähler für Vervielfachung bei DUP
-	;				  ! unused (2 bytes)
+					; ! unused (2 bytes)
 	plpos		= $cbb1		; Position des gesuchten Strings bei PLACE
-	;				  ! unused (2 bytes)
+					; ! unused (2 bytes)
 	strlen2		= $cbb4		; Adresse von String 2 bei PLACE
-	;				  ! unused (2 bytes)
+					; ! unused (2 bytes)
 	strlen1		= $cbb7		; Adresse von String 1 bei PLACE
-	;				  ! unused (3 bytes)
+					; ! unused (3 bytes)
 	idivsor		= $cbbb		; word: Divisor bei DIV
-	;				  ! unused (3 bytes)
+					; ! unused (3 bytes)
 	idivdend		= $cbc0		; word: Dividend bei DIV
 	idivrest		= $cbc2		; word: Rest bei DIV
-	;
+					; ! unused (1 byte)
 	kry		= $cbc5		; Kreis: Radius Y
 	stackdo		= $cbc6		; DO-Stack (20 bytes)
 	dobooles		= $cbda		; Wahrheitswerte der DO-Strukturen
 	doindex		= $cbe4		; Index in DO-Stack	(0..9)
 	stackelse		= $cbe5		; ELSE-Stack (20 Bytes)
 	elseindex		= $cbf9		; Index in ELSE-Stack
-	;				  ! unused (6 bytes)
+					; ! unused (6 bytes)
 
-	; 		total of 373 unused bytes between $c500 and $cc00
+	; 		total of 327 unused bytes between $c500 and $cc00
 
 ; ----------------------------------------- 
 ;
