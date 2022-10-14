@@ -1268,10 +1268,10 @@ nrm	sta $d018		; entry for CSET
 befmoboff	jsr chkonoff	; check for ON/ OFF
 	sty helpvec	; .x=0: OFF/.x=10: ON
 	tya		; MOB ohne ON/OFF?
-	beq +		; ja, skip (.x is mob#)
+	beq mbo0		; ja, skip (.x is mob#)
 	stx helpvec
 	jsr getx8		; get mob# to .x
-+	lda $d015
+mbo0	lda $d015
 	ldy helpvec	; ON or OFF?
 	beq moboff
 	ora mbittabs,x	; ON

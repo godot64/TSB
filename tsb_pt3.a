@@ -844,66 +844,67 @@ sq0	jmp sirq2
 
 ; ----------------------------------------- bef MOB SET
 ; 96e0			enhanced
-befmobset	jsr getx8n
+befmobset	jsr getx8n	; get sprite number
 	stx $aa
-	lda $d015
-	ora mbittabs,x	; switch mob on
-	sta $d015
-
-	jsr sgetbytc
+	jsr sgetbytc	; get block number
 	ldy $aa
-	lda video		; where is video?
-	cmp #$cc		; at $cc00 (after mem)?
+	lda video		; which video mode?
+	cmp #$cc		; mem mode?
 	beq ifmem
 	lda gmemflag
-	cmp #10
-	bne ifnrm
+	cmp #10		; standard mode?
+	bne ifnrm		; graphics mode?
 ifhires	txa
-	sta $c3f8,y	; move mobs accordingly
+	sta $c3f8,y	; set block accordingly
 	jmp msk0
 ifmem	txa
-	sta $cff8,y	; move mobs accordingly
+	sta $cff8,y	; set block accordingly
 	jmp msk0
 ifnrm	txa
-	sta $07f8,y	; move mobs accordingly
+	sta $07f8,y	; set block accordingly
 
-msk0	jsr sgetbytc	; set mob color
+msk0	jsr sgetbytc	; get mob color
 	ldy $aa
 	txa
 	sta $d027,y
 
-	jsr sgetbytc	; set priority
-	cpx #1
-	bne +
-
-	lda $d01b		; 1
+	jsr sgetbytc	; get priority
+	txa
+	sta helpvec	; set activation flag
 	ldx $aa
+	and #1
+	beq +
+
+	lda $d01b		; prio 1
 	ora mbittabs,x
 	bne ++
 
-+	lda $d01b		; 0
-	ldx $aa
++	lda $d01b		; prio 0
 	and mbittabl,x
 ++	sta $d01b
 
-	jsr sgetbytc	; set mob type (multi/hires)
-	cpx #1
+	jsr sgetbytc	; get mob type (multi/hires)
+	txa
+	ldx $aa
+	cmp #1
 	bne +
 
-	ldx $aa		; 1 (multi)
-	lda $d01c	
+	lda $d01c		; type 1 (multi)
 	ora mbittabs,x
 	bne ++
 
-+	ldx $aa		; 0 (hires)
-	lda $d01c
++	lda $d01c		; type 0 (hires)
 	and mbittabl,x
 ++	sta $d01c
-	jmp endsmb
+
+	lda helpvec	; activate MOB? (number in .x)
+	bmi +		; no if negative
+	inc helpvec	; yes
+	jmp mbo0
 
 ; ----------------------------------------- 
-; 9756
-	!by 0,0		; 2 bytes
+; 9754
+	!by 0,0,0,0,0	; 5 bytes
 
 ; ----------------------------------------- End SB command
 ; 9759
