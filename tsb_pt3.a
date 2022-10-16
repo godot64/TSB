@@ -1851,41 +1851,41 @@ befexit	jsr incbasbz
 	beq +
 	ldx #$28 		; LOOP ERROR (if not found)
 	jmp ($0300)
-+
--	jmp bef0		; finish command
-
-; ----------------------------------------- bef ON KEY
-; 9d72			recoded
-befonkey	jsr incbasbz
-	jsr sgetstr
-	sta okstring+1	; controlstring
-	stx okstring
-	ldy $69		; len
-	sty okstrlen
-	lda progz
-	ldy progz+1
-	sta onkeyzeig
-	sty onkeyzeig+1
-	lda #$5d		; "]" (emergency key)
-	sta keyon
-	jsr chkkey
-	bcs +
-
-	sty onkeypos
-+	lda #10
-	sta onkeyflag
-	ldy #0
-	jmp res2
 
 ; ----------------------------------------- bef DISABLE
-; 9da4			original
+; 9d6f			original
 befdisable
 	lda #0
 	sta onkeyflag
-	beq -
++	jmp bef0		; finish command
+
+; ----------------------------------------- bef ON KEY
+; 9d77			recoded
+befonkey	jsr incbasbz
+	jsr sgetstr	; get controlstring
+	sta okstring+1	; address
+	stx okstring
+	ldy $69		; len
+	sty okstrlen
+	jsr srem		; proceed to command after ON KEY
+	lda progz		; save PZ
+	ldy progz+1
+	sta onkeyzeig
+	sty onkeyzeig+1
+	lda #$5d		; set "]" (emergency key) for 1st init
+	sta keyon
+	jsr chkkey	; fake: is in ctrl string?
+	bcs +
+
+	sty onkeypos	; save position (or 0)
++	lda #10
+	sta onkeyflag
+	ldy #0
+	jsr skipline	; skip rest of line
+	beq -		; uncond. branch
 
 ; ----------------------------------------- 
-; 9dab
+; 9dae
 onkey1	lda onkeypos	; key pressed?
 	bne +
 	jsr $ffe4		; no, sys get key
@@ -1896,16 +1896,18 @@ onkey1	lda onkeypos	; key pressed?
 
 +	lda #0		; found
 	sta onkeyflag
-	lda progz
+	lda progz		; save PZ (for RESUME)
 	ldx progz+1
 	sta basbzk
 	stx basbzk+1
-	lda onkeyzeig
+	lda onkeyzeig	; set PZ to ON KEY command
 	ldx onkeyzeig+1
 	sta progz
 	stx progz+1
-	jmp scd5		; continue elsewhere
-; 9dd9
+	jmp scd5		; continue there
+
+; ----------------------------------------- 
+; 9ddc
 chkkey	lda #0
 	sta onkeypos
 chkonkey	lda okstring	; get on key ctrl string
@@ -1924,7 +1926,7 @@ chkonkey	lda okstring	; get on key ctrl string
 oky0	rts
 
 ; ----------------------------------------- bef RESUME
-; 9df9			recoded
+; 9dfc			recoded
 befresume	lda errn		; from ON ERROR?
 	bpl res0		; yes, go there
 
@@ -1932,16 +1934,16 @@ befresume	lda errn		; from ON ERROR?
 	cmp #8
 	bcc res3		; yes, leave
 
-	sta progz+1
+	sta progz+1	; no, ON KEY
 	lda basbzk
-	sta progz
+	sta progz		; proceed where you came from
 	jsr basromei
 	lda #10
 	sta onkeyflag
-	jmp sintprt0
+	jmp sintprt0	; now
 
 ; ----------------------------------------- 
-; 9e17
+; 9e1a
 res0	jsr chrget	; parameters?
 	beq res4		; no
 
@@ -1954,32 +1956,32 @@ res0	jsr chrget	; parameters?
 	sta int
 	stx int+1
 	jsr sgoto1	; goto errln
-	ldy #5
+	ldy #5		; skip line header
 	jsr sbzply
 
 ; ----------------------------------------- bef PROC
-; 9e35			enhanced
+; 9e38			enhanced
 befproc	jsr flinend	; find end of line
-	beq +
+	beq +		; end of command (uncond. branch)
 
 ; ----------------------------------------- 
-
-res4	ldy #0
-	lda savecont
+; 9e3d
+res4	ldy #0		; RESUME w/o params
+	lda savecont	; proceed where break was
 	ldx savecont+1
 	sta progz
 	stx progz+1
-	lda (progz),y
+	lda (progz),y	; at line end?
 	bne res2
-	ldy #5
+	ldy #5		; yes, skip header of next line
 	!by $24
 res2	iny
 	jsr sbzply
-	jsr srem
-+	jmp endsmb
+	jsr srem		; advance to command after break
++	jmp endsmb	; continue PRG
 
 ; ----------------------------------------- bef LOOP
-; 9e57			enhanced
+; 9e5a			enhanced
 befloop	ldy sploop
 	cpy #20
 	bcc +
@@ -1995,7 +1997,7 @@ befloop	ldy sploop
 res3	jmp bef0
 
 ; ----------------------------------------- bef ON ERROR
-; 9e73			enhanced
+; 9e76			enhanced
 befonerror
 	jsr incbasbz
 	lda progz
@@ -2005,7 +2007,7 @@ befonerror
 	lda #10
 	sta onerrorflag
 	jsr flinend
-	beq swm0
+	beq swm0		; uncond. branch
 
 swm1	lda $3d
 	ldy $3e
@@ -2014,10 +2016,9 @@ swm1	lda $3d
 -	rts		; - label from chkfchlen!
 
 ; ----------------------------------------- bef NO ERROR
-; 9e95			original
-befnoerr	lda #0
-	sta onerrorflag
-	jmp bef0
+; 9e98			original
+befnoerr	jsr eck0		; clear on error flag
+	beq res3
 
 ; ----------------------------------------- Warmstart
 ; 9e9d			recoded

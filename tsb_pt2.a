@@ -954,7 +954,7 @@ frominsrt	jsr sgetstrn
 endcheck	jsr basromei
 	txa		; any error?
 	bpl +
-	lda #0		; no, clear on error flag
+eck0	lda #0		; no, clear on error flag
 	sta onerrorflag
 +	rts
 
