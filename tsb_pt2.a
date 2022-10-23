@@ -568,7 +568,7 @@ sgetstr1	lda portspei
 sgetari	lda #0
 	sta $0d
 	jsr chrget
-fromat	bcs +		; 8c94
+	bcs +		; 8c94
 	jmp sascflp
 
 +	cmp #$24		; "$"?

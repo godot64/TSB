@@ -685,7 +685,7 @@ dir6	dec helpvec
 
 dir5	jsr sclose
 	cli
-	jmp endsmb
+mmb4	jmp endsmb
 
 ; ----------------------------------------- 
 ; 95b4
@@ -725,16 +725,6 @@ mmb0	cmp #1
 	bne mmb2
 	jsr mobexs	; 1: x-expanded
 	jsr mobeyl
-	jmp mmb1
-
-mmb2	cmp #2
-	bne mmb3
-	jsr mobexl	; 2: y-expanded
-	jsr mobeys
-	jmp mmb1
-
-mmb3	jsr mobexs	; 3: x-y-expanded
-	jsr mobeys
 
 mmb1	jsr sgetbytc	; get motion speed
 	stx mobspeed
@@ -744,12 +734,23 @@ mmb1	jsr sgetbytc	; get motion speed
 	sta mobbew	; (clear mob flag)
 	beq mmb4		; uncond. branch
 
+mmb2	cmp #2
+	bne mmb3
+	jsr mobexl	; 2: y-expanded
+	jsr mobeys
+	bne mmb1
+
+mmb3	jsr mobexs	; 3: x-y-expanded
+	jsr mobeys
+	bne mmb1
+
 ; ----------------------------------------- part of USE
-; 9620
-use1	jsr basromau
+; 961e
+use1	jsr sgetstr	; get ctrl string
+	jsr basromau
 	jsr use3		; analyse USE parameters (b3e2)
 	jsr sclrch
-mmb4	jmp endsmb
+	beq mmb4		; uncond. branch
 
 ; ----------------------------------------- 
 ; 962c

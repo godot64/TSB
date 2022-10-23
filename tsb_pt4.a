@@ -646,12 +646,13 @@ vloop	lda ax
 	sta $a4
 	lda ay+1
 	sta $a5
-	lda mobbew
+	lda mobbew	; mmob or line?
 	cmp #$f0
 	bne +
-	jsr mobposs
+	jsr mobposs	; mmob
 	jmp vergl
-+	jsr punkt
+
++	jsr punkt		; line
 ; a3eb
 vergl	lda diffv
 	ora diffv+1

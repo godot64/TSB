@@ -1212,8 +1212,11 @@ err11	ldx #$0b		; error "syntax"
 
 ; ----------------------------------------- 
 ; b3e4
-use3	jsr sgetstr	; get ctrl string
-	lda $69		; len=0?
+	!by 0,0,0
+
+; ----------------------------------------- 
+; b3e7
+use3	lda $69		; len=0?
 	beq err11		; yes, syntax error
 	jsr use4		; set string parms (ac46)
 
