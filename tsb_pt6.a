@@ -1624,7 +1624,7 @@ allnrm	lda vecrenum	; vector of bef RENUMBER
 	lda progz+2	; chrget changed? (DOS 5.1)
 	cmp #$4c
 	beq nrm3		; yes, go to "tsb.ext" (!changes!)
-
+; c9de
 !if uniprom {		; if for Uniprom CRT:
 	ldx #4
 	ldy #$cc
@@ -1696,7 +1696,7 @@ null	!tx "null"
 ; ca44
 version	!tx "ad86"	; Signature
 	!by $0d
-	!tx "2.21022"	; Version Number
+	!tx "2.21026"	; Version Number
 
 ; ----------------------------------------- 
 ; ca4f

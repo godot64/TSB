@@ -53,17 +53,17 @@
 					; ! unused (8 bytes)
 	portspei		= $c596		; Zwischenspeicher bei Prozessorport-Umschaltung
 	ax		= $c597		; word: X-Anfangswert
-	procnffl		= $c598		; PROC NOT FOUND (changed from $c597, doesn't interfere with AX)
-	mfreq		= $c599		; word: Frequenz für PLAY
-					; ! unused (4 bytes)
-	ydiff		= $c59f		; word: Differenz bei MOB
-	diffv		= $c5a1		; word: Differenz vertikal
-	dry		= $c5a3		; word used by DUP
+	ay		= $c599		; word: Anfangswert y
+	mfreq		= $c59b		; word: Frequenz für PLAY
+	procnffl		= $c59d		; PROC NOT FOUND (changed from $c597, doesn't interfere with AX)
+					; ! unused (3 bytes)
+	ydiff		= $c5a1		; word: Differenz bei MOB
+	diffv		= $c5a3		; word: Differenz vertikal
+	dry		= $c5a5		; word used by DUP
+	xdiff		= $c5a7		; word: Differenz horizontal
+	ex		= $c5a9		; word: Endwert x
+	ey		= $c5ab		; word: Endwert y
 					; ! unused (1 byte)
-	xdiff		= $c5a6		; word: Differenz horizontal
-	ey		= $c5a8		; word: Endwert y
-	ex		= $c5aa		; word: Endwert x
-	ay		= $c5ac		; word: Anfangswert y
 	gflag		= $c5ae		; Flag für BLOCK
 					; ! unused (1 byte)
 	multijn		= $c5b0		; flag für Multi-Modus
