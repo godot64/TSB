@@ -483,10 +483,7 @@ to20	lda $a8
 
 ; ----------------------------------------- bef INSERT
 ; af44			new
-befinsert	jsr frominsrt	; get box definition
-	sty $21
-	stx $20
-	lda $69		; len<>9?
+befinsert	jsr get1ststr	; get string and len
 	cmp #9
 	bne jerr14	; yes, error
 
@@ -527,11 +524,20 @@ befinsert	jsr frominsrt	; get box definition
 	jmp mve3		; out box
 
 ; ----------------------------------------- 
-; af93
-jerr14	jmp err14		; error "illegal quantity"
+; af8d
+get1ststr	jsr frominsrt	; get box definition
+	sty $21
+	stx $20
+	lda $69		; len<>9 or even empty?
+	beq jerr14
+	rts
 
 ; ----------------------------------------- 
-; af96
+; af99
+jerr14	jmp err14		; yes, error "illegal quantity"
+
+; ----------------------------------------- 
+; af9c
 mkbox	jsr mkrow
 	jsr mkline	; top row
 	jsr l20pl40
@@ -544,7 +550,7 @@ mkbox	jsr mkrow
 +	jsr fillbox	; middle rows
 ++	jsr mkrow
 	jmp mkline	; bottom row
-; afb6
+; afbc
 mkrow	ldy helpvec	; one row
 	lda $02c0,y
 	tax
@@ -568,12 +574,12 @@ mkrow	ldy helpvec	; one row
 	rts
 
 ; ----------------------------------------- part of CALL
-; afde
+; afe4
 fillfast	ldx prstack	; stack voll?
 	inx
 	beq ++		; ja, keine einträge mehr annehmen
 
-+	dex		; sonst: eintragen in stack
+	dex		; sonst: eintragen in stack
 	lda $20
 	sta procstack,x
 	inx
@@ -586,18 +592,14 @@ fillfast	ldx prstack	; stack voll?
 ++	rts
 
 ; -----------------------------------------
-
+; afff
 cfreset	lda #0
 	sta execflag
 	jmp fastcall
 
 ; ----------------------------------------- bef FETCH
-; b001			recoded
-
-beffetch	jsr frominsrt	; get ctrl string and its len
-	stx $20
-	sty $21
-	lda $69
+; b004			recoded
+beffetch	jsr get1ststr	; get ctrl string and its len
 	sta fetchlen	; store len of ctrl string
 	jsr chkfchlen	; get (and check) len
 	stx fetchanz	; get len (max 88)
