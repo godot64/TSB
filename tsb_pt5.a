@@ -621,7 +621,7 @@ fetchit	jsr fgetkey	; gather input chars
 
 	jsr sclrch	; yes, clear io
 -	jsr srem		; advance to next basic command
-	bne ++		; finish fetch
+--	jmp endsmb	; end of fetch
 
 ; ----------------------------------------- 
 
@@ -634,7 +634,7 @@ fetchit	jsr fgetkey	; gather input chars
 +	jsr sinput1	; yes, perform kernal input
 
 	ldx helpvec+1	; was comma in string?
-	beq ++
+	beq --
 	ldy #1		; yes, reconstruct comma
 	lda ($49),y
 	sta helpvec
@@ -646,7 +646,7 @@ fetchit	jsr fgetkey	; gather input chars
 	lda #$2c
 	sta (helpvec),y
 
-++	jmp endsmb	; end of fetch
+	bne --		; finish fetch
 
 ; ----------------------------------------- 
 
@@ -755,7 +755,7 @@ foutcr	ldx helpvec
 
 ; ----------------------------------------- Checks
 
-fchkdig	cpx #$1f		; below space?
+fchkdig	cpx #$20		; below space?
 	bcc notinit
 	cpx #$41		; beyond a?
 	bcs notinit
