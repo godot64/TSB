@@ -29,150 +29,150 @@ smnivec	!wo sbnmi
 modultext	!tx "CBM80"
 
 ; ----------------------------------------- 
-
+; 8009
 sstart	jmp befcold
 
 ; ----------------------------------------- Calls to BASIC ROM
-; 800d
+; 800c
 sfrmnum	jsr pspeibe
 	jsr $ad8a		; get numerical expression
 	jmp prestor
-; 8016
+; 8015
 sfacadr	jsr pspeibe
 	jsr $b7f7		; FAC to word (.y=lo, .a=hi, :INT)
 	jmp prestor
-; 801f
+; 801e
 ssin	jsr pspeibe
 	jsr $e26b		; func SIN
 	jmp prestor
-; 802b
+; 8027
 scos	jsr pspeibe
 	jsr $e264		; func COS
 	jmp prestor
-; 8031
+; 8030
 schkcom	jsr pspeibe
 	jsr $aefd		; check for comma
 	jmp prestor
-; 803a
+; 8039
 sfrmevl	jsr pspeibe
 	jsr $ad9e		; retrieve expression
 	jmp prestor
-; 8043
+; 8042
 sfrestr	jsr pspeibe
 	jsr $b6a3		; retrieve string parameters
 	jmp prestor
-; 804c
+; 804b
 noround	jsr usel3		; restore format string
 	lda #$25
 	sta toul3+1
 	rts		; and out, finish
-; 8055
+; 8054
 sgoto1	jsr pspeibe
 	jsr $a8a3		; bef GOTO (to line in INT)
 	jmp prestor
-; 805e
+; 805d
 schkzei	jsr pspeibe
 	jsr $aeff		; check if char in .a is at pz
 	jmp prestor
-; 8067
+; 8066
 sxflppl	jsr pspeibe
 	jsr $bc44		; integer to float (hi: $62, lo: $63, .x:#$90)
 	jmp prestor
-; 8070
+; 806f
 sstrpz	jsr pspeibe
 	jsr $a613		; compute address of line start (number in INT)
 	jmp prestor
-; 8079
+; 8078
 sascflp	jmp $bcf3		; digits from basic to float
-; 807c
+; 807b
 sgetari1	jmp $ae92		; get arithmetical expression from basic
-; 807f
+; 807e
 schkklz	jsr pspeibe
 	jsr $aef7		; check for "Klammer zu"
 	jmp prestor
-; 8088
+; 8087
 sxflp	jsr pspeibe
 	jsr $bc49		; convert to FAC (.x=exponent)
 	jmp prestor
-; 8091
+; 8090
 sfacarg	jsr pspeibe
 	jsr $bc0c		; FAC to ARG
 	jmp prestor
-; 809a
+; 8099
 sfmult	jsr pspeibe
 	jsr $ba30		; FAC*ARG
 	jmp prestor
-; 80a3
+; 80a2
 sfldfack	jsr pspeibe
 	jsr $bba2		; const (.a=lo, .y=hi) to FAC
 	jmp prestor
-; 80ac
+; 80ab
 sfdiv	jsr pspeibe
 	jsr $bb14		; ARG/FAC
 	jmp prestor
-; 80b5
+; 80b4
 sfacasc	jsr pspeibe
 	jsr $bddd		; FAC to ASCII (in $0100)
 	jmp prestor
-; 80be
+; 80bd
 sgetvar	jsr pspeibe
 	jsr $b08b		; get var from basic
 	jmp prestor
-; 80c7
+; 80c6
 stestdirm	jsr pspeibe
 	jsr $b3a6		; check for direct mode (error if yes)
 	jmp prestor
-; 80d0
+; 80cf
 sclrch	jsr pspeibe
 	jsr $abb5		; clear open device channels
 	jmp prestor
-; 80d9
+; 80d8
 srem	jsr pspeibe
 	jsr $a8f8		; find colon and add to progz
 	jmp prestor
-; 80e2
+; 80e1
 snexttr	jsr pspeibe
 	jsr $a906		; find colon, offset in .y
 	jmp prestor
-; 80eb
+; 80ea
 sinput1	jsr pspeibe
 	jsr $ac0d		; bef INPUT
 	jmp prestor
-; 80f4
+; 80f3
 spuf0cr	jsr pspeibe
 	jsr $aaca		; write buffer $0200 and cr
 	jmp prestor
-; 80fd
+; 80fc
 sbzply	jsr pspeibe
 	jsr $a8fb		; progz plus .y
 	jmp prestor
-; 8106
+; 8105
 sgetbyt1	jsr pspeibe
 	jsr $b79e		; getbyt from basic (to .x)
 	jmp prestor
-; 810f
+; 810e
 sbind	jsr pspeibe
 	jsr $a533		; bind basic lines
 	jmp prestor
-; 8118
+; 8117
 ssmni	lda pport
 	sta pspeinmi
 	jsr kerromein
 	jmp $fe43		; sys NMI
-; 8123
+; 8122
 sopen	jsr pspeibe
 	jsr newopen	; bef OPEN (with TSB drive)
 	jmp prestor
 
 ; ----------------------------------------- 
-; 812c
+; 812b
 pspeibe	pha		; save .a
 	lda pport
 	sta portspei	; save $01
 	jsr basromei
 	pla		; restore .a
 	rts
-; 8137
+; 8136
 prestor	pha		; save .a
 	lda portspei	; restore $01
 	sta pport
@@ -180,7 +180,7 @@ prestor	pha		; save .a
 	rts
 
 ; ----------------------------------------- Out Control
-; 813f
+; 813e
 chkscolon	jsr basromei	; uses ROM routines:
 	jsr $aa9d		; check if more (part of PRINT)
 	jmp basromau
