@@ -31,91 +31,107 @@
 
 ; ----------------------------------------- all MOVE befs
 ; ac5f			recoded
-			; entry for: MOVE (15), UP (17/18),
-			; LEFT (19/20), DOWN (21/22), RIGHT (23/24)
-movebef	lda progz		; get address of token
-	sta $c1
-	lda progz+1	; (INSERT)
+; here: .y contains (token-1)*2
+; entry for: MOVE (.y=28), UP (32/34), LEFT (36/38),
+; DOWN (40/42), RIGHT (44/46), INV (24).
+; Each of these commands gets performed twice, 1st: set chars, 2nd: set colors
+
+movebef	lda progz		; save address of token in basic code
+	sta $c1		; for 2nd pass
+	lda progz+1
 	sta $c2
-	lda #0
-	sta helpvec
-	sta helpvec+1
-	sta $a6
+	lda #0		; init:
+	sta helpvec	; - w-marker
+	sta helpvec+1	; - displacement offset
+	sta $a6		; - pass counter
 	beq mve6		; uncond. branch
 
-mve0	ldy $a7
-	lda $c1
+; --------------------------- 
+
+mve0	ldy $a7		; 2nd pass: reset basic pointer
+	lda $c1		; and token number ($a7)
 	sta progz
 	lda $c2
 	sta progz+1
 
-mve6	tya		; .y: token# (*2)
+mve6	tya		; mind: .y: token# (*2)
 	sta $a7
 	pha
-	jsr getrcwd	; get parameters
-	jsr toa8
+	jsr getrcwd	; get parameters: row, column, width, height
+			; and compute start address (in $20/1 and $a4/5)
+	jsr toa8		; save start address to $a8/9
 	pla
-	cmp #32		; upb?
-	bcc mve5		; no, move (30)
+	cmp #32		; command: upb (32)?
+	bcc mve5		; no, move (28), INV (24), FCHR (8), FCOL (6), or FILL (12)
 
 ; ac8a
-	jsr mdistrb	; distribute
-mve4	inc $a6
+	jsr mdistrb	; distribution vector for all commands
+
+mve4	inc $a6		; advance to 2nd pass
 	lda $a6
 	cmp #2
 	bcc mve0
-	jmp endsmb
+mve4b	jmp endsmb	; after 2nd pass: finished
 
-; ----------------------------------------- 
+; ----------------------------------------- befs FCHR, FCOL, FILL, INV
 ; ac98
-mve5	cmp #16		; is move?
-	bcs mve1
+mve5	cmp #16		; is INV?
+	bcs mve1		; yes, branch
 
-	and #7
+	and #7		; FCHR?
 	lsr
 	beq mve2
-	lsr
+	lsr		; no, FCOL?
 	beq mve3
-	jsr mve9
-	jsr to20
-mve3	jsr mvea
-	beq mve4
-mve2	jsr mve9
-	beq mve4
-mvea	inc $a6
+
+; ----------------------------------------- bef FILL
+	jsr mve9		; FILL: get char
+	jsr to20		; reset start address, now:
+
+; ----------------------------------------- bef FCOL
+mve3	jsr mvea		; address color ram, get color
+	beq mve4		; finished
+
+; ----------------------------------------- bef FCHR
+mve2	jsr mve9		; get character
+	beq mve4		; finished
+
+; --------------------------- 
+mvea	inc $a6		; address color ram
 	jsr movez
-mve9	inc $a6
-	jsr sgetbytc
-	txa
+; --------------------------- 
+mve9	inc $a6		; advance pass counter
+	jsr sgetbytc	; get next parameter (character or color)
+	txa		; value in .x
 	ldy spaltenanz
-	jsr fillmt
+	jsr fillmt	; fill buffer with value in .a
 	ldx zeilenanz
--	jsr mkline
-	jsr l20pl40
-fillbox	dex
+-	jsr mkline	; write buffer to address in $20/1
+	jsr l20pl40	; next row
+fillbox	dex		; all rows
 	bne -
 	rts
 
 ; ----------------------------------------- 
 ; acd2
-mve1	and #4
+mve1	and #4		; command: INV?
 	beq mve7
-	jsr mveb
-	beq mve4
+	jsr mveb		; no, MOVE
+	beq mve4		; finished
 
 ; ----------------------------------------- bef INV
 ; acdb			enhanced
 mve7	jsr befinv
-	beq mve4
+	beq mve4b		; finish after 1st pass
 
 ; ace0
-befinv	ldx #0		; inv
+befinv	ldx #0
 --	ldy #0
 -	cpy spaltenanz
 	beq mve8
-	lda ($20),y
-	eor #$80
-	sta ($20),y
+	lda ($20),y	; get char
+	eor #$80		; set bit 7 (revert)
+	sta ($20),y	; store back
 	iny
 	bne -
 mve8	inx
@@ -124,20 +140,21 @@ mve8	inx
 	jsr l20pl40
 	bne --
 +	rts
-; ----------------------------------------- 
+
+; ----------------------------------------- bef MOVE
 ; acfe
-mveb	jsr sgetbytc
+mveb	jsr sgetbytc	; get target row
 	stx zeileanf
-	jsr sgetbytc
+	jsr sgetbytc	; get target column
 	stx spalteanf
-	jsr movez
-	lda $a8
+	jsr movez		; compute address
+	lda $a8		; set source
 	sta $23
 	lda $a9
 	sta $24
-	jmp moveit
+	jmp moveit	; and move
 
-; ----------------------------------------- 
+; ----------------------------------------- Command Distributor
 ; ad18
 mdistrb	and #$0f		; reduce token nums
 	lsr
@@ -153,169 +170,166 @@ mdistrb	and #$0f		; reduce token nums
 	beq befdownb
 	cmp #5		; downw?
 	beq befdownw
-	cmp #6		; rightw?
+	cmp #6		; rightb?
 	beq befleftb
 
-; ----------------------------------------- bef LEFTW
+; ----------------------------------------- bef RIGHTW (7) / LEFTW (2)
 ; ad36			enhanced
 befleftw	lda #1
-	sta helpvec
+	sta helpvec	; set w-marker
 	bne mdb0
-; ----------------------------------------- bef UPW
+; ----------------------------------------- bef UPW (1)
 ; ad3c			enhanced
 befupw	lda #1
-	sta helpvec
+	sta helpvec	; set w-marker
 	bne befupb
-; ----------------------------------------- bef LEFTB
+; ----------------------------------------- bef RIGHTB (6) / LEFTB (3)
 ; ad42			enhanced
-befleftb	lda #1
+befleftb	lda #1		; set displacement to 1
 	bne mdb0
-; ----------------------------------------- bef DOWNB
+; ----------------------------------------- bef DOWNB (4)
 ; ad46			enhanced
-befdownb	lda #2
+befdownb	lda #2		; set down flag
 	bne mdb1
-; ----------------------------------------- bef DOWNW
+; ----------------------------------------- bef DOWNW (5)
 ; ad4a			enhanced
-befdownw	lda #3
+befdownw	lda #3		; set down flag and w-marker
 mdb1	sta helpvec
 
-; ----------------------------------------- bef UPB
+; ----------------------------------------- bef UPB (0)
 ; ad4e			enhanced
-befupb	lda #40
+befupb	lda #40		; set displacement to 40
 
 ; ----------------------------------------- 
 ; ad50
-mdb0	sta helpvec+1
+mdb0	sta helpvec+1	; displacement
 
-	cpy #2		; up?
+	cpy #2		; up (0/1)?
 	bcs +
-	jmp mcontup
+	jmp mcontup	; yes
 
-+	cpy #4		; left?
-	bcc mcontleft
++	cpy #4		; left (2/3)?
+	bcc mcontleft	; yes
 
-	cpy #6		; down?
-	bcc mcontdown
+	cpy #6		; down (4/5)?
+	bcc mcontdown	; yes
 
-; ----------------------------------------- 
+; ----------------------------------------- RIGHT(B/W)
 
 mcontright
 	dec spaltenanz
-	lda helpvec
+	lda helpvec	; w-marker (if=1)
 	and #1
 	beq +
 	ldy spaltenanz
-	jsr mfrow
+	jsr mfrow		; RIGHTW: store rightmost line to buffer
 	bne ++
 +	ldy zeilenanz
-	jsr mspc0
-++	jsr mminus
+	jsr mspc0		; RIGHTB: store spaces to buffer
+++	jsr mminus	; set src to 1 column before (to $23/4)
 
 	ldx #0
---	ldy spaltenanz
--	lda ($23),y
-	sta ($20),y
-	dey
-	bpl -
-	inx
-	cpx zeilenanz
+--	ldy spaltenanz	; start rightmost
+-	lda ($23),y	; get src
+	sta ($20),y	; write to dest
+	dey		; proceed to the left
+	bne -		; until 1 before leftmost
+	inx		; next row
+	cpx zeilenanz	; until bottom
 	beq +
-	jsr l20pl40
-	jsr l23pl40
-	bne --
-+	ldy #0
-	jmp mfbox
+	jsr l20pl40	; next dest row
+	jsr l23pl40	; next src row
+	jmp --
+	iny		; INY unused
++	jmp mfbox		; restore leftmost w/ previous rightmost
 
-; ----------------------------------------- 
+; ----------------------------------------- DOWN(B/W)
 ; ad9a
 mcontdown	dec zeilenanz
 	ldx zeilenanz
 	beq mcup0
-	jsr maddhg
-	jsr mminus
-	lda helpvec
+	jsr maddhg	; proceed to bottom row
+	jsr mminus	; set source (1 row above)
+	lda helpvec	; w-marker (if=1)
 	and #1
 	beq +
-	jsr mfline
+	jsr mfline	; DOWNW: store bottom row to buffer
 	beq ++
-+	ldy spaltenanz
++	ldy spaltenanz	; DOWNB: store spaces to buffer
 	jsr mspc0
-++	jsr moveit
+++	jsr moveit	; move rows
 	dex
-	jsr mvit0
-	jmp mkln0
+	jsr mvit0		; move last row (probably useless)
+	jmp mkln0		; restore bottom row at top row
 
-; ----------------------------------------- 
+; ----------------------------------------- LEFT(B/W)
 ; adc3
-mcontleft	jsr mplus
-	lda helpvec
+mcontleft	jsr mplus		; set source (1 column in advance)
+	lda helpvec	; w-marker (if=1)
 	and #1
 	beq +
 	ldy #0
-	jsr mfrow
+	jsr mfrow		; LEFTW: store leftmost to buffer
 	bne ++
-+	ldy zeilenanz
++	ldy zeilenanz	; LEFTB: store spaces to buffer
 	jsr mfspace
 ++	dec spaltenanz
-	jsr moveit
+	jsr moveit	; move from left to right
 	ldy spaltenanz
-	jmp mfbox
+	jmp mfbox		; restore rightmost line from buffer
 
-; ----------------------------------------- 
-; ade5
-mcup0	inc zeilenanz
+mcup0	inc zeilenanz	; repair DOWN (?)
 
-; ----------------------------------------- up
+; ----------------------------------------- UP(B/W)
 ; ade8
-mcontup	jsr mplus
+mcontup	jsr mplus		; set source (1 row in advance)
 	lda helpvec
 	and #1
 	beq +
-	jsr mfline
+	jsr mfline	; UPW: store topmost to buffer
 	beq ++
-+	ldy spaltenanz
++	ldy spaltenanz	; UPB: store spaces to buffer
 	jsr mfspace
-++	jsr moveit
-	jmp mkline
+++	jsr moveit	; move topdown
+	jmp mkline	; restore bottommost from topmost
 
-; ----------------------------------------- 
+; ----------------------------------------- Move bytes
 ; ae02
 moveit	ldx #0
 mvit0	ldy #0
 -	cpy spaltenanz
 	beq +
-	lda ($23),y
-	sta ($20),y
+	lda ($23),y	; from source
+	sta ($20),y	; to dest
 	iny
 	bne -
 +	inx
 	cpx zeilenanz
-	beq ++
-	lda helpvec
+	beq ++		; finished
+	lda helpvec	; down flag?
 	and #2
 	bne +
-	jsr l20pl40
+	jsr l20pl40	; no: top down
 	jsr l23pl40
 	bne mvit0
-+	jsr l20mn40
++	jsr l20mn40	; yes: bottom up
 	jsr l23mn40
-	bne mvit0
-++	rts
+	jmp mvit0		; loop
 
-; ----------------------------------------- 
+; ----------------------------------------- Set Sources
 ; ae2f
 mplus	clc
-	lda $20
+	lda $20		; 1 (char/row) next
 	adc helpvec+1
 	sta $23
 	lda $21
 	adc #0
 	sta $24
-	rts
+++	rts
 
 ; ae3d
 mminus	sec
-	lda $20
+	lda $20		; 1 (char/row) before
 	sbc helpvec+1
 	sta $23
 	lda $21
@@ -323,17 +337,17 @@ mminus	sec
 	sta $24
 	rts
 
-; ----------------------------------------- 
+; ----------------------------------------- Go to bottom
 ; ae4b
 maddhg	jsr l20pl40
 	dex
 	bne maddhg
 	rts
 
-; ----------------------------------------- 
+; ----------------------------------------- Set Vectors
 ; ae52
 l20mn40	sec
-	lda $20
+	lda $20		; dest: 1 row before
 	sbc #40
 	sta $20
 	bcs +
@@ -342,14 +356,14 @@ l20mn40	sec
 
 ; ae5e
 l23mn40	sec
-	lda $23
+	lda $23		; source: 1 row before
 	sbc #40
 	sta $23
 	bcs +
 	dec $24
 +	rts
 
-; ----------------------------------------- 
+; ----------------------------------------- Restore vertically
 ; ae6a
 mfbox	jsr to20
 	ldx #0
@@ -361,7 +375,7 @@ mfbox	jsr to20
 	bne -
 	rts
 
-; ----------------------------------------- 
+; ----------------------------------------- Restore horizontally
 ; ae7e
 mkln0	jsr to20
 mkline	ldy #0
@@ -372,10 +386,10 @@ mkline	ldy #0
 	bne -
 	rts
 
-; ----------------------------------------- 
+; ----------------------------------------- Save to Buffer
 ; ae8d
 mfrow	ldx #0
--	lda ($20),y
+-	lda ($20),y	; vertically
 	sta movetab,x
 	jsr l20pl40
 	inx
@@ -385,13 +399,14 @@ mfrow	ldx #0
 
 ; aea2
 mfline	ldy #0
--	lda ($20),y
+-	lda ($20),y	; horizontally
 	sta movetab,y
 	iny
 	cpy spaltenanz
 	bne -
 	rts
 
+; ----------------------------------------- Spaces to Buffer
 ; aeb0
 mfspace	dey		; fill movetab w/
 mspc0	lda #$20		; space
@@ -400,7 +415,7 @@ fillmt	sta movetab,y
 	bpl fillmt
 	rts
 
-; ----------------------------------------- 
+; ----------------------------------------- Retrieve Parameters
 ; aeba
 getrcwd	jsr sgetbytn	; get row
 	cpx #25		; >24? 
@@ -422,19 +437,19 @@ getrcwd	jsr sgetbytn	; get row
 	beq err32		; 0 is error
 	stx zeilenanz
 
-; ----------------------------------------- 
+; ----------------------------------------- Compute Addresses
 ; aee0
 movez	ldy #0
-	sty zaehler
-	sty $20
+	sty zaehler	; unused
+	sty $20		; init dest
 	sty $a5
-	lda $a6
+	lda $a6		; which pass?
 	bne +
-	lda video		; video
+	lda video		; video (1st pass)
 	!by $2c
-+	lda #$d8		; or colors
++	lda #$d8		; or colors (2nd pass)
 	sta $21
-	lda zeileanf
+	lda zeileanf	; compute start address
 	sta $a4
 	jsr a4mal40
 	clc
@@ -453,7 +468,7 @@ movez	ldy #0
 	sta $21
 	clc
 	lda zeileanf
-	adc zeilenanz
+	adc zeilenanz	; beyond limits?
 	cmp #26
 	bcs err32
 	clc
@@ -461,7 +476,7 @@ movez	ldy #0
 	adc spalteanf
 	cmp #41
 	bcs err32
-	rts
+	rts		; no, proceed
 
 ; ----------------------------------------- 
 ; af2f
@@ -469,13 +484,13 @@ err32	jmp swarm		; error "bad mode"
 
 ; ----------------------------------------- 
 ; af32
-toa8	lda $20
+toa8	lda $20		; save start address
 	sta $a8
 	lda $21
 	sta $a9
 	rts
 ; af3b
-to20	lda $a8
+to20	lda $a8		; restore start address
 	sta $20
 	lda $a9
 	sta $21
