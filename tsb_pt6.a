@@ -1696,7 +1696,7 @@ null	!tx "null"
 ; ca44
 version	!tx "ad86"	; Signature
 	!by $0d
-	!tx "2.21125"	; Version Number
+	!tx "2.21202"	; Version Number
 
 ; ----------------------------------------- 
 ; ca4f
@@ -1730,8 +1730,8 @@ byte2	cmp #2
 	bcc byte1		; max position? if not: continue
 	jmp incbasbz	; yes, out
 ; ca85
-byte0	ldx #0		; formerly called from c8fd (nrm)
-	stx $a5		; now unsed
+byte0	ldx #0		; used by MMOB
+	stx $a5
 	jmp chrgot
 ; ca8c
 fromnrm	ldx #1		; c8fd: jsr fromnrm

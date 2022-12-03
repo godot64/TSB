@@ -819,13 +819,22 @@ setmobpos	jsr getxy
 	beq +
 	jmp getxyf
 
-; ----------------------------------------- 
-; a53e
-	!by 0,0,0,0,0,0,0,0	; 13 bytes
-	!by 0,0,0,0,0
+; ----------------------------------------- Part of MOB SET
+; a53b
+gmsize	jsr chrgot	; anything following?
+	beq +		; no
+	jsr getpktf	; yes, get mob size
+	ldx $aa		; and set accordingly
+	jmp chkexp
+
+; ----------------------------------------- Part of MMOB
+; a53b
+gmspeed	jsr byte0		; anything following?
+	beq +		; no (speed=0: default)
+	jmp sgetbytc	; yes, get mob speed
 
 ; ----------------------------------------- 
-; a548
+; a550
 clrhicols	sta $c000,y	; clear video ram
 	sta $c0f9,y
 	sta $c1f3,y
@@ -836,7 +845,7 @@ clrhicols	sta $c000,y	; clear video ram
 +	rts
 
 ; ----------------------------------------- 
-; a55a
+; a562
 tofind	lda $a6
 	cmp $a8
 	bne +
@@ -849,9 +858,7 @@ tofind	lda $a6
 	lda $a7
 	sta $62
 	sta $a9
-	ldx #$90		; look at scflp!
-	sec		; (4 bytes gain)
-	jsr sxflp		; 
+	jsr scflp		; make line number digits
 	jsr sfacasc
 	jsr outasc
 	sec
@@ -867,12 +874,11 @@ tofind	lda $a6
 	bne +
 ++	jmp fcont
 
-+	lda #$20		; sys out space
-	jsr bsout
-	jmp -
++	jsr leerzch	; out space
+	bne -
 
 ; ----------------------------------------- bef FIND
-; a59b			original
+; a59d			original
 beffind	jsr incbasbz
 	lda #$ff
 	sta $a8
@@ -883,7 +889,7 @@ beffind	jsr incbasbz
 	lda $2c
 	sta $21
 	bne infind
-; a5b0
+; a5b2
 fnd0	lda (progz),y
 	beq tofind
 	lda ($20),y
@@ -893,13 +899,12 @@ fnd0	lda (progz),y
 	bne fcont
 	iny
 	bne fnd0
-; a5c1
+; a5c3
 fcont	jsr inc20
 	ldy #0
 	lda ($20),y
 	bne fnd0
 	jsr inc20
-	ldy #0
 	sty pendflag
 	lda ($20),y
 	bne infind

@@ -711,38 +711,40 @@ befmmob	jsr getx8n	; get sprite number (0..7)
 	asl mobnr2	; and as index into registers
 	jsr schkcom
 	jsr dec7a
-	jsr setmobpos	; get start and target coordinates
+	jsr setmobpos	; get start/target coordinates and size
 	beq mmba
 ; 95e2
-mobcont	ldx mobnr
-	lda $f7		; get mob size
-	bne mmb0
-	jsr mobexl	; 0: not expanded
-	jsr mobeyl
-	jmp mmb1
-
-mmb0	cmp #1
-	bne mmb2
-	jsr mobexs	; 1: x-expanded
-	jsr mobeyl
-
-mmb1	jsr sgetbytc	; get motion speed
+mobcont	ldx mobnr		; mob number:
+	jsr chkexp	; set sprite expansions
+	jsr gmspeed	; get mob speed (defaults to 0)
 	stx mobspeed
+
 mmba	lda #$f0		; (set mob flag)
 	sta mobbew
 	jsr mobbeweg	; move the mob
 	sta mobbew	; (clear mob flag)
 	beq mmb4		; uncond. branch
 
-mmb2	cmp #2
-	bne mmb3
-	jsr mobexl	; 2: y-expanded
-	jsr mobeys
+; ----------------------------------------- 
+; 
+chkexp	lda $f7		; get mob size
 	bne mmb1
 
-mmb3	jsr mobexs	; 3: x-y-expanded
+mmb0	jsr mobexl	; 0: not expanded
+-	jmp mobeyl
+
+mmb1	cmp #1		; 1: x-expanded
+	bne mmb2
+	jsr mobexs
+	bne -
+
+mmb2	cmp #2		; 2: y-expanded
+	bne mmb3
 	jsr mobeys
-	bne mmb1
+	jmp mobexl
+
+mmb3	jsr mobexs	; 3: x-y-expanded
+	jmp mobeys
 
 ; ----------------------------------------- part of USE
 ; 9623
@@ -846,22 +848,26 @@ sq0	jmp sirq2
 ; 96e5			enhanced
 befmobset	jsr getx8n	; get sprite number
 	stx $aa
-	jsr sgetbytc	; get block number
-	ldy $aa
-	lda video		; which video mode?
-	cmp #$cc		; mem mode?
+;40
+	lda #$f8
+	sta $a8
+	lda video
+	cmp #$cc		; MEM-Modus?
 	beq ifmem
-	lda gmemflag
-	cmp #10		; standard mode?
-	bne ifnrm		; graphics mode?
-ifhires	txa
-	sta $c3f8,y	; set block accordingly
-	jmp msk0
-ifmem	txa
-	sta $cff8,y	; set block accordingly
-	jmp msk0
-ifnrm	txa
-	sta $07f8,y	; set block accordingly
+	lda gmemflag	; Grafik-Modus?
+	cmp #10
+	bne ifnrm
+ifhires	lda #$c3		; Grafik
+	!by $2c
+ifmem	lda #$cf		; MEM
+	!by $2c
+ifnrm	lda #$07		; NRM
+	sta $a9
+
+	jsr sgetbytc	; get block number (to .x)
+	txa
+	ldy $aa
+	sta ($a8),y
 
 msk0	jsr sgetbytc	; get mob color
 	ldy $aa
@@ -869,38 +875,43 @@ msk0	jsr sgetbytc	; get mob color
 	sta $d027,y
 
 	jsr sgetbytc	; get priority
+	stx helpvec	; set activation flag
 	txa
-	sta helpvec	; set activation flag
-	ldx $aa
+	ldx $d01b
+	ldy $aa
 	and #1
 	beq +
 
-	lda $d01b		; prio 1
-	ora mbittabs,x
+	txa		; prio 1
+	ora mbittabs,y
 	bne ++
 
-+	lda $d01b		; prio 0
-	and mbittabl,x
++	txa		; prio 0
+	and mbittabl,y
 ++	sta $d01b
 
 	jsr sgetbytc	; get mob type (multi/hires)
-	txa
-	ldx $aa
-	cmp #1
+	lda $d01c
+	ldy $aa
+	cpx #1
 	bne +
 
-	lda $d01c		; type 1 (multi)
-	ora mbittabs,x
+	ora mbittabs,y	; type 1 (multi)
 	bne ++
-
-+	lda $d01c		; type 0 (hires)
-	and mbittabl,x
++	and mbittabl,y	; type 0 (hires)
 ++	sta $d01c
+
+	jsr gmsize	; get mob size
+	ldx $aa
+	jsr gmspeed
 
 	lda helpvec	; activate MOB? (number in .x)
 	bmi +		; no if negative
-	inc helpvec	; yes
+	ldx $aa
+	inc helpvec	; yes, activate
 	jmp mbo0
+
+	!by 0
 
 ; ----------------------------------------- End SB command
 ; 9759
