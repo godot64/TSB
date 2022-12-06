@@ -713,11 +713,11 @@ befmmob	jsr getx8n	; get sprite number (0..7)
 	jsr dec7a
 	jsr setmobpos	; get start/target coordinates and size
 	beq mmba
-; 95e2
+; 95e4
 mobcont	ldx mobnr		; mob number:
 	jsr chkexp	; set sprite expansions
-	jsr gmspeed	; get mob speed (defaults to 0)
-	stx mobspeed
+	ldx mobspeed	; get mob speed (default is 0)
+	jsr setspeed	; get mob speed
 
 mmba	lda #$f0		; (set mob flag)
 	sta mobbew
@@ -726,7 +726,7 @@ mmba	lda #$f0		; (set mob flag)
 	beq mmb4		; uncond. branch
 
 ; ----------------------------------------- 
-; 
+; 95fd
 chkexp	lda $f7		; get mob size
 	bne mmb1
 
@@ -747,7 +747,7 @@ mmb3	jsr mobexs	; 3: x-y-expanded
 	jmp mobeys
 
 ; ----------------------------------------- part of USE
-; 9623
+; 9620
 use1	jsr sgetstr	; get ctrl string
 	jsr basromau
 	jsr use3		; analyse USE parameters (b3e2)
@@ -755,7 +755,7 @@ use1	jsr sgetstr	; get ctrl string
 	beq mmb4		; uncond. branch
 
 ; ----------------------------------------- 
-; 9631
+; 962e
 mobposs	ldx #0
 mmb6	cpx mobspeed	; first slowdown
 	beq mmb5
@@ -788,7 +788,7 @@ mmb8	ldy mobnr		; no, set accordingly
 	jmp mmb9
 
 ; ----------------------------------------- bef BFLASH
-; 9671			recoded
+; 966e			recoded
 befbflash	jsr chkonoff	; get first parameter
 	txa		; OFF?
 	beq ++		; yes, switch flag off
@@ -814,7 +814,7 @@ befbflash	jsr chkonoff	; get first parameter
 	jmp endsmb
 
 ; ----------------------------------------- 
-; 96a5			enhanced
+; 96a0			enhanced
 sirq	ldy #0
 	inc zaeirq	; count 60 jiffies
 	lda zaeirq
@@ -845,7 +845,7 @@ sq1	sta $d020
 sq0	jmp sirq2
 
 ; ----------------------------------------- bef MOB SET
-; 96e5			enhanced
+; 96e0			enhanced
 befmobset	jsr getx8n	; get sprite number
 	stx $aa
 ;40
@@ -863,17 +863,17 @@ ifmem	lda #$cf		; MEM
 	!by $2c
 ifnrm	lda #$07		; NRM
 	sta $a9
-
+; 9701
 	jsr sgetbytc	; get block number (to .x)
 	txa
 	ldy $aa
 	sta ($a8),y
-
+; 9709
 msk0	jsr sgetbytc	; get mob color
 	ldy $aa
 	txa
 	sta $d027,y
-
+; 9712
 	jsr sgetbytc	; get priority
 	stx helpvec	; set activation flag
 	txa
@@ -889,7 +889,7 @@ msk0	jsr sgetbytc	; get mob color
 +	txa		; prio 0
 	and mbittabl,y
 ++	sta $d01b
-
+; 972e
 	jsr sgetbytc	; get mob type (multi/hires)
 	lda $d01c
 	ldy $aa
@@ -900,10 +900,10 @@ msk0	jsr sgetbytc	; get mob color
 	bne ++
 +	and mbittabl,y	; type 0 (hires)
 ++	sta $d01c
-
+; 9745
 	jsr gmsize	; get mob size
 	ldx $aa
-	jsr gmspeed
+	jsr setspeed
 
 	lda helpvec	; activate MOB? (number in .x)
 	bmi +		; no if negative

@@ -828,10 +828,10 @@ gmsize	jsr chrgot	; anything following?
 	jmp chkexp
 
 ; ----------------------------------------- Part of MMOB
-; a53b
-gmspeed	jsr byte0		; anything following?
-	beq +		; no (speed=0: default)
-	jmp sgetbytc	; yes, get mob speed
+; a548
+gmspeed	jsr chrgot	; anything following?
+	beq +		; no, leave with speed in .x 
+	jmp sgetbytc	; yes, get new mob speed to .x
 
 ; ----------------------------------------- 
 ; a550

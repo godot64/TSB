@@ -1696,7 +1696,7 @@ null	!tx "null"
 ; ca44
 version	!tx "ad86"	; Signature
 	!by $0d
-	!tx "2.21202"	; Version Number
+	!tx "2.21206"	; Version Number
 
 ; ----------------------------------------- 
 ; ca4f
@@ -1730,9 +1730,9 @@ byte2	cmp #2
 	bcc byte1		; max position? if not: continue
 	jmp incbasbz	; yes, out
 ; ca85
-byte0	ldx #0		; used by MMOB
-	stx $a5
-	jmp chrgot
+setspeed	jsr gmspeed	; used by MMOB
+	stx mobspeed
+	rts
 ; ca8c
 fromnrm	ldx #1		; c8fd: jsr fromnrm
 	ldy $69		; len of digit string?
