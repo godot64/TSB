@@ -1173,7 +1173,7 @@ beferror	jsr chrget
 	beq flpmsg
 	jmp swarm		; no, error bad mode
 
-flpmsg	jsr chkdrv	; is drive there? 
+flpmsg	jsr chkdrv	; is drive there? (error 5 if not)
 flpmsg2	lda drive		; and set
 	jsr $ffb4		; sys: talk
 	lda #$6f
@@ -1696,7 +1696,7 @@ null	!tx "null"
 ; ca44
 version	!tx "ad86"	; Signature
 	!by $0d
-	!tx "2.21206"	; Version Number
+	!tx "2.21207"	; Version Number
 
 ; ----------------------------------------- 
 ; ca4f

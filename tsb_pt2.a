@@ -491,19 +491,20 @@ cold2	ldy #3
 	rts
 
 ; ----------------------------------------- Check Drive Presence
-; 8c0f
-chkdrv	lda #$0f		; open 15, dr, 15
-	tay
-	ldx drive
-	jsr $ffba
-	lda #0
-	jsr $ffbd
-	jsr $ffc0
-	lda #$0f		; close 15
-	jsr $ffc3
+; 8c0f			(P. Hagemann)
+chkdrv	lda #0
+	sta status
+	lda drive
+	jsr $ffb1		; sys: LISTEN
+	jsr $ffae		; sys: UNLISTEN
 	lda status	; what happened?
 	bmi err05
 -	rts
+
+; ----------------------------------------- 
+; 8c21
+	!by 0,0,0,0,0,0,0,0	; 9 bytes
+	!by 0
 
 ; ----------------------------------------- 
 ; 8c29
