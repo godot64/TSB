@@ -635,8 +635,8 @@ mobbeweg	lda #0
 	sta ay+1
 	sta ey+1
 	sta ydiff+1
-	sta diffv
-	sta diffv+1
+	sta helpvc2
+	sta helpvc2+1
 ; a3c7
 vloop	lda ax
 	sta $09
@@ -654,8 +654,8 @@ vloop	lda ax
 
 +	jsr punkt		; line
 ; a3eb
-vergl	lda diffv
-	ora diffv+1
+vergl	lda helpvc2
+	ora helpvc2+1
 	beq +
 ; a3f3
 vergl1	jsr ynext
@@ -725,9 +725,9 @@ diff	sec
 	pla
 	sta xdiff+1
 	lda #0
-	sta diffv+1
+	sta helpvc2+1
 ; a472
--	sta diffv
+-	sta helpvc2
 	sec
 	lda ydiff
 	sbc xdiff
@@ -742,10 +742,10 @@ diff	sec
 	sta ydiff
 	pla
 	sta ydiff+1
-	inc diffv
+	inc helpvc2
 	bne +
-	inc diffv+1
-+	lda diffv
+	inc helpvc2+1
++	lda helpvc2
 	jmp -
 ; a49e
 ++	pla
@@ -761,21 +761,21 @@ diff	sec
 ++	inc ax
 	bne +
 	inc ax+1
-+	lda diffv
-	ora diffv+1
++	lda helpvc2
+	ora helpvc2+1
 	bne +
 +++	jmp vloop
 +	jmp vergl1
 
 ; ----------------------------------------- 
 ; a4cb
-ynext	lda diffv
-	ora diffv+1
+ynext	lda helpvc2
+	ora helpvc2+1
 	beq ++
-	lda diffv
+	lda helpvc2
 	bne +
-	dec diffv+1
-+	dec diffv
+	dec helpvc2+1
++	dec helpvc2
 ++	jsr cmpay
 	beq +++
 	bcs ++
@@ -813,23 +813,26 @@ cmpay	lda ay+1
 	jmp vglae
 
 ; ----------------------------------------- 
-; a530
-setmobpos	jsr getxy
+; a520
+	!by 0,0,0,0,0,0,0,0	; 13 bytes
+	!by 0,0,0,0,0
+
+; ----------------------------------------- 
+; a52d
+setmobpos	jsr getxy		; get start position
 	jsr chrgot
 	beq +
-	jmp getxyf
-
-; ----------------------------------------- Part of MOB SET
-; a53b
-gmsize	jsr chrgot	; anything following?
-	beq +		; no
-	jsr getpktf	; yes, get mob size
-	ldx $aa		; and set accordingly
-	jmp chkexp
+smp2	lda #$60		; patch!
+	sta getpktf
+	jsr getxyf	; get target position
+	lda #$20		; unpatch!
+	sta getpktf
+ 	jmp gpf2		; get/set mobsize
 
 ; ----------------------------------------- Part of MMOB
 ; a548
-gmspeed	jsr chrgot	; anything following?
+gmspeed	ldx mobspeed	; get current speed
+gnextpar	jsr chrgot	; anything following?
 	beq +		; no, leave with speed in .x 
 	jmp sgetbytc	; yes, get new mob speed to .x
 
@@ -1151,11 +1154,11 @@ whichdo	bcs waitkey	; "null"? (yes, if .c)
 
 ; ----------------------------------------- bef RLOCMOB
 ; a764			modified
-befrlocm	jsr getx8n
+befrlocm	jsr getx8n	; get sprite number (0..7)
 	stx mobnr2
 	stx mobnr
-	asl mobnr2
-	lda $d010
+	asl mobnr2	; and as index into registers
+	lda $d010		; get xpos hibyte
 	ora mbittabs,x
 	cmp $d010
 	bne +
@@ -1164,14 +1167,14 @@ befrlocm	jsr getx8n
 +	lda #0
 	sta ax+1
 	ldy mobnr2
-	lda $d000,y
+	lda $d000,y	; set current xpos as start address
 	sta ax
-	lda $d001,y
+	lda $d001,y	; likewise ypos
 	sta ay
 	lda #0
 	sta ay+1
-	jsr getxyf
-	jmp mobcont
+	jsr smp2		; get/set target address and size
+	jmp mobcont	; set expand and speed
 
 ; ----------------------------------------- bef CMOB
 ; a79d			original

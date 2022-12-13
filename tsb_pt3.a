@@ -355,7 +355,7 @@ gxyf0	jsr sgetadr	; end x
 	sty ex
 gyf0	jsr sgetbytc	; end y
 	stx ey
-getpktf	jsr sgetbytc	; draw mode
+getpktf	jsr gnextpar	; draw mode/MOB size
 	stx $f7
 	rts
 
@@ -711,23 +711,22 @@ befmmob	jsr getx8n	; get sprite number (0..7)
 	asl mobnr2	; and as index into registers
 	jsr schkcom
 	jsr dec7a
-	jsr setmobpos	; get start/target coordinates and size
+	jsr setmobpos	; get start/target position and size
 	beq mmba
 ; 95e4
-mobcont	ldx mobnr		; mob number:
-	jsr chkexp	; set sprite expansions
-	ldx mobspeed	; get mob speed (default is 0)
-	jsr setspeed	; get mob speed
+mobcont	ldx mobnr		; with mob number:
+	jsr chkexp	; set sprite size
+	jsr setspeed	; get/set mob speed and:
 
 mmba	lda #$f0		; (set mob flag)
 	sta mobbew
-	jsr mobbeweg	; move the mob
+	jsr mobbeweg	; -> move mob
 	sta mobbew	; (clear mob flag)
 	beq mmb4		; uncond. branch
 
 ; ----------------------------------------- 
-; 95fd
-chkexp	lda $f7		; get mob size
+; 95fa
+chkexp	lda mobsize	; mob size in .a
 	bne mmb1
 
 mmb0	jsr mobexl	; 0: not expanded
@@ -747,7 +746,7 @@ mmb3	jsr mobexs	; 3: x-y-expanded
 	jmp mobeys
 
 ; ----------------------------------------- part of USE
-; 9620
+; 961e
 use1	jsr sgetstr	; get ctrl string
 	jsr basromau
 	jsr use3		; analyse USE parameters (b3e2)
@@ -755,7 +754,7 @@ use1	jsr sgetstr	; get ctrl string
 	beq mmb4		; uncond. branch
 
 ; ----------------------------------------- 
-; 962e
+; 962c
 mobposs	ldx #0
 mmb6	cpx mobspeed	; first slowdown
 	beq mmb5
@@ -788,7 +787,7 @@ mmb8	ldy mobnr		; no, set accordingly
 	jmp mmb9
 
 ; ----------------------------------------- bef BFLASH
-; 966e			recoded
+; 966c			recoded
 befbflash	jsr chkonoff	; get first parameter
 	txa		; OFF?
 	beq ++		; yes, switch flag off
@@ -814,7 +813,7 @@ befbflash	jsr chkonoff	; get first parameter
 	jmp endsmb
 
 ; ----------------------------------------- 
-; 96a0			enhanced
+; 969e			enhanced
 sirq	ldy #0
 	inc zaeirq	; count 60 jiffies
 	lda zaeirq
@@ -845,10 +844,9 @@ sq1	sta $d020
 sq0	jmp sirq2
 
 ; ----------------------------------------- bef MOB SET
-; 96e0			enhanced
+; 96de			enhanced
 befmobset	jsr getx8n	; get sprite number
 	stx $aa
-;40
 	lda #$f8
 	sta $a8
 	lda video
@@ -863,17 +861,17 @@ ifmem	lda #$cf		; MEM
 	!by $2c
 ifnrm	lda #$07		; NRM
 	sta $a9
-; 9701
+; 96ff
 	jsr sgetbytc	; get block number (to .x)
 	txa
 	ldy $aa
 	sta ($a8),y
-; 9709
+; 9707
 msk0	jsr sgetbytc	; get mob color
 	ldy $aa
 	txa
 	sta $d027,y
-; 9712
+; 9710
 	jsr sgetbytc	; get priority
 	stx helpvec	; set activation flag
 	txa
@@ -889,7 +887,7 @@ msk0	jsr sgetbytc	; get mob color
 +	txa		; prio 0
 	and mbittabl,y
 ++	sta $d01b
-; 972e
+; 972c
 	jsr sgetbytc	; get mob type (multi/hires)
 	lda $d01c
 	ldy $aa
@@ -900,18 +898,17 @@ msk0	jsr sgetbytc	; get mob color
 	bne ++
 +	and mbittabl,y	; type 0 (hires)
 ++	sta $d01c
-; 9745
-	jsr gmsize	; get mob size
-	ldx $aa
-	jsr setspeed
+; 9743
+	jsr gpf2		; get/set mob size
+	ldx $aa		; of MOB nr .x
+	jsr chkexp	; set sprite size
+	jsr setspeed	; get/set mobspeed
 
 	lda helpvec	; activate MOB? (number in .x)
 	bmi +		; no if negative
 	ldx $aa
 	inc helpvec	; yes, activate
 	jmp mbo0
-
-	!by 0
 
 ; ----------------------------------------- End SB command
 ; 9759

@@ -503,11 +503,13 @@ chkdrv	lda #0
 
 ; ----------------------------------------- 
 ; 8c21
-	!by 0,0,0,0,0,0,0,0	; 9 bytes
-	!by 0
+gpf2	ldx mobsize	; get current mobsize
+	jsr gnextpar	; get new one to .x (or keep .x and skip)
+gpf3	stx mobsize	; set new mobsize
+	rts
 
 ; ----------------------------------------- 
-; 8c29
+; 8c2a
 safeopen	jsr sopen
 	bcc -
 
@@ -515,7 +517,7 @@ err05	ldx #5		; drive not ready
 	jmp ($0300)
 
 ; ----------------------------------------- 
-; 8c33
+; 8c34
 mobexs	lda $d01d
 	ora mbittabs,x
 	bne +
@@ -535,17 +537,13 @@ mobeyl	lda $d017
 	rts
 
 ; ----------------------------------------- 
-; 8c57
+; 8c58
 chkdost	lda doindex	; stack pointer DO
 	cmp #2
 	bcs faildo
 	jmp dec7a
 
 faildo	jmp err2a		; "stack too large"
-
-; ----------------------------------------- 
-; 8c64
-	!by 0
 
 ; ----------------------------------------- 
 ; 8c65

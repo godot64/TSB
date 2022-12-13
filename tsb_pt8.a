@@ -72,7 +72,8 @@
 	gmemflag		= $c5b3		; Flag für Grafik/MOB
 	mobbew		= $c5b4		; Flag bei MOB-Bewegungen
 	mobspeed		= $c5b5		; Speed bei MOB-Bewegungen
-					; ! unused (5 bytes)
+	mobsize		= $c5b6		; TSB: Expand-Größe eines Sprites
+					; ! unused (4 bytes)
 	mobnr2		= $c5bb		; Index in $d000
 	mobnr		= $c5bc		; MOB-Nummer
 					; ! unused (7 Bytes)
