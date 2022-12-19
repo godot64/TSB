@@ -602,13 +602,13 @@ mbl0	lda $a4
 
 ; ----------------------------------------- bef BLOCK
 ; bbcc			enhanced
-befblock	jsr getxyxyf
+befblock	jsr getxyxyf	; get top left and bottom right edges
 	jsr blockzei
 	jmp endsmb
 
 ; ----------------------------------------- 
 ; bbd5
-blockzei	ldx ay
+blockzei	ldx ay		; exchange x and y of top left edge...
 	lda ax
 	sta ay
 	stx ax
@@ -623,10 +623,12 @@ blockzei	ldx ay
 	lda ay
 	sta $09
 	lda ax
-	sta $a4
-	lda #$ff		; set flag: don't colorize
+	sta $a4		; ...done
+	lda #$ff		; set flag: don't colorize,
 	sta gflag
-	jsr punkt		; check if x/y-values are plausible
+
+	jsr punkt		; just check if x/y-values are plausible
+			; and compute address
 	lda #0
 	sta gflag		; reset flag
 	lda status
@@ -898,7 +900,7 @@ memnrml	lda #$cc		; video now at $cc00
 ; bdef			original
 befdetect	jsr sgetbytn
 	stx detectart
-	lda $d01e,x
+	lda $d01e,x	; from bdf5
 	sta detecterg
 	jmp endsmb
 
@@ -1696,7 +1698,7 @@ null	!tx "null"
 ; ca44
 version	!tx "ad86"	; Signature
 	!by $0d
-	!tx "2.21212"	; Version Number
+	!tx "2.21219"	; Version Number
 
 ; ----------------------------------------- 
 ; ca4f

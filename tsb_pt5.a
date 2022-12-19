@@ -54,12 +54,12 @@ mve0	ldy $a7		; 2nd pass: reset basic pointer
 	lda $c2
 	sta progz+1
 
-mve6	tya		; mind: .y: token# (*2)
+mve6	tya		; mind: .y: (token#-1)*2
 	sta $a7
 	pha
 	jsr getrcwd	; get parameters: row, column, width, height
 			; and compute start address (in $20/1 and $a4/5)
-	jsr toa8		; save start address to $a8/9
+	jsr toa8		; save start address to $a8/9 for wrap
 	pla
 	cmp #32		; command: upb (32)?
 	bcc mve5		; no, move (28), INV (24), FCHR (8), FCOL (6), or FILL (12)

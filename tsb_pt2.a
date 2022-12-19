@@ -1253,41 +1253,42 @@ csgetarih	cpy #$7c		; CHECK?
 ; ----------------------------------------- func CHECK
 ; 90cf			recoded
 fncheck	jsr $aefa		; sys "("?
-	jsr getx8		; get sprite#
-	stx pos
-	lda detectart
+	jsr getx8		; get 1st sprite #
+	stx pos		; store
+	lda detectart	; type?
 	bne ++
-	jsr $aefd		; sys chkcom
-	jsr getx8		; get sprite# (2nd sprite)
-	stx pos1
+
+	jsr $aefd		; Spr-Spr: sys chkcom
+	jsr getx8		; get 2nd sprite #
+	stx pos1		; store
 	jsr $aef7		; sys ")"?
 
-	ldy pos		; sprite #1
-	jsr wdetect	; check: an Kollision beteiligt?
-	beq +		; wenn nein: return 1
+; ----------------------------------------- now check
 
-	ldy pos1		; wenn ja: sprite #2
+	ldy pos1		; 2nd sprite
 	jsr wdetect	; check: an Kollision beteiligt?
-	beq +		; wenn ja: return 0
+	bne +		; nein
+-	ldy pos		; and 1st sprite
+	jsr wdetect	; check: an Kollision beteiligt?
 
---	ldy #0
-	!by $2c
--
-+	ldy #1
-	jmp sxyflp3
-; 9101
++	jmp sxyflp3
+
 wdetect	lda detecterg
 	and mbittabs,y
+	beq +
+	ldy #0		; wenn ja  : return 0
+	!by $2c
++	ldy #1		; wenn nein: return 1
 	rts
 
 ; -----------------------------------------
 ; 9108
-++	jsr $aef7		; sys ")"?
+++	jsr $aef7		; Spr-Bgr: sys ")"?
+	jmp -		; check
 
-	ldy pos		; sprite #x
-	jsr wdetect	; Hintergrund berührt?
-	beq -		; nein, return 1
-	bne --		; ja, return 0
+; ----------------------------------------- 
+
+	!by 0,0,0,0,0,0,0	; 7 bytes
 
 ; ----------------------------------------- 
 ; 9115
