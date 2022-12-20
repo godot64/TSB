@@ -1253,42 +1253,42 @@ csgetarih	cpy #$7c		; CHECK?
 ; ----------------------------------------- func CHECK
 ; 90cf			recoded
 fncheck	jsr $aefa		; sys "("?
+	sty helpvc2	; .y=0
 	jsr getx8		; get 1st sprite #
-	stx pos		; store
+	stx helpvec	; store
 	lda detectart	; type?
 	bne ++
 
 	jsr $aefd		; Spr-Spr: sys chkcom
 	jsr getx8		; get 2nd sprite #
-	stx pos1		; store
+	stx helpvec+1	; store
 	jsr $aef7		; sys ")"?
 
 ; ----------------------------------------- now check
 
-	ldy pos1		; 2nd sprite
 	jsr wdetect	; check: an Kollision beteiligt?
-	bne +		; nein
--	ldy pos		; and 1st sprite
+	jmp +
+
+++	jsr $aef7		; Spr-Bgr: sys ")"?
++	ldx helpvec	; and 1st sprite
 	jsr wdetect	; check: an Kollision beteiligt?
 
-+	jmp sxyflp3
++	ldy #1		; vorbesetzen: nein (1)
+	lda helpvc2	; Abfrage-Ergebnis
+	beq ++
+	ldx detectart
+	bne +
+	and #2		; Spr-Spr: beide?
+	beq ++		; nein
+	
++	dey		; wenn ja  : return 0
+++	jmp sxyflp3	; wenn nein: return 1
 
 wdetect	lda detecterg
-	and mbittabs,y
-	beq +
-	ldy #0		; wenn ja  : return 0
-	!by $2c
-+	ldy #1		; wenn nein: return 1
-	rts
-
-; -----------------------------------------
-; 9108
-++	jsr $aef7		; Spr-Bgr: sys ")"?
-	jmp -		; check
-
-; ----------------------------------------- 
-
-	!by 0,0,0,0,0,0,0	; 7 bytes
+	and mbittabs,x	; beteiligt?
+	beq +		; nein
+	inc helpvc2
++	rts		; 70
 
 ; ----------------------------------------- 
 ; 9115
