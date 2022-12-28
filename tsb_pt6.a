@@ -902,7 +902,7 @@ befdetect	jsr sgetbytn
 	stx detectart
 	lda $d01e,x	; from bdf5
 	sta detecterg
-	jmp endsmb
+dtno	jmp endsmb
 
 ; ----------------------------------------- bef DISPLAY
 ; bffe			original
@@ -969,7 +969,7 @@ nxkey	jsr quote		; end of text: out quote
 	cmp #17
 	bne dpl1
 
-	beq no		; finished
+	beq dtno		; finished
 
 ; ----------------------------------------- 
 ; be78
@@ -1698,7 +1698,7 @@ null	!tx "null"
 ; ca44
 version	!tx "ad86"	; Signature
 	!by $0d
-	!tx "2.21220"	; Version Number
+	!tx "2.21228"	; Version Number
 
 ; ----------------------------------------- 
 ; ca4f
