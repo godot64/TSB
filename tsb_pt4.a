@@ -753,18 +753,15 @@ diff	sec
 	jsr cmpax
 	beq +++
 	bcc ++
-	lda ax
-	bne +
-	dec ax+1
-+	dec ax
+	jsr decax
 	jmp +
-++	inc ax
-	bne +
-	inc ax+1
+
+++	jsr incax
 +	lda helpvc2
 	ora helpvc2+1
 	bne +
 +++	jmp vloop
+
 +	jmp vergl1
 
 ; ----------------------------------------- 
@@ -777,18 +774,32 @@ ynext	lda helpvc2
 	dec helpvc2+1
 +	dec helpvc2
 ++	jsr cmpay
-	beq +++
-	bcs ++
-	inc ay
+	beq +
+	bcs decay
+
+; ----------------------------------------- 
+; 
+incay	inc ay		; inc y
 	bne +
 	inc ay+1
 +	rts
 
-++	lda ay
+decay	lda ay		; dec y
 	bne +
 	dec ay+1
 +	dec ay
-+++	rts
+	rts
+
+incax	inc ax		; inc x
+	bne +
+	inc ax+1
++	rts
+
+decax	lda ax		; dec x
+	bne +
+	dec ax+1
++	dec ax
+	rts
 
 ; ----------------------------------------- 
 ; a4fa
@@ -814,8 +825,7 @@ cmpay	lda ay+1
 
 ; ----------------------------------------- 
 ; a520
-	!by 0,0,0,0,0,0,0,0	; 13 bytes
-	!by 0,0,0,0,0
+	!by 0,0,0,0,0	; 5 bytes
 
 ; ----------------------------------------- 
 ; a52d

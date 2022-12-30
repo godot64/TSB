@@ -505,56 +505,66 @@ isnull	sty indoloop	; .y=0, clear DO flag
 	jmp whichdo	; or DONE?
 
 ; ----------------------------------------- bef REC
-; baf8			original
-befrec	jsr getxyxyf
-	lda ey
+; baf8			recoded
+befrec	jsr getxyxyf	; get x (AX), y (AY), Breite (EX), Höhe (EY) und Farbe ($f7)
+
+	lda ey		; ey retten
 	sta $61
-	lda ex
-	sta $5f
-	lda ex+1
-	sta $60
-	lda #0
-	sta ey+1
-	clc
+	lda ay		; ey=ay (ay retten)
+	sta $62
+	sta ey
+	clc		; ax plus Breite (gleich Endpunkt X) -> 5f/60 
 	lda ax
-	adc $5f
+	pha
+	adc ex
+	sta $5f		; merken Lo
 	sta ex
 	lda ax+1
-	adc $60
+	pha
+	adc ex+1
+	sta $60		; merken Hi
 	sta ex+1
+	jsr linzei	; obere Linie (von ax nach ex auf ay) = AB
+
+	pla
+	tax
+	sta ax+1
+	pla
+	pha
+	sta ax
+	txa
+	pha
+	clc		; ay plus Höhe (gleich Endpunkt Y) -> 61/62 
 	lda ay
-	sta ey
-	jsr linzei
-	clc
-	lda ey
-	sta ay
 	adc $61
-	sta ey
-	lda ex
-	sta ax
-	lda ex+1
-	sta ax+1
-	jsr linzei
-	sec
-	lda ax
-	sbc $5f
-	sta ex
-	lda ax+1
-	sbc $60
-	sta ex+1
-	lda ey
 	sta ay
-	jsr linzei
-	sec
-	lda ey
-	sbc $61
 	sta ey
-	lda ex
-	sta ax
-	lda ex+1
+	jsr incax
+	jsr linzei	; untere Linie (von ax nach ex auf ay+ey) = DC
+
+	pla
 	sta ax+1
-	jsr linzei
-	jmp endsmb
+	sta ex+1
+	pla		; ex=ax
+	sta ax
+	sta ex
+	lda $62
+	sta ay
+	jsr incay
+	jsr linzei	; linke Linie (von ay nach ey auf ax) = AD
+
+	lda $5f		; ax=ex
+	sta ax
+	sta ex
+	lda $60
+	sta ax+1
+	sta ex+1
+	lda $62
+	sta ay
+	jsr incay
+	jsr linzei	; rechte Linie (von ay nach ey auf ax+ex) = BC
+
+	jmp endsmb	; (72)
 
 ; ----------------------------------------- part of BLOCK
 ; bb79
@@ -1698,7 +1708,7 @@ null	!tx "null"
 ; ca44
 version	!tx "ad86"	; Signature
 	!by $0d
-	!tx "2.21228"	; Version Number
+	!tx "2.21230"	; Version Number
 
 ; ----------------------------------------- 
 ; ca4f
