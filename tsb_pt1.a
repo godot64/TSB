@@ -744,16 +744,17 @@ befsound	jsr sgetbytn	; get voice number
 ; 8664			new
 optpulse	jsr schkcom
 	jsr sgetadr	; returns .a=hi, .y=lo from INT
-	ldy $aa
-	iny
-	iny
-	iny
+	ldy #3		; index to pulse high
 optp1	sta ($20),y
 	dey
 	lda int
 	sta ($20),y
 	rts
-	
+
+; ----------------------------------------- 
+; 
+	!by 0,0,0		; 3 bytes
+
 ; ----------------------------------------- Part of RENUMBER
 ; 8677 
 isprg	tax		; save .a

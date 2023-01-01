@@ -1299,7 +1299,7 @@ befwave	jsr sgetbytn	; get voice number
 	jsr getpanel
 	jsr bincon	; get switch panel value
 bwv0	ldx $aa		; get voice number
-	jsr setsid
+	jsr setsid	; set $20/1 to SID voice base address
 	ldy #4
 	lda $a8		; set waveform/sync to SID...
 	sta ($20),y

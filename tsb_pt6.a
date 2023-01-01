@@ -550,7 +550,7 @@ befrec	jsr getxyxyf	; get x (AX), y (AY), Breite (EX), Höhe (EY) und Farbe ($f7)
 	sta ex
 	lda $62
 	sta ay
-	jsr incay
+	jsr cpay
 	jsr linzei	; linke Linie (von ay nach ey auf ax) = AD
 
 	lda $5f		; ax=ex
@@ -561,7 +561,7 @@ befrec	jsr getxyxyf	; get x (AX), y (AY), Breite (EX), Höhe (EY) und Farbe ($f7)
 	sta ex+1
 	lda $62
 	sta ay
-	jsr incay
+	jsr cpay
 	jsr linzei	; rechte Linie (von ay nach ey auf ax+ex) = BC
 
 	jmp endsmb	; (72)
@@ -1708,7 +1708,7 @@ null	!tx "null"
 ; ca44
 version	!tx "ad86"	; Signature
 	!by $0d
-	!tx "2.21230"	; Version Number
+	!tx "2.30101"	; Version Number
 
 ; ----------------------------------------- 
 ; ca4f

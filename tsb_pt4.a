@@ -768,12 +768,12 @@ diff	sec
 ; a4cb
 ynext	lda helpvc2
 	ora helpvc2+1
-	beq ++
+	beq cpay
 	lda helpvc2
 	bne +
 	dec helpvc2+1
 +	dec helpvc2
-++	jsr cmpay
+cpay	jsr cmpay
 	beq +
 	bcs decay
 
