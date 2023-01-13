@@ -525,7 +525,7 @@ befrec	jsr getxyxyf	; get x (AX), y (AY), Breite (EX), Höhe (EY) und Farbe ($f7)
 	sta $60		; merken Hi
 	sta ex+1
 	jsr linzei	; obere Linie (von ax nach ex auf ay) = AB
-
+; bb24
 	pla
 	tax
 	sta ax+1
@@ -541,33 +541,37 @@ befrec	jsr getxyxyf	; get x (AX), y (AY), Breite (EX), Höhe (EY) und Farbe ($f7)
 	sta ey
 	jsr incax
 	jsr linzei	; untere Linie (von ax nach ex auf ay+ey) = DC
-
+; bb42
 	pla
 	sta ax+1
 	sta ex+1
 	pla		; ex=ax
 	sta ax
 	sta ex
-	lda $62
-	sta ay
-	jsr cpay
-	jsr linzei	; linke Linie (von ay nach ey auf ax) = AD
-
+	jsr chkcrnr	; linke Linie (von ay nach ey auf ax) = AD	
+; bb53
 	lda $5f		; ax=ex
 	sta ax
 	sta ex
 	lda $60
 	sta ax+1
 	sta ex+1
-	lda $62
+	lda $61		; height=0?
+	beq +
+	dec ey		; no, height minus 1 (to save bottom right corner)
++	jsr chkcrnr	; rechte Linie (von ay nach ey-1 auf ax+ex) = BC
+
+	jmp endsmb
+
+; ----------------------------------------- 
+; bb70
+chkcrnr	lda $62		; check if height=0 (returns .e)
 	sta ay
 	jsr cpay
-	jsr linzei	; rechte Linie (von ay nach ey auf ax+ex) = BC
-
-	jmp endsmb	; (72)
+	jmp linzei	; draw line if not
 
 ; ----------------------------------------- part of BLOCK
-; bb79
+; bb7b
 mblock	lda ex		; multi BLOCK
 	cmp #$9f		; 159?
 	bcc +
@@ -584,14 +588,14 @@ mblock	lda ex		; multi BLOCK
 	asl
 	tax
 	jmp mbl0
-; bb9c
+; bb9e
 -	lda $09
 	and #3
 	asl
 	tax
 	bne mbl0
 	jsr a8plus8
-; bba7
+; bba9
 mbl0	lda $a4
 	and #7
 	tay
@@ -611,13 +615,13 @@ mbl0	lda $a4
 	rts
 
 ; ----------------------------------------- bef BLOCK
-; bbcc			enhanced
+; bbce			enhanced
 befblock	jsr getxyxyf	; get top left and bottom right edges
 	jsr blockzei
 	jmp endsmb
 
 ; ----------------------------------------- 
-; bbd5
+; bbd7
 blockzei	ldx ay		; exchange x and y of top left edge...
 	lda ax
 	sta ay
@@ -636,7 +640,7 @@ blockzei	ldx ay		; exchange x and y of top left edge...
 	sta $a4		; ...done
 	lda #$ff		; set flag: don't colorize,
 	sta gflag
-
+; bc08
 	jsr punkt		; just check if x/y-values are plausible
 			; and compute address
 	lda #0
@@ -645,7 +649,7 @@ blockzei	ldx ay		; exchange x and y of top left edge...
 	cmp #8
 	bne +
 	jmp swarm		; error: bad mode (not plausible)
-
+; bc19
 +	sec
 	lda $a8
 	sbc $63
@@ -714,7 +718,7 @@ blockzei	ldx ay		; exchange x and y of top left edge...
 +	rts
 
 ; ----------------------------------------- 
-
+; bca7
 a8plus8	clc
 	lda $a8
 	adc #8
@@ -725,7 +729,7 @@ a8plus8	clc
 	rts
 
 ; ----------------------------------------- 
-
+; bcb5
 plus320	inc $a4
 	lda $a4
 	and #7
@@ -749,7 +753,7 @@ plus320	inc $a4
 	rts
 
 ; ----------------------------------------- part of MEM
-; bcdb			new
+; bcdd			new
 memplus	dey		; .y=0
 	jsr chrget
 	lda (progz),y
@@ -780,7 +784,7 @@ memplus	dey		; .y=0
 	jmp execdma	; to $b5ed (this part by P. Hagemann)
 
 ; ----------------------------------------- w/ Parameters
-; bd10
+; bd12
 params	sty helpvc2	; .y=0
 	tax
 	jsr chrget	; advance to parameters:
@@ -796,8 +800,7 @@ params	sty helpvc2	; .y=0
 	beq param2
 	cpx #$b9		; POS?	(set address & bank in REU)
 	beq param3u4
-	ldx #32		; otherwise: error "Bad Mode",
-	jmp ($0300)
+	jmp swarm		; otherwise: error "Bad Mode",
 
 ; ----------------------------------------- 
 ; bd33
@@ -853,17 +856,13 @@ ready	jmp endsmb
 
 ; ----------------------------------------- 
 ; bd97
-	!by 0,0,0,0
+	!by 0,0,0,0,0,0,0
 
 ; ----------------------------------------- part of COLOUR
-; bd9b
+; bd9e
 docolor	ldx #0
 	jsr chrget	; anything following?
 	jmp docolor2
-
-; ----------------------------------------- 
-; bda3
-rtrcout	jmp dscbmout
 
 ; ----------------------------------------- bef MEM
 ; bda6			; new/enhanced
@@ -1708,7 +1707,7 @@ null	!tx "null"
 ; ca44
 version	!tx "ad86"	; Signature
 	!by $0d
-	!tx "2.30101"	; Version Number
+	!tx "2.30113"	; Version Number
 
 ; ----------------------------------------- 
 ; ca4f
