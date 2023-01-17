@@ -605,11 +605,11 @@ mbl0	lda $a4
 	lda $09
 	cmp #$a0		; 160?
 	bcs +
-	cmp $c5aa
+	cmp ex
 	bcc -
 	beq -
 +	jsr plus320
-	cmp $c5a8
+	cmp ey
 	beq mblock
 	bcc mblock
 	rts
@@ -1078,9 +1078,9 @@ wait	jsr $ffe1		; Hold, sys: stop? (Abbruch)
 	lda $d4		; $d4, cursorphase retten
 	pha
 	lda #0
-	tay
 	sta $d4		; cursor aus
 	jsr clear		; clr/home ausgeben
+	ldy #0
 ml2	lda $0244,y	; zeilennummer wieder hinschreiben
 	jsr bsout
 	iny
@@ -1103,7 +1103,7 @@ back	ldy helpvc2	; nein, flags für weitermachen im ROM-List
 	rts
 
 ; ----------------------------------------- 
-; bf45
+; bf46
 listb	ldx $d4
 	bne back
 
@@ -1144,7 +1144,7 @@ ml8	and #$7f		; geshiftetes zeichen ausgeben
 lr1	rts
 
 ; ----------------------------------------- Part of USE
-; bf8a
+; bf8b
 roundup	inc helpvec	; now: 1
 -	ldx $02a6,y	; no, get digits from last to first
 	cpx #$30		; is comma or period?
@@ -1164,10 +1164,6 @@ roundup	inc helpvec	; now: 1
 	dey		; no, check next char
 	bpl -
 +	jmp userr		; leave to error routine
-
-; ----------------------------------------- 
-; bfb0
-	!by 0
 
 ; ----------------------------------------- Part of MEM
 ; bfb1
@@ -1707,7 +1703,7 @@ null	!tx "null"
 ; ca44
 version	!tx "ad86"	; Signature
 	!by $0d
-	!tx "2.30113"	; Version Number
+	!tx "2.30117"	; Version Number
 
 ; ----------------------------------------- 
 ; ca4f

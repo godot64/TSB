@@ -587,19 +587,18 @@ befmulti	lda #$2c		; set multi limits
 
 	jsr get2nyb2	; yes, get 2 parameters, returns .y=0
 	jsr clrhicols	; set video ram
-
+; 950b
 	jsr sgetbytc	; get 3rd parameter
 	txa
-	ldy #0
--	sta $d800,y	; set color ram
-	sta $d8f9,y
-	sta $d9f3,y
-	sta $daed,y
-	iny
-	cpy #$fb
+	ldy #$fc
+-	sta $d7ff,y	; set color ram
+	sta $d8f8,y
+	sta $d9f2,y
+	sta $daec,y
+	dey
 	bne -
-	ldx #$ff
-
+	inx		; (never set 3rd param to 255!)
+; 9521
 justmulti	txa
 	beq +
 	lda #$18		; multi on
@@ -610,43 +609,43 @@ justmulti	txa
 	jmp endsmb
 
 ; ----------------------------------------- bef COLOUR
-; 9532			recoded
+; 952e			recoded
 befcolour	jsr docolor
 	jmp endsmb
 
 ; ----------------------------------------- part of USE
-; 9538
+; 9534
 usedrv	jsr sgetbyt1	; get drive# (constant[+expression])
 	stx drive		; and set
-	jmp endsmb
++	jmp endsmb
 
 ; ----------------------------------------- 
-; 9540
+; 953c
 ren0	lda $09
 	sta $a8
 	lda $0a
 	sta $a9
-	rts		; 9
+	rts
 
 ; ----------------------------------------- bef DIR
-; 9549			enhanced
+; 9545			enhanced
 befdir	jsr sclose	; first: close file
 	jsr chrget	; get next byte
-	jsr fromdir	; check if anything follows ($a2ce)
+	jsr fromdir	; check if anything follows (a2d5)
 	stx $ae
 	sta $af
 	ldy #0
 	lda ($ae),y
 dollars	cmp #$24		; "$"?
 	beq dir0
-	jmp swarm		; error "Bad Mode"?
+	jmp swarm		; no, error "Bad Mode"
 
 dir0	ldy $af
 	lda drive
 	sta $ba
 	jsr basromau
 	lda $69
-	jsr fileopen	; aa5a open file
+	jsr fileopen	; aa61 open file
 	jsr basromei
 
 	ldx #5
@@ -681,9 +680,10 @@ dir6	dec helpvec
 	bne dir2
 	lda #$3a		; out ":" after 2nd quote
 	bne dir4
-
-dir5	jsr sclose
-	cli
+; 95ae
+dir5	lda #0
+	sta numkeys
+	jsr sclose
 mmb4	jmp endsmb
 
 ; ----------------------------------------- 

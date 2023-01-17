@@ -32,14 +32,13 @@ outeql	lda #$3d		; =
 	!by $2c
 komma	lda #$2c		; ,
 	!by $2c
-clear	lda #$93		; CLS
-	!by $2c
 leerzch	lda #$20		; space
 	!by $2c
 quote	lda #$22		; "
 	!by $2c
 return	lda #$0d		; Return
 	jmp bsout
+clear	jmp $e544		; CLS
 	
 ; ----------------------------------------- 
 ; 9f4e
