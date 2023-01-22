@@ -42,6 +42,7 @@
 	settings2	= $cb00
 	extension	= $cc00
 
+	clear	= $e544
 	bsout	= $ffd2
 	load	= $ffd5
 

@@ -613,7 +613,7 @@ cfreset	lda #0
 	jmp fastcall
 
 ; ----------------------------------------- bef FETCH
-; b004			recoded
+; b007			recoded
 beffetch	jsr get1ststr	; get ctrl string and its len
 	sta fetchlen	; store len of ctrl string
 	jsr chkfchlen	; get (and check) len
@@ -625,7 +625,7 @@ beffetch	jsr get1ststr	; get ctrl string and its len
 	sta $01ff
 
 ; ----------------------------------------- 
-
+; b021
 fetchit	jsr fgetkey	; gather input chars
 	lda $13		; current io device
 	beq +		; is 0? (keyboard)
@@ -633,13 +633,13 @@ fetchit	jsr fgetkey	; gather input chars
 	jsr $ffb7		; no, sys read floppy status
 	and #2		; timeout?
 	beq +		; no, proceed
-
+; b02f
 	jsr sclrch	; yes, clear io
 -	jsr srem		; advance to next basic command
 --	jmp endsmb	; end of fetch
 
 ; ----------------------------------------- 
-
+; b038
 +	lda basinbuf	; anything typed?
 	bne +
 	lda $13		; no, io device is 
@@ -647,7 +647,7 @@ fetchit	jsr fgetkey	; gather input chars
 	beq -		;   keyboard
 
 +	jsr sinput1	; yes, perform kernal input
-
+; b046
 	ldx helpvec+1	; was comma in string?
 	beq --
 	ldy #1		; yes, reconstruct comma
@@ -664,15 +664,15 @@ fetchit	jsr fgetkey	; gather input chars
 	bne --		; finish fetch
 
 ; ----------------------------------------- 
-
+; b05d
 jfoa	jmp foutall	; yes, perform input
 
 ; ----------------------------------------- 
-
+; b060
 fgetkey	ldx #0		; .x=0: start length of input
 	stx helpvec	; store
 	stx helpvec+1	; store comma flag
-
+; b066
 floop	jsr $ffe4		; sys get key
 	sta joywert	; merken
 	lda joywert
@@ -684,7 +684,7 @@ floop	jsr $ffe4		; sys get key
 	bne fquote
 
 ; ----------------------------------------- key: delete
-
+; b079
 fdelete	ldx helpvec	; no input yet?
 	beq floop		; yes, loop
 
@@ -694,7 +694,7 @@ fdelete	ldx helpvec	; no input yet?
 	bpl floop
 
 ; ----------------------------------------- 
-
+; b0b6
 fquote	lda $d4		; no, quote mode?
 	bne fcheck
 
@@ -707,7 +707,7 @@ fquote	lda $d4		; no, quote mode?
 	bne -
 
 ; ----------------------------------------- check input char
-
+; b099
 fcheck	ldy #0
 	lda joywert	; get current char
 chkloop	ldx helpvec	; get current len
@@ -715,7 +715,7 @@ chkloop	ldx helpvec	; get current len
 	beq fchrisin	; yes, store
 
 ; ----------------------------------------- 
-
+; b0a4
 fspecials	tax
 	lda ($20),y	; no, check ctrl string:
 	cmp #$13		; home? (a..z)
@@ -726,7 +726,7 @@ fspecials	tax
 	beq fchkazup
 
 ; ----------------------------------------- 
-
+; b0b3
 ftcont	lda joywert	; no, reget char
 	iny		; advance to next in list
 	cpy fetchlen	; until end of ctrl string
@@ -734,7 +734,7 @@ ftcont	lda joywert	; no, reget char
 	beq ftc0		; at end of input: wait for finish
 
 ; ----------------------------------------- 
-
+; b9be
 fchrisin	jsr bsout		; sys out
 	cmp #$3a		; colon?
 	beq +
@@ -751,7 +751,7 @@ fchrisin	jsr bsout		; sys out
 ftc0	jmp floop		; and wait for more input
 
 ; ----------------------------------------- 
-
+; b9de
 flastchar	jsr $ffe4		; sys get key
 	sta joywert	; store
 	cmp #$0d		; cr?
@@ -762,20 +762,20 @@ fend	cmp #$14		; del?
 	bne flastchar	; no, wait on
 
 ; ----------------------------------------- 
-
+; b0ee
 foutall	jsr leerzch	; sys out space (switch crsr off)
 
 foutcr	ldx helpvec
 	jmp spuf0cr	; out all
 
 ; ----------------------------------------- Checks
-
+; b0f6
 fchkdig	cpx #$20		; below space?
 	bcc notinit
 	cpx #$41		; beyond a?
 	bcs notinit
 	bcc legal		; no, legal
-
+; b100
 fchkazup	cpx #$c1		; below A?
 	bcc fchkaz
 	cpx #$db		; beyond Z?
@@ -786,7 +786,7 @@ fchkaz	cpx #$41		; below a?
 	bcc notinit
 	cpx #$5b		; beyond z?
 	bcs notinit
-
+; b112
 legal	txa
 	ldx helpvec
 	jmp fchrisin	; yes, legal

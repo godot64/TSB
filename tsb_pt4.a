@@ -38,11 +38,10 @@ quote	lda #$22		; "
 	!by $2c
 return	lda #$0d		; Return
 	jmp bsout
-clear	jmp $e544		; CLS
 	
 ; ----------------------------------------- 
-; 9f4e
-	!by 0,0
+; 9f4b
+	!by 0,0,0,0,0
 
 ; ----------------------------------------- bef DUMP
 ; 9f50			enhanced
@@ -1239,8 +1238,7 @@ befpause	jsr chrget
 	sta zaesec
 	sta zaeirq
 -	jsr $ffe4		; sys getin keyboard
-	cmp #$0d		; <return>?
-	beq +
+	bne +
 	lda zaesec	; check timer
 	cmp int
 	bne -
@@ -1249,7 +1247,7 @@ befpause	jsr chrget
 
 ; ----------------------------------------- 
 ; a80f
-	!by 0,0
+	!by 0,0,0,0
 
 ; ----------------------------------------- Part of FETCH
 ; a816
