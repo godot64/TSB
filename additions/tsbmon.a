@@ -1,8 +1,10 @@
 ; ###############################################################
 ; #                                                             #
-; #  TSB.MON 1.00	                                            #       
+; #  TSB.MON 1.01	                                            #       
 ; #                                                             #
 ; #  patched for TSB by Arndt Dettke,  2023.01.30               #
+; #  enhanced by Claus Schlereth, 2023.01.30                    #
+; #                                                             #
 ; #  based on SMON RELOCATABLE SOURCE CODE                      #       
 ; #  Version 1.1.4.007 (2023.01.14)                             #
 ; #  Copyright (c) 2022, 2023 Claus Schlereth                   #
@@ -33,7 +35,7 @@
 	loper	= $ae	; low-operand for ass./disass.
 	hoper	= $af	; high-operand for ass./disass.
 	beflen	= $b6	; command length ass./disass.
-	tsb_use	= $be	; tsb reg for current drive number
+	tsbio	= $be	; tsb reg for current drive number
 	pcl	= $fb	; smon-programmcounter low-byte
 	pch	= $fc	; smon-programmcounter high-byte
 
@@ -146,12 +148,14 @@
 ; 7000
 setbrk	lda #<break	; set break-vector to program start
 	sta brk_lo
-_brk_hb	ldx #>setbrk	; $70
+	lda #>break
+	sta brk_hi
+	ldx #$70
 	stx ramend_hi
-	bne csetbrk
+	brk
 
 ; ------------------ here are the general commands ----------
-
+; 700f
 cmdtbl	!by $27,$23,$24,$25,$2c,$3a,$3b,$3d	; "'#$%,:;=" 
 	!by $3f,$41,$42,$43,$44,$46,$47,$49	; "?abcdfgi"		       
 	!by $4b,$4c,$4d,$4f,$50,$52,$53	; "klmoprs"
@@ -218,18 +222,9 @@ cmds	!by <tick-1	; ' 01
 	!by >exit-1
 	!by <dmon-1	; z 1d
 	!by >dmon-1
-	!by <next-1	; n 1e
-	!by >next-1
-
-; ----------------------------------------- Start of TSB.MON
-
-csetbrk	inx
-	inx
-	stx brk_hi
-	brk
 
 ; ----------------------------------------- 
-
+; 7064
 offset	!by $ff,$ff,$01,$00		   
 
 findtab:    !by $41,$5a,$49,$52,$54	; "azirt"
@@ -313,9 +308,9 @@ lc204	!by $08,$84,$81,$22,$21,$26,$20,$80
 lc20c	!by $03,$20,$1c,$14,$14,$10,$04,$0c
 
 ; --------- into smon  -------------------------------------
-; 7214 
+; 720d 
 break	cld
-	lda tsb_use
+	lda tsbio
 	sta iono		; set drive 
 	lda #$04
 	sta prnno		; set printer #4   
@@ -339,7 +334,7 @@ break3	dec pclsave	; pc low
 	jmp cmdstore	; execute r-command
 ;
 ; ----------------------------------------- 
-; 7249
+; 7242
 getstart	jsr getret	; check for return
 	beq getstrts
 getstart1	jsr getadr1
@@ -349,14 +344,14 @@ getstart1	jsr getadr1
 getstrts	rts
 
 ; ----------------------------------------- 
-; 725a
+; 7253
 get3adr	ldx #$a4
 	jsr getadr
 	jsr getadr
 	bne getadr
 
 ; ----------------------------------------- 
-; 7264
+; 725d
 get12adr	jsr getadr1	; start address to $fb/fc (pcl)
 	lda #$fe		; set end address to $fffe
 	sta $fd
@@ -364,12 +359,12 @@ get12adr	jsr getadr1	; start address to $fb/fc (pcl)
 	sta $fe
 	jsr getret	; check for return
 	bne getadr	; no, end address follows (.x=$fd)
-g123	sta tastbuf	; yes, activate command
+m_check	sta tastbuf	; yes, activate command
 	inc $c6
 	rts
 
 ; ----------------------------------------- 
-; 727a
+; 7273
 get2adr	jsr getadr1
 	!by $2c
 getadr1	ldx #$fb		; points to pcl
@@ -383,7 +378,7 @@ getadr	jsr getbyt	; get address
 	rts
 
 ; ----------------------------------------- 
-; 728d
+; 7286
 getbyt	jsr getchrerr
 _getbyt	cmp #$20		; skip space
 	beq getbyt
@@ -392,7 +387,7 @@ _getbyt	cmp #$20		; skip space
 	bne aschex	; convert to hex (in $b4)
 
 ; ----------------------------------------- 
-; 729a
+; 7293
 getbyt1	jsr getchrerr
 aschex	jsr aschex1
 	asl
@@ -406,7 +401,7 @@ aschex	jsr aschex1
 	rts
 
 ; ----------------------------------------- 
-; 72af
+; 72a8
 aschex1	cmp #$3a
 	bcc aschex2
 	adc #$08
@@ -414,7 +409,7 @@ aschex2	and #$0f
 	rts
 
 ; ----------------------------------------- 
-; 72b8
+; 72b1
 skipspace	jsr getchrerr
 	cmp #$20
 	beq skipspace
@@ -422,20 +417,20 @@ skipspace	jsr getchrerr
 	rts
 
 ; ----------------------------------------- 
-; 72c2
+; 72bb
 getret	jsr chrin		; get
 	dec $d3		; column minus 1
 	cmp #$0d		; is return?
 getbrts	rts
 
 ; --------- get input and await return ----------------------
-; 72ca
+; 72c3
 getchrerr	jsr chrin
 	cmp #$0d		; await return  
 	bne getbrts	; not cr
 
 ; --------- faulty userinput -------------------------------- 
-; 72d1
+; 72ca
 error	lda #$3f		; "?"
 	jsr chrout
 
@@ -464,7 +459,7 @@ cmdstore	sta command	; store command
 	ldx #$20		; amount of commands
 
 ; --------- check user input --------------------------------
-; 7305
+; 72fe
 cmdsearch	cmp cmdtbl-1,x	; compare users char
 	beq cmdfound	; matched
 	dex
@@ -475,7 +470,7 @@ cmdfound	jsr cmdexec	; fetch routine offset
 	jmp execute	; go back, wait for next input
 
 ; --------- get address according command char and execute --
-; 7315
+; 730e
 cmdexec	txa
 	asl
 	tax
@@ -488,7 +483,7 @@ cmdexec	txa
 	rts		; jump to execute command 
 
 ; --------- output pc as 4 digit hex -----------------------
-; 7323
+; 731c
 hexout	lda pch		; load pc high byte
 	jsr hexout1	; output 2 digit hex address
 	lda pcl		; load pc low byte
@@ -508,25 +503,25 @@ hexout3	adc #$30		; add $30
 	jmp chrout
 
 ; --------- output a char with leading cr ---------------------
-; 7340 
+; 7339 
 charret	lda #$0d		; next line
 charr1	jsr chrout
 	txa		; get value from x
 	jmp chrout
 
 ; --------- output 2 x space ----------------------------------
-; 7349
+; 7342
 space2	jsr space
 space	lda #$20		; space
 	jmp chrout
 
 ; --------- output cr -----------------------------------------
-; 7351
+; 734a
 return	lda #$0d		; next line
 	jmp chrout
 
 ; --------- print string from address in a,y ------------------
-; 7356
+; 734f
 print	sta $bb		; pointer to address low byte
 	sty $bc		; pointer to address high byte
 	ldy #$00		; counter
@@ -538,7 +533,7 @@ print1	lda ($bb),y	; get byte from address
 print2	rts
 
 ; --------- increase pc -------------------------------------
-; 7367
+; 7360
 pcinc	inc pcl		; increase low byte
 	bne pcrts		; not 0, then finish
 	inc pch		; otherwise increase also the high byte
@@ -547,12 +542,10 @@ pcrts	rts
 ; ----------------------------------------- 
 ; --------- exit (x) ----------------------------------------
 ; ----------------------------------------- 
-; 736e
-exit	lda #$00		; restore 
+; 7367
+exit	jsr tsbcols
+	lda #$00		; restore 
 	sta color		; system   
-	sta border	; colors  
-	lda #$0c		    
-	jsr tsbcols
 	lda #$37		; default rom-config 
 	sta $01
 	ldx spsave	; restore stack  
@@ -562,7 +555,7 @@ exit	lda #$00		; restore
 ; ----------------------------------------- 
 ; --------- register (r) ------------------------------------				  
 ; ----------------------------------------- 
-; 7386
+; 737a
 register	ldy #>reghead
 	lda #<reghead
 	jsr print
@@ -586,7 +579,7 @@ register2	lda $01af,x
 ; ----------------------------------------- 
 ; --------- semis (;) ---------------------------------------
 ; ----------------------------------------- 
-; 73b6
+; 73aa
 semis	jsr getstart1
 	ldx #$fb
 semis1	jsr getchrerr
@@ -611,7 +604,7 @@ changb1	jsr chrout
 ; ----------------------------------------- 
 ; --------- go (g) ------------------------------------------
 ; ----------------------------------------- 
-; 73dd
+; 73d4
 go	jsr getstart
 	ldx spsave
 	txs
@@ -628,18 +621,17 @@ go2	lda $01ae,x
 	rti
 
 ; ----------------------------------------- 
-; --------- continue memdump (n) ---------------------------
-; ----------------------------------------- 
-; 73f3
-next	jsr g123		; activate n command
-	bne next1
-
-; ----------------------------------------- 
 ; --------- memdump (m) -------------------------------------
 ; ----------------------------------------- 
-; 73f8
-memdump	jsr get12adr
-next1:
+; 73ea
+memdump	jsr chrin		; get char
+	cmp #$0d		; check for return
+	bne m_next	; branch if not
+	jsr m_check	; prepare m without address
+	bne memdump1	; jmp
+m_next	dec $d3		; restore pointer for normal m-command
+
+	jsr get12adr
 memdump1	ldx #$3a		; ':' (hidden command)
 	jsr charret
 	jsr hexout	; output as 4 digit hex
@@ -822,8 +814,8 @@ lc52c	ldy #$01
 	ldy #$03
 	bne lc543
 lc541	ldy beflen
-lc543	stx $ae
-	sta $af
+lc543	stx loper
+	sta hoper
 	rts
 
 ; ----------------------------------------- 
@@ -929,10 +921,10 @@ lc5da	bit flag
 	asl
 	tay
 	lda buf1,y
-	sta $ae
+	sta loper
 	iny
 	lda buf1,y
-	sta $af
+	sta hoper
 	jsr lc6be
 	ldy beflen
 	jsr lc693
@@ -1047,12 +1039,12 @@ lc6b9	dec $b5
 ; 76bc
 lc6be	cpx #$18
 	bmi lc6d0
-	lda $ae
+	lda loper
 	sec
 	sbc #$02
 	sec
 	sbc pcl
-	sta $ae
+	sta loper
 	ldy #$40
 lc6d0	rts
 
@@ -1182,8 +1174,8 @@ lc7b0	ldy #$08
 	cmp #$23
 	beq lc7d6
 	jsr aschex
-	sta $00ae
-	sta $00af
+	sta loper
+	sta hoper
 	jsr lc6a1
 	ldy #$20
 	cmp #$30
@@ -1194,7 +1186,7 @@ lc7b0	ldy #$08
 	dec $d3
 lc7d6	jsr lc6a1
 	jsr aschex
-	sta $00ae
+	sta loper
 	jsr lc6a1
 	cpy #$08
 	beq lc7e9
@@ -1242,7 +1234,7 @@ lc831	jsr lc68a
 ; ----------------------------------------- 
 ; --------- setprinter (p) ----------------------------------
 ; ----------------------------------------- 
-; 7839
+; 7836
 setprinter
 	jsr getbyt
 	sta prnno
@@ -1251,7 +1243,7 @@ setprinter
 ; ----------------------------------------- 
 ; --------- io set (i) --------------------------------------
 ; ----------------------------------------- 
-; 7840
+; 783d
 ioset	jsr getbyt
 	sta iono
 	rts
@@ -1261,7 +1253,7 @@ lserror	jmp error
 ; ----------------------------------------- 
 ; --------- load/save (l/s) ---------------------------------
 ; ----------------------------------------- 
-; 784a
+; 7847
 loadsave	ldy #$02
 	sty $bc		; name at $0201
 	dey
@@ -1288,7 +1280,7 @@ lsi	jsr getchrerr	; yes, store name to $0201
 	beq save
 
 ; ----------------------------------------- 
-; 7876
+; 7873
 load_s	jsr getret	; l (load): adress follows?
 	beq load1
 	ldx #$c3		; yes, set start address
@@ -1297,10 +1289,10 @@ load_s	jsr getret	; l (load): adress follows?
 	sta $b9
 
 load1	lda #$00
-	jmp sysload		; load 
+	jmp sysload	; load 
 
 ; --------- .....save (..s) ---------------------------------
-; 7889
+; 7886
 save	ldx #$c1
 	jsr getadr
 	ldx #$ae
@@ -1310,7 +1302,7 @@ save	ldx #$c1
 ; ----------------------------------------- 
 ; --------- add/sub (?) -------------------------------------
 ; ----------------------------------------- 
-; 7896
+; 7893
 addsub	jsr getadr1
 	jsr getchrerr
 	eor #$02
@@ -1368,7 +1360,7 @@ lc8eb	jsr space		; output space
 ; ----------------------------------------- 
 ; --------- convert hex ($) ---------------------------------
 ; ----------------------------------------- 
-; 7904
+; 7901
 befhex	jsr getbyt
 	tax
 	ldy $d3
@@ -1384,7 +1376,7 @@ lc919	sec
 ; ----------------------------------------- 
 ; --------- convert binary (%) ------------------------------
 ; ----------------------------------------- 
-; 7918
+; 7915
 befbin	jsr skipspace
 	ldy #$08
 lc921	pha
@@ -1399,7 +1391,7 @@ lc921	pha
 ; ----------------------------------------- 
 ; --------- convert decimal (#) -----------------------------
 ; ----------------------------------------- 
-; 792a
+; 7927
 befdec	jsr skipspace
 	ldx #$00
 	txa
@@ -1413,7 +1405,7 @@ lc934	stx pcl
 	bcs lc948
 	sec
 	jmp lc8c4
-; 7944
+; 7941
 lc948	sta $fd
 	asl pcl
 	rol pch
@@ -1439,7 +1431,7 @@ lc948	sta $fd
 ; ----------------------------------------- 
 ; --------- basicdata (b) -----------------------------------
 ; ----------------------------------------- 
-; 7968
+; 7965
 basicdata	jsr get2adr
 	lda #$37
 	sta $01
@@ -1482,7 +1474,7 @@ lc9b5	lda sys172-1,x
 ; ----------------------------------------- 
 ; --------- occupy (o) --------------------------------------
 ; ----------------------------------------- 
-; 79bd
+; 79ba
 occupy	jsr get2adr
 	jsr getbyt
 _occupy	ldx #$00		; entrance from e-command
@@ -1496,7 +1488,7 @@ lc9c9	sta (pcl,x)
 ; ----------------------------------------- 
 ; --------- write (w) ---------------------------------------
 ; ----------------------------------------- 
-; 79cf
+; 79cc
 write	jsr get3adr
 _write	lda $a6		; entrance from y-command
 	bne lc9dc
@@ -1544,7 +1536,7 @@ lca0c	clc
 lca29	lda $b5
 	beq lca3c
 	jmp error
-; 7a2c
+; 7a29
 lca30	sec
 	ldx #$fe
 lca33	lda flag,x
@@ -1557,14 +1549,14 @@ lca3c	rts
 ; ----------------------------------------- 
 ; --------- convert (c) -------------------------------------
 ; ----------------------------------------- 
-; 7a39
+; 7a36
 convert	jsr lca62
 	jmp _write
 
 ; ----------------------------------------- 
 ; --------- verschieb (v) -----------------------------------
 ; ----------------------------------------- 
-; 7a3f
+; 7a3c
 verschieb	jmp lca62
 
 lca46	cmp $a7
@@ -1583,7 +1575,7 @@ lca54	bcc lca61
 	lda $b4
 	adc hoper
 lca61	rts
-; 7a5e
+; 7a5b
 lca62	jsr get3adr
 	jsr get2adr
 _verschieb
@@ -1630,7 +1622,7 @@ lcaae	jsr lc66a
 ; ----------------------------------------- 
 ; --------- kontrolle (k) -----------------------------------
 ; ----------------------------------------- 
-; 7ab3
+; 7ab0
 kontrolle	jsr get12adr
 lcaba	ldx #$27
 	jsr charret
@@ -1650,7 +1642,7 @@ lcada	rts
 ; ----------------------------------------- 
 ; --------- tick (') -----------------------------------
 ; ----------------------------------------- 
-; 7ad7
+; 7ad4
 tick	jsr getadr1
 	ldy #$03
 lcae0	jsr chrin
@@ -1668,7 +1660,7 @@ lcaef	iny
 ; ----------------------------------------- 
 ; --------- compare (=) -----------------------------------
 ; ----------------------------------------- 
-; 7af1
+; 7aee
 comp	jsr get2adr
 	ldx #$00
 lcafa	lda (pcl,x)
@@ -1685,7 +1677,7 @@ lcb0b	jsr space		; output space
 ; ----------------------------------------- 
 ; --------- find (f) ----------------------------------------
 ; ----------------------------------------- 
-; 7b0d
+; 7b0a
 find	lda #$ff
 	ldx #$04
 lcb15	sta $fa,x
@@ -1725,7 +1717,7 @@ lcb5f	jsr cmpend
 	bcc lcb3e
 	ldy #$27
 	jmp printer
-; 7b65
+; 7b62
 lcb69	lda findflg-1,x
 	sta $a8
 	lda findflg1-1,x
@@ -1758,7 +1750,7 @@ lcba1	sty flag
 lcba9	jsr cmpend1
 	bcc lcb7f
 	rts
-; 7bab
+; 7ba8
 lcbaf	jsr lc66a
 	beq lcba9
 lcbb4	jsr lcbc0
@@ -1775,7 +1767,7 @@ lcbcb	jsr aschex1
 	tya
 	sta buf3,x
 	rts
-; 7bd2
+; 7bcf
 lcbd6	sta $b4
 	lsr
 	lsr
@@ -1794,26 +1786,26 @@ lcbf0	rts
 ; ----------------------------------------- 
 ; --------- trace (t) ------- $cbf1 -------------------------
 ; ----------------------------------------- 
-; 7bed
+; 7bea
 trace	pla
 	pla
 	jsr chrin
 	cmp #$57		; w? (trace walk)
 	bne lcbfd
 	jmp lcd56		; yes, branch
-; 7bf9
+; 7bf6
 lcbfd	cmp #$42		; b? (trace break)
 	bne lcc04
 	jmp lcdd0
-; 7c00
+; 7bfd
 lcc04	cmp #$51		; q? (trace quick)
 	bne lcc0b
 	jmp lcd4f
-; 7c07
+; 7c04
 lcc0b	cmp #$53		; s? (trace stop)
 	beq lcc12
 	jmp error
-; 7c0e
+; 7c0b
 lcc12	jsr getbyt
 	pha
 	jsr getbyt
@@ -1830,7 +1822,7 @@ lcc2c	lda #>lcc36
 	sta brk_hi
 	ldx #$fc
 	jmp go2
-; 7c32
+; 7c2f
 lcc36	ldx #$03
 lcc38	pla
 	sta srsave,x
@@ -1853,13 +1845,13 @@ lcc5b	lda #>break
 	sta brk_hi
 	lda #$52		; r (registers)
 	jmp cmdstore	; store and compare command
-; 7c61
+; 7c5e
 lcc65	jsr return	; next line
 	lda vic_ctrl1	; switch screen on
 	ora #$10
 	sta vic_ctrl1
 lcc70	rts
-; 7c6d
+; 7c6a
 	sta aksave
 	php
 	pla
@@ -1877,7 +1869,7 @@ lcc70	rts
 	lda #$80
 	sta $02bc
 	bne lcca5
-; 7c91
+; 7c8e
 lcc95	jsr lcde5		; set sys irq
 	jsr en_timer	; enable timer	
 	cld
@@ -1886,7 +1878,7 @@ lcc9e	pla
 	sta pchsave,x
 	dex
 	bpl lcc9e
-; 7ca1
+; 7c9e
 lcca5	lda irq_lo	; save copy of irq vec
 	sta $02bb
 	lda irq_hi
@@ -1897,11 +1889,11 @@ lcca5	lda irq_lo	; save copy of irq vec
 	lda srsave	; break?
 	and #$10
 	beq lccc5
-; 7cb9
+; 7cb6
 lccbd	jsr lcc65		; yes: cr, r (registers)
 	lda #$52
 	jmp cmdstore	; store and compare command
-; 7cc1
+; 7cbe
 lccc5	bit $02bc		; no: flag?
 	bvc lcce9
 	sec
@@ -1916,7 +1908,7 @@ lccc5	bit $02bc		; no: flag?
 	bne lcd43
 	lda #$80
 	sta $02bc
-; 7ce5
+; 7ce2
 lcce9	bmi lccfd
 	lsr $02bc
 	bcc lccbd
@@ -1927,7 +1919,7 @@ lccf4	lda #>lcc70	; to cc71
 	lda #<lcc70
 	pha
 	jmp lcdba
-; 7cf9
+; 7cf6
 lccfd	jsr lcc65		; cr, screen on
 	lda #$a8
 	sta pcl
@@ -1958,27 +1950,18 @@ lcd33	jsr getin
 	lda #$01		; yes
 	sta $02bc
 	bne lcd72
-; 7d3f
+; 7d3c
 lcd43	dec $02bf
 lcd46	lda $91		; stop?
 	cmp #$7f
 	bne lcd72
 	jmp lccbd		; yes, show regs
-; 7d4b
+; 7d48
 lcd4f	jsr lcdf2
 	lda #$40
 	bne lcd60
-; 7d52			trace walk
+; 7d4f			trace walk
 lcd56	jsr lcdf2
-; korrektur
-	nop
-	nop
-	nop
-	nop
-	nop
-			 ; php
-			 ; pla
-			 ; sta srsave
 	lda #$80
 lcd60	sta $02bc
 	tsx
@@ -1987,7 +1970,7 @@ lcd60	sta $02bc
 	jsr lcc65		; cr, screen on
 	lda $02bc
 	beq lcda9
-; 7d6e
+; 7d66
 lcd72	ldx #$00		; is screen on?
 	lda vic_ctrl1
 	tay
@@ -2003,10 +1986,10 @@ lcd86	dex
 	bne lcd86
 	dey
 	bne lcd86
-; 7d88
+; 7d80
 lcd8c	sei
 
-!ifdef cia_n {		; at 7d8a:
+!ifdef cia_n {		; at 7d82:
 	lda #$49		; this is the timing value for the new cia 
 } else {
 	lda #$47		; this is the timing value for the old cia    
@@ -2038,7 +2021,7 @@ lcdba	lda pchsave	; get pc
 	ldx xrsave	; get .x
 	ldy yrsave	; get .y
 	rti		; end of irq
-; 7dcc
+; 7dc4
 lcdd0	jsr getbyt
 	sta $02be
 	jsr getbyt
@@ -2046,13 +2029,13 @@ lcdd0	jsr getbyt
 	jsr getbyt
 	sta $02bf
 	jmp execute	; go back, wait for next input
-; 7de1
+; 7dd9
 lcde5	lda tracebuf
 	ldx tracebuf+1
 	sta irq_lo
 	stx irq_hi
 	rts
-; 7dee
+; 7de6
 lcdf2	lda irq_lo
 	ldx irq_hi
 	sta tracebuf
@@ -2066,7 +2049,7 @@ lce08	rts
 ; ----------------------------------------- 
 ; --------- diskmonitor (z) ---------------------------------
 ; ----------------------------------------- 
-; 7e05			dmon (z)
+; 7dfd			dmon (z)
 dmon	lda #$07
 	sta border
 	lda #$36
@@ -2077,7 +2060,7 @@ lce14	lda lcfe4,x
 	inx
 	cpx #$0d
 	bcc lce14
-; 7e1b
+; 7e13
 lce1f	ldx #$2a
 	jsr charret
 dce24	jsr chrin
@@ -2097,11 +2080,11 @@ lce2d	cmp lcfd2,x
 	lda lcfd8,x
 	pha
 	rts
-; 7e3f
+; 7e37
 lce43	dex
 	bpl lce2d
 	jmp lce1f
-; 7e45
+; 7e3d
 lce49	lda #<diskbuf	; show buffer $c000
 	sta pcl
 	lda #>diskbuf
@@ -2121,7 +2104,7 @@ lce5c	jsr stopt		; stop?
 	cmp #>(diskbuf+256)	; one page?
 	bcc lce53
 dce70	jmp lce1f
-; 7e6f
+; 7e67
 lce73	jsr getadr1
 	ldy #$20
 	ldx #$00
@@ -2132,13 +2115,13 @@ lce7a	jsr getchrerr
 	bne lce7a
 	jsr return	; next line
 	jmp dce24
-; 7e89
+; 7e81
 lce8d	jsr lcf55		; open "#"
 	lda savex
 	cmp #$02		; r or w?
 	bne lce9a
 	jmp lceeb
-; 7e96
+; 7e8e
 lce9a	ldx #$00		; r
 	lda diskbuf,x
 	sta tmpsecto	; save track
@@ -2147,11 +2130,11 @@ lce9a	ldx #$00		; r
 	sta $02c4
 	txa
 	jmp lcecb
-; 7ea9			read
+; 7ea1			read
 lcead	jsr getret	; check for return
 	bne lceb5
 	jmp lce8d
-; 7eb1
+; 7ea9
 lceb5	jsr getbyt	; input  track
 	sta tmpsecto
 	jsr getbyt	; input sector
@@ -2162,16 +2145,12 @@ lceb5	jsr getbyt	; input  track
 	beq lceeb
 
 ; ----------------------------------------- 
-; 7ec7
+; 7ebf
 lcecb	jsr lcf0d		; read sector
 	ldx #$0d
 	jsr chkin
 	ldy #$00
 lced5	jsr chrin
-	nop
-	nop
-	nop
-	nop
 	sta diskbuf,y
 	iny
 	bne lced5
@@ -2180,7 +2159,7 @@ lced5	jsr chrin
 	jmp lce49		; show
 
 ; ----------------------------------------- 
-; 7ee7			write
+; 7edb			write
 lceeb	jsr lcf40		; w: set bufferpointer
 	ldx #$0d
 	jsr chkout
@@ -2197,7 +2176,7 @@ lcf02	jsr clrchn
 	jmp lcfb6
 
 ; ----------------------------------------- 
-; 7f09
+; 7efd
 lcf0d	sta $02d1
 	lda tmpsecto
 	jsr lcf79
@@ -2219,7 +2198,7 @@ dcf2f	lda dcmdst,x
 	jmp dcf8c
 
 ; ----------------------------------------- 
-; 7f3c
+; 7f30
 lcf40	ldx #$0f
 	jsr chkout
 	ldx #$00
@@ -2231,7 +2210,7 @@ lcf47	lda dcff2,x
 	jmp clrchn
 
 ; ----------------------------------------- 
-; 7f51
+; 7f45
 lcf55	lda #$0f
 	tay
 	ldx iono
@@ -2250,7 +2229,7 @@ lcf55	lda #$0f
 	jmp open
 
 ; ----------------------------------------- 
-; 7f77
+; 7f6b
 lcf79	ldx #$30
 	sec
 lcf7c	sbc #$0a
@@ -2261,12 +2240,12 @@ lcf83	adc #$3a
 dcf85	rts
 
 ; ----------------------------------------- 
-; 7f84
+; 7f78
 dcf86	jsr dcf8c
 	jmp lcfb6
 
 ; ----------------------------------------- 
-; 7f8a
+; 7f7e
 dcf8c	lda #$00
 	sta $90
 	jsr return 	; next line
@@ -2278,7 +2257,7 @@ dcf8c	lda #$00
 	cmp #$30
 	bne lcfaa
 	jmp untalk
-; 7fa6
+; 7f9a
 lcfa7	jsr iecin
 lcfaa	jsr chrout
 	cmp #$0d
@@ -2288,14 +2267,14 @@ lcfaa	jsr chrout
 	pla
 lcfb6	jsr lcfbc
 	jmp lce1f
-; 7fbb
+; 7fafb
 lcfbc	lda #$0d
 	jsr close
 	lda #$0f
 	jmp close
 
 ; ----------------------------------------- 
-; 7fc5			leave dmon
+; 7fb9			leave dmon
 lcfc6	lda #$06
 	sta border
 	lda #$37
@@ -2303,11 +2282,11 @@ lcfc6	lda #$06
 	jmp execute	; go back, wait for next input
 
 ; ----------------------------------------- 
-; 7fd1
+; 7fc5
 lcfd2	!by $3a,$52,$57,$4d,$58	; ":rwmx" , new floppy commands
-; 7fd6
+; 7fca
 	!by $40		; "@"   used in normal fmon mode    
-; 7fd7
+; 7fcb
 lcfd8	!by <lce73-1
 	!by >lce73-1
 	!by <lcead-1
@@ -2320,15 +2299,15 @@ lcfd8	!by <lce73-1
 	!by >lcfc6-1
 	!by <dcf85	; address for normal fmon command
 	!by >dcf85    
-; 7fe3
+; 7fd7
 lcfe4	!by $55,$31,$3a,$31,$33,$20,$30,$20	; "u1:13 0 "
 	!by $31,$38,$20,$30,$30		; "18 00"
-; 7ff0
+; 7fe4
 lcff1	!by $23				; "#"
-; 7ff1
+; 7fe5
 dcff2	!by $42,$2d,$50,$20,$31,$33,$20,$30	; "b-p 13 0"
 
-; 7ff9
+; 7fed
 ; -----------------------------------------------------------
 ; --------- end fcom/fmon part ------------------------------
 ; -----------------------------------------------------------
