@@ -1,0 +1,2335 @@
+; ###############################################################
+; #                                                             #
+; #  TSB.MON 1.00	                                            #       
+; #                                                             #
+; #  patched for TSB by Arndt Dettke,  2023.01.30               #
+; #  based on SMON RELOCATABLE SOURCE CODE                      #       
+; #  Version 1.1.4.007 (2023.01.14)                             #
+; #  Copyright (c) 2022, 2023 Claus Schlereth                   #
+; #  https://github.com/LeshanDaFo/SMON-RelocatableSourceCode   #
+; #                                                             #
+; #  SMON was written by:                                       #
+; #  Norfried Mann und Dietrich Weineck                         #
+; #                                                             #
+; #  This version of the source code is under MIT License       #
+; ###############################################################
+
+; ----------------------------------------- equates
+; hidden commands (constants)
+
+	hck	= $27	; "'"
+	hcm	= $3a	; ":"
+	hcr	= $3b	; ";"
+	hcd	= $2c	; ","
+
+; used zero page addresses
+
+	ramend_hi	= $38	; high byte of sys ram end		
+	_01buff	= $41	; buffer for $01 zero page value used in ram under rom version
+	flag	= $aa	; universal flag
+	adrcode	= $ab	; addressing code for assembler/disassembler
+	command	= $ac	; smon-command code
+	befcode	= $ad	; command code ass./disass.
+	loper	= $ae	; low-operand for ass./disass.
+	hoper	= $af	; high-operand for ass./disass.
+	beflen	= $b6	; command length ass./disass.
+	tsb_use	= $be	; tsb reg for current drive number
+	pcl	= $fb	; smon-programmcounter low-byte
+	pch	= $fc	; smon-programmcounter high-byte
+
+	tastbuf	= $0277	; key buffer
+	color	= $0286	; charcolor
+	pchsave	= $02a8	; pc hi
+	pclsave	= $02a9	; pc lo
+	srsave	= $02aa	; sr
+	aksave	= $02ab	; a
+	xrsave	= $02ac	; xr
+	yrsave	= $02ad	; yr
+	spsave	= $02ae	; sp
+	prnno	= $02af	; printer number
+	iono	= $02b0	; device-number
+	mem	= $02b1	; buffer 
+	tracebuf	= $02b8	; buffer for trace mode (upto $02bf)
+
+; addresses used from disk monitor:
+
+	savex	= $02c1	; temp storage for x- und y-register
+	tmptrck	= $02c2
+	tmpsecto	= $02c3	; temp storage for track and sector
+	dcmdst	= $02d0	; disc command string
+	track	= $02d8
+	secto	= $02db	; track and sector number
+	buf1	= $033c	; buffer for assembly command, upto $03fc
+	buf2	= $036c
+	buf3	= $039c
+	buf4	= $03cc
+
+; tsb addresses:
+
+	tsbcols	= $83c9	; set tsb screen colors
+
+; all other:
+
+	irq_lo	= $0314	; vector: hardware irq interrupt address lo
+	irq_hi	= $0315	; vector: hardware irq interrupt address hi
+	brk_lo	= $0316	; vector: brk lo
+	brk_hi	= $0317	; vector: brk hi
+	loadvect	= $0330	; vector: kernal load
+	savevect	= $0332	; vector: kernal save
+
+	warmstart	= $a474	; restart basic
+	add	= $bc49	; addition
+	intout	= $bdcd	; output positive integer in a/x
+	intout1	= $bdd1	; output positive integer in a/x
+	flpstr	= $bddd	; convert fac#1 to ascii string
+	diskbuf	= $c000
+	vic_ctrl1	= $d011	; vic control register 1
+	border	= $d020	; border color
+	bkgrnd	= $d021	; background clor
+	timera_lo	= $dc04	; timer a low-byte (kernal-irq, tape)
+	timera_hi	= $dc05	; timer a high-byte (kernal-irq, tape)
+	ctrl_rega	= $dc0e	; control register a cia#1
+	sysload	= $f4a5	; load
+	syssave	= $f5ed	; save
+	en_timer	= $fddd	; enable timer
+	secnd	= $ff93	; send sa after listen
+	tksa	= $ff96	; set secondary address
+	iecin	= $ffa5	; read byte from iec bus
+	ciout	= $ffa8	; handshake ieee byte out
+	untalk	= $ffab	; send untalk out ieee
+	unlsn	= $ffae	; send unlisten out ieee
+	listn	= $ffb1	; send listen out ieee
+	talk	= $ffb4	; send talk out ieee
+	setlfs	= $ffba	; set length and fn adr
+	setnam	= $ffbd	; set file name
+	open	= $ffc0	; open vector
+	close	= $ffc3	; close vector
+	chkin	= $ffc6	; set input file
+	chkout	= $ffc9	; set output
+	clrchn	= $ffcc	; restore i/o vector
+	chrin	= $ffcf	; input vector
+	chrout	= $ffd2	; output vector
+	stopt	= $ffe1	; test stop vector
+	getin	= $ffe4	; vector: kernal getin routine
+
+; -----------------------------------------------------------
+; --------- define here the start address in memory ---------
+
+	*= $7000
+
+; -----------------------------------------------------------
+
+; -----------------------------------------------------------
+; ----------------------- cia version -----------------------
+; -----------------------------------------------------------
+; the new cia is defined as standard
+; commenting cia_n will activate the old version
+; changing the cia timing is necessary if the trace-command is not working well
+; it can also defined manually at address $7d8e
+
+	cia_n = 1   ; change here
+
+; -----------------------------------------------------------
+
+; -----------------------------------------------------------
+; feature to hide the bounding line after 'brk','rts' and 'jmp'
+; -----------------------------------------------------------
+; with this switch it is possible to hide the bounding lines
+; which is normally displayed after some commands during disassemble
+; commenting bndline will hide the lines
+
+	bndline = 1   ; change here
+
+; -----------------------------------------------------------
+; --------- TSB.MON -----------------------------------------
+; -----------------------------------------------------------
+; 7000
+setbrk	lda #<break	; set break-vector to program start
+	sta brk_lo
+_brk_hb	ldx #>setbrk	; $70
+	stx ramend_hi
+	bne csetbrk
+
+; ------------------ here are the general commands ----------
+
+cmdtbl	!by $27,$23,$24,$25,$2c,$3a,$3b,$3d	; "'#$%,:;=" 
+	!by $3f,$41,$42,$43,$44,$46,$47,$49	; "?abcdfgi"		       
+	!by $4b,$4c,$4d,$4f,$50,$52,$53	; "klmoprs"
+	!by $54				; "t"
+	!by $56,$57,$58			; "vwx"
+	!by $5a				; "z"
+	!by $4e				; "n"
+
+; the command addresses:
+
+cmds	!by <tick-1	; ' 01
+	!by >tick-1
+	!by <befdec-1	; # 02
+	!by >befdec-1
+	!by <befhex-1	; $ 03
+	!by >befhex-1
+	!by <befbin-1	; % 04
+	!by >befbin-1
+	!by <comma-1	; , 05
+	!by >comma-1
+	!by <colon-1	; : 06
+	!by >colon-1
+	!by <semis-1	; ; 07
+	!by >semis-1
+	!by <comp-1	; = 08
+	!by >comp-1
+	!by <addsub-1	; ? 09
+	!by >addsub-1
+	!by <assembler-1	; a 0a
+	!by >assembler-1
+	!by <basicdata-1	; b 0b
+	!by >basicdata-1
+	!by <convert-1	; c 0c
+	!by >convert-1
+	!by <disass-1	; d 0d
+	!by >disass-1
+	!by <find-1	; f 0f
+	!by >find-1
+	!by <go-1		; g 10
+	!by >go-1
+	!by <ioset-1	; i 11
+	!by >ioset-1
+	!by <kontrolle-1	; k 12
+	!by >kontrolle-1
+	!by <loadsave-1	; l 13
+	!by >loadsave-1
+	!by <memdump-1	; m 14
+	!by >memdump-1
+	!by <occupy-1	; o 15
+	!by >occupy-1
+	!by <setprinter-1	; p 16
+	!by >setprinter-1
+	!by <register-1	; r 17
+	!by >register-1
+	!by <loadsave-1	; s 18
+	!by >loadsave-1
+	!by <trace-1	; t 19				  
+	!by >trace-1   
+	!by <verschieb-1	; v 1a
+	!by >verschieb-1
+	!by <write-1	; w 1b
+	!by >write-1
+	!by <exit-1	; x 1c
+	!by >exit-1
+	!by <dmon-1	; z 1d
+	!by >dmon-1
+	!by <next-1	; n 1e
+	!by >next-1
+
+; ----------------------------------------- Start of TSB.MON
+
+csetbrk	inx
+	inx
+	stx brk_hi
+	brk
+
+; ----------------------------------------- 
+
+offset	!by $ff,$ff,$01,$00		   
+
+findtab:    !by $41,$5a,$49,$52,$54	; "azirt"
+findflg:    !by $80,$20,$40,$10,$00
+findflg1:   !by $02,$01,$01,$02,$00
+
+; code for generating basic lines:
+sys172	!by $91,$91,$0d
+	!by $53,$d9,$31,$37,$32,$0d   ; "sy172." 
+datatab	!by $00,$7d		; basic line number 32000
+	!by $4c			; jmp dataloop
+	!by <dataloop
+basjmp	!by >dataloop
+
+; the register header:
+reghead	!by $0d,$0d,$20,$2d,$50,$43,$2d,$20	; ".. -pc- "  
+	!by $53,$52,$20,$41,$43,$20,$58,$52	; "sr ac xr"
+	!by $20,$59,$52,$20,$53,$50,$20,$20	; " yr sp  "
+	!by $4e,$56,$2d,$42,$44,$49,$5a,$43	; "nv-bdizc"
+
+; -----------------------------------------------------------
+lc0ac	!by $00,$02,$04
+lc0af	!by $01,$2c,$00
+lc0b2	!by $2c,$59,$29
+lc0b5	!by $58,$9d,$1f,$ff,$1c,$1c,$1f,$1f
+	!by $1f,$1c,$df,$1c,$1f,$df,$ff,$ff
+	!by $03
+lc0c6	!by $1f,$80,$09,$20,$0c,$04,$10,$01
+	!by $11,$14,$96,$1c,$19,$94,$be,$6c
+	!by $03,$13
+lc0d8	!by $01,$02,$02,$03,$03,$02,$02,$02
+	!by $02,$02,$02,$03,$03,$02,$03,$03
+	!by $03,$02
+lc0ea	!by $00,$40,$40,$80,$80,$20,$10,$25
+	!by $26,$21,$22,$81,$82,$21,$82,$84
+	!by $08
+lc0fb	!by $08,$e7,$e7,$e7,$e7,$e3,$e3,$e3
+	!by $e3,$e3,$e3,$e3,$e3,$e3,$e3,$e7
+	!by $a7,$e7,$e7,$f3,$f3,$f7
+lc111	!by $df
+
+; --------- 6510 commands -----------------------------------
+lc112: 	!by $26,$46,$06,$66,$41,$81,$e1,$01	;rol,lsr,asl,....
+	!by $a0,$a2,$a1,$c1,$21,$61,$84,$86
+	!by $e6,$c6,$e0,$c0,$24,$4c,$20,$90
+	!by $b0,$f0,$30,$d0,$10,$50,$70,$78
+	!by $00,$18,$d8,$58,$b8,$ca,$88,$e8
+lc13a	!by $c8,$ea,$48,$08,$68,$28,$40,$60
+	!by $aa,$a8,$ba,$8a,$9a,$98,$38,$f8 
+
+lc14a	!by $89,$9c,$9e
+lc14d	!by $b2,$2a,$4a,$0a,$6a,$4f,$23,$93
+	!by $b3,$f3,$33,$d3,$13,$53,$73
+
+; --------- 6510 commands char ------------------------------
+lc15c	!by $52,$4c,$41,$52,$45,$53,$53,$4f	; "r l a r e s s o"   ;r
+	!by $4c,$4c,$4c,$43,$41,$41,$53,$53	; "l l l c a a s s"
+	!by $49,$44,$43,$43,$42,$4a,$4a,$42	; "i d c c b j j b"
+	!by $42,$42,$42,$42,$42,$42,$42,$53	; "b b b b b b b s"
+	!by $42,$43,$43,$43,$43,$44,$44,$49	; "b c c c c d d i"
+	!by $49,$4e,$50,$50,$50,$50,$52,$52	; "i n p p p p r r"
+	!by $54,$54,$54,$54,$54,$54,$53,$53	; "t t t t t t s s"
+
+lc194	!by $4f,$53,$53,$4f,$4f,$54,$42,$52	; "o s s o o t b r"   ;o
+	!by $44,$44,$44,$4d,$4e,$44,$54,$54	; "d d d m n d t t"
+	!by $4e,$45,$50,$50,$49,$4d,$53,$43	; "n e p p i m s c"
+	!by $43,$45,$4d,$4e,$50,$56,$56,$45	; "c e m n p v v e"
+	!by $52,$4c,$4c,$4c,$4c,$45,$45,$4e	; "r l l l l e e n"
+	!by $4e,$4f,$48,$48,$4c,$4c,$54,$54	; "n o h h l l t t"
+	!by $41,$41,$53,$58,$58,$59,$45,$45	; "a a s x x y e e"
+
+lc1cc	!by $4c,$52,$4c,$52,$52,$41,$43,$41	; "l r l r r a c a"   ;l
+	!by $59,$58,$41,$50,$44,$43,$59,$58	; "y x a p d c y x"
+	!by $43,$43,$58,$59,$54,$50,$52,$43	; "c c x y t p r c"
+	!by $53,$51,$49,$45,$4c,$43,$53,$49	; "s q i e l s c i"
+	!by $4b,$43,$44,$49,$56,$58,$59,$58	; "k c d i v x y x"
+	!by $59,$50,$41,$50,$41,$50,$49,$53	; "y p a p a p i s"
+	!by $58,$59,$58,$41,$53,$41,$43,$44	; "x y x a s a c d"
+
+lc204	!by $08,$84,$81,$22,$21,$26,$20,$80
+lc20c	!by $03,$20,$1c,$14,$14,$10,$04,$0c
+
+; --------- into smon  -------------------------------------
+; 7214 
+break	cld
+	lda tsb_use
+	sta iono		; set drive 
+	lda #$04
+	sta prnno		; set printer #4   
+	lda #$06
+	sta border	; border and  
+	sta bkgrnd	; screen color  
+	lda #$03
+	sta color		; charcolor
+	ldx #$05
+break2	pla
+	sta pchsave,x	; save stack
+	dex
+	bpl break2
+	lda pclsave
+	bne break3
+	dec pchsave	; pc high
+break3	dec pclsave	; pc low  
+	tsx
+	stx spsave
+	lda #$52		; "r"-command
+	jmp cmdstore	; execute r-command
+;
+; ----------------------------------------- 
+; 7249
+getstart	jsr getret	; check for return
+	beq getstrts
+getstart1	jsr getadr1
+	sta pclsave
+	lda pch
+	sta pchsave
+getstrts	rts
+
+; ----------------------------------------- 
+; 725a
+get3adr	ldx #$a4
+	jsr getadr
+	jsr getadr
+	bne getadr
+
+; ----------------------------------------- 
+; 7264
+get12adr	jsr getadr1	; start address to $fb/fc (pcl)
+	lda #$fe		; set end address to $fffe
+	sta $fd
+	lda #$ff
+	sta $fe
+	jsr getret	; check for return
+	bne getadr	; no, end address follows (.x=$fd)
+g123	sta tastbuf	; yes, activate command
+	inc $c6
+	rts
+
+; ----------------------------------------- 
+; 727a
+get2adr	jsr getadr1
+	!by $2c
+getadr1	ldx #$fb		; points to pcl
+;
+getadr	jsr getbyt	; get address
+	sta $01,x		; store according to .x
+	jsr getbyt1
+	sta $00,x
+	inx
+	inx
+	rts
+
+; ----------------------------------------- 
+; 728d
+getbyt	jsr getchrerr
+_getbyt	cmp #$20		; skip space
+	beq getbyt
+	cmp #$2c		; skip comma
+	beq getbyt
+	bne aschex	; convert to hex (in $b4)
+
+; ----------------------------------------- 
+; 729a
+getbyt1	jsr getchrerr
+aschex	jsr aschex1
+	asl
+	asl
+	asl
+	asl
+	sta $b4
+	jsr getchrerr
+	jsr aschex1
+	ora $b4
+	rts
+
+; ----------------------------------------- 
+; 72af
+aschex1	cmp #$3a
+	bcc aschex2
+	adc #$08
+aschex2	and #$0f
+	rts
+
+; ----------------------------------------- 
+; 72b8
+skipspace	jsr getchrerr
+	cmp #$20
+	beq skipspace
+	dec $d3
+	rts
+
+; ----------------------------------------- 
+; 72c2
+getret	jsr chrin		; get
+	dec $d3		; column minus 1
+	cmp #$0d		; is return?
+getbrts	rts
+
+; --------- get input and await return ----------------------
+; 72ca
+getchrerr	jsr chrin
+	cmp #$0d		; await return  
+	bne getbrts	; not cr
+
+; --------- faulty userinput -------------------------------- 
+; 72d1
+error	lda #$3f		; "?"
+	jsr chrout
+
+execute	ldx spsave		
+	txs
+	ldx #$00
+	stx $c6
+	jsr return	; next line
+	lda ($d1,x)
+	cmp #$27		; "'" (tick)
+	beq exec1
+	cmp #$3a		; ':' (colon)
+	beq exec1
+	cmp #$3b		; ";" (semicolon)
+	beq exec1
+	cmp #$2c		; "," (comma)
+	beq exec1
+	lda #$2e		; "." (period)
+	jsr chrout		  
+exec1	jsr getchrerr
+	cmp #$2e		; "."
+	beq exec1
+
+cmdstore	sta command	; store command
+	and #$7f		; delete bit 7
+	ldx #$20		; amount of commands
+
+; --------- check user input --------------------------------
+; 7305
+cmdsearch	cmp cmdtbl-1,x	; compare users char
+	beq cmdfound	; matched
+	dex
+	bne cmdsearch	; repeat compare
+	beq error		; command unknown    
+
+cmdfound	jsr cmdexec	; fetch routine offset
+	jmp execute	; go back, wait for next input
+
+; --------- get address according command char and execute --
+; 7315
+cmdexec	txa
+	asl
+	tax
+	inx
+	lda cmds-2,x	; low address 
+	pha		; on stack
+	dex
+	lda cmds-2,x	; high address
+	pha		; on stack 
+	rts		; jump to execute command 
+
+; --------- output pc as 4 digit hex -----------------------
+; 7323
+hexout	lda pch		; load pc high byte
+	jsr hexout1	; output 2 digit hex address
+	lda pcl		; load pc low byte
+; --------- output value as 2 digit hex -----------------------
+hexout1	pha		; save byte
+	lsr		; shift 4 times to get low nibble
+	lsr
+	lsr
+	lsr
+	jsr hexout2	; output one nibble
+	pla		; get back saved value
+	and #$0f		; mask low nibble
+hexout2	cmp #$0a		; compare
+	bcc hexout3	; output as number
+	adc #$06		; add 6 for letter
+hexout3	adc #$30		; add $30
+	jmp chrout
+
+; --------- output a char with leading cr ---------------------
+; 7340 
+charret	lda #$0d		; next line
+charr1	jsr chrout
+	txa		; get value from x
+	jmp chrout
+
+; --------- output 2 x space ----------------------------------
+; 7349
+space2	jsr space
+space	lda #$20		; space
+	jmp chrout
+
+; --------- output cr -----------------------------------------
+; 7351
+return	lda #$0d		; next line
+	jmp chrout
+
+; --------- print string from address in a,y ------------------
+; 7356
+print	sta $bb		; pointer to address low byte
+	sty $bc		; pointer to address high byte
+	ldy #$00		; counter
+print1	lda ($bb),y	; get byte from address
+	beq print2	; if 0 then end
+	jsr chrout
+	iny		; increase counter
+	bne print1	; more to print
+print2	rts
+
+; --------- increase pc -------------------------------------
+; 7367
+pcinc	inc pcl		; increase low byte
+	bne pcrts		; not 0, then finish
+	inc pch		; otherwise increase also the high byte
+pcrts	rts
+
+; ----------------------------------------- 
+; --------- exit (x) ----------------------------------------
+; ----------------------------------------- 
+; 736e
+exit	lda #$00		; restore 
+	sta color		; system   
+	sta border	; colors  
+	lda #$0c		    
+	jsr tsbcols
+	lda #$37		; default rom-config 
+	sta $01
+	ldx spsave	; restore stack  
+	txs 
+	jmp warmstart	; basic warmstart 
+
+; ----------------------------------------- 
+; --------- register (r) ------------------------------------				  
+; ----------------------------------------- 
+; 7386
+register	ldy #>reghead
+	lda #<reghead
+	jsr print
+	ldx #$3b		; ";" (hidden command)
+	jsr charret	; print on screen
+	lda pchsave	; pc high byte
+	sta pch
+	lda pclsave	; pc low byte
+	sta pcl
+	jsr hexout	; output as 4 digit hex
+	jsr space		; output space
+	ldx #$fb
+register2	lda $01af,x
+	jsr hexout1	; output register values as 2 digit hex values
+	jsr space		; output space
+	inx
+	bne register2
+	lda srsave	; output space
+	jmp chngbin	; output sr as bin
+
+; ----------------------------------------- 
+; --------- semis (;) ---------------------------------------
+; ----------------------------------------- 
+; 73b6
+semis	jsr getstart1
+	ldx #$fb
+semis1	jsr getchrerr
+	jsr getbyt1
+	sta $01af,x
+	inx
+	bne semis1
+	jsr space		; output space
+	lda srsave,x
+
+chngbin	sta flag
+	lda #$20
+	ldy #$09
+changb1	jsr chrout
+	asl flag
+	lda #$30
+	adc #$00
+	dey
+	bne changb1
+	rts
+
+; ----------------------------------------- 
+; --------- go (g) ------------------------------------------
+; ----------------------------------------- 
+; 73dd
+go	jsr getstart
+	ldx spsave
+	txs
+	ldx #$fa
+go2	lda $01ae,x
+	pha
+	inx
+	bne go2
+	pla
+	tay
+	pla
+	tax
+	pla
+	rti
+
+; ----------------------------------------- 
+; --------- continue memdump (n) ---------------------------
+; ----------------------------------------- 
+; 73f3
+next	jsr g123		; activate n command
+	bne next1
+
+; ----------------------------------------- 
+; --------- memdump (m) -------------------------------------
+; ----------------------------------------- 
+; 73f8
+memdump	jsr get12adr
+next1:
+memdump1	ldx #$3a		; ':' (hidden command)
+	jsr charret
+	jsr hexout	; output as 4 digit hex
+	ldy #$20
+	ldx #$00
+memdump2	jsr space		; output space
+	lda (pcl,x)
+	jsr hexout1	; output 2 digit hex address
+	lda (pcl,x)
+	jsr ascii		; output ascii chars
+	bne memdump2
+	jsr contin
+	bcc memdump1
+	rts
+
+; ----------------------------------------- 
+; --------- colon (:) ---------------------------------------
+; ----------------------------------------- 
+; 741c
+colon	jsr getadr1	; get address of current line
+	ldy #$20		; start column for output (32)
+	ldx #$00
+colon1	jsr getchrerr
+	jsr getbyt1	; get content of current line
+	sta (pcl,x)
+	cmp (pcl,x)
+	beq colon2
+	jmp error
+
+colon2	jsr ascii		; show as ascii, at column 39?
+	bne colon1	; no, next (8 values)
+	rts
+; 7438
+ascii	cmp #$20		; below space? 
+	bcc ascii1	; yes, show "."
+	cmp #$60		; below ascii?
+	bcc ascii2	; yes, show as is
+	cmp #$c0		; below upper case?
+	bcc ascii1	; yes, show "."
+	cmp #$db		; upper case?
+	bcc ascii3	; yes, show as is
+
+ascii1	lda #$2e		; replace with "."
+ascii2	and #$3f		; force digits and operators
+ascii3	and #$7f		; force characters
+ascii4	sta ($d1),y	; to screen
+	lda color
+	sta ($f3),y	; in color
+ascii5	jsr pcinc		; up to 40 chars
+	iny
+	cpy #$28
+	rts
+
+; ----------------------------------------- 
+; 745c
+contin	jsr taste
+	jmp cmpend1
+
+; ----------------------------------------- 
+; 7462
+cmpend	jsr pcinc
+cmpend1	lda pcl
+	cmp $fd
+	lda pch
+	sbc $fe
+	rts
+;
+; ----------------------------------------- 
+; 746e
+taste	jsr printer1
+taste1	jsr scankey
+	beq tastrts
+taste2	jsr scankey
+	beq taste2
+	cmp #$20
+	bne tastrts
+	sta tastbuf
+	inc $c6
+tastrts	rts
+
+; ----------------------------------------- 
+; 7485
+scankey	jsr getin
+	pha
+	jsr stopt
+	beq stop
+	pla
+scanrts	rts
+
+stop	jmp execute	; go back, wait for next input
+
+; ----------------------------------------- 
+; 7493
+printer1	ldy #$28
+printer	bit command	; command shifted?
+	bpl scanrts	; no, leave
+	sty $c8		; yes, send line to printer
+	sty $d0
+	lda #$ff
+	jsr close
+	lda #$ff
+	sta $b8
+	sta $b9
+	lda prnno
+	sta $ba
+	jsr open
+	ldx #$00
+	stx $d3
+	dex
+	jsr chkout
+prloop	jsr chrin
+	jsr chrout
+	cmp #$0d
+	bne prloop
+	jsr clrchn
+	lda #$91		; crsr up
+	jmp chrout
+
+; ----------------------------------------- 
+; 74ca
+lc4cb	ldy #$00
+	lda (pcl),y
+	bit flag
+	bmi lc4d5
+	bvc lc4e1
+lc4d5	ldx #$1f
+lc4d7	cmp lc13a+2,x
+	beq lc50b
+	dex
+	cpx #$15
+	bne lc4d7
+lc4e1	ldx #$04
+lc4e3	cmp lc14a-1,x
+	beq lc509
+	cmp lc14d,x
+	beq lc50b
+	dex
+	bne lc4e3
+	ldx #$38
+lc4f2	cmp lc111,x
+	beq lc50b
+	dex
+	cpx #$16
+	bne lc4f2
+lc4fc	lda (pcl),y
+	and lc0fb,x
+	eor lc111,x
+	beq lc50b
+	dex
+	bne lc4fc
+lc509	ldx #$00
+lc50b	stx befcode
+	txa
+	beq lc51f
+	ldx #$11
+lc512	lda (pcl),y
+	and lc0b5,x
+	eor lc0c6,x
+	beq lc51f
+	dex
+	bne lc512
+lc51f	lda lc0ea,x
+	sta adrcode
+	lda lc0d8,x
+	sta beflen
+	ldx befcode
+	rts    
+
+; ----------------------------------------- 
+; 752b
+lc52c	ldy #$01
+	lda (pcl),y
+	tax
+	iny
+	lda (pcl),y
+	ldy #$10
+	cpy adrcode
+	bne lc541
+	jsr lc54a
+	ldy #$03
+	bne lc543
+lc541	ldy beflen
+lc543	stx $ae
+	sta $af
+	rts
+
+; ----------------------------------------- 
+; 7547
+lc54a	ldy #$01
+	lda (pcl),y
+	bpl lc551
+	dey
+lc551	sec
+	adc pcl
+	tax
+	inx
+	beq lc559
+	dey
+lc559	tya
+	adc pch
+lc55c	rts
+
+; ----------------------------------------- 
+; --------- disass (d) --------------------------------------
+; ----------------------------------------- 
+; 755a
+disass	ldx #$00
+	stx flag
+	jsr get12adr
+lc564	jsr lc58c		; output one line
+	lda befcode	; load command code
+	cmp #$16		; compare with "jmp"
+	beq lc576		; print one line with "-"
+	cmp #$2f		; compare with "rti"
+	beq lc576		; print one line with "-"
+	cmp #$30		; compare with "rts"
+	beq lc576		; print one line with "-"
+	cmp #$21		; compare with "brk"
+	bne lc586
+
+lc576	jsr printer1
+; 7579
+; here the bounding line after 'jmp','rts' and 'brk' will be printed
+!ifdef bndline {
+	jsr return	; next line
+	ldx #$23		; amount of bounding line chars
+	lda #$2d		; load with '-'
+lc580	jsr chrout	; print char
+	dex			; dec amount
+	bne lc580		; not last
+} 
+; end printing bounding line		 
+; 7586
+lc586	jsr contin
+	bcc lc564
+	rts
+
+; ----------------------------------------- 
+; 758c
+lc58c	ldx #$2c		; "," (hidden command comma)
+	jsr charret
+	jsr hexout	; output as 4 digit hex
+	jsr space		; output space
+lc597	jsr lc675
+	jsr lc4cb
+	jsr space		; output space
+lc5a0	lda (pcl),y
+	jsr hexout1	; output 2 digit hex address
+	jsr space		; output space
+	iny
+	cpy beflen
+	bne lc5a0
+	lda #$03
+	sec
+	sbc beflen
+	tax
+	beq spcoc		; output opcode with leading space
+lc5b5	jsr space2	; output 2 x space
+	jsr space		; output space
+	dex
+	bne lc5b5
+; 75be
+spcoc	lda #$20		; output opcode with leading space
+	jsr chrout
+	ldy #$00
+	ldx befcode
+lc5c7	bne lc5da
+lc5c9	ldx #$03
+lc5cb	lda #$2a		; show "***" (unknown code)
+	jsr chrout
+	dex
+	bne lc5cb
+	bit flag
+	bmi lc55c		; branch to rts
+	jmp lc66a
+; 75da
+lc5da	bit flag
+	bvc lc607
+	lda #$08
+	bit adrcode
+	beq lc607
+	lda (pcl),y
+	and #$fc
+	sta befcode
+	iny
+	lda (pcl),y
+	asl
+	tay
+	lda buf1,y
+	sta $ae
+	iny
+	lda buf1,y
+	sta $af
+	jsr lc6be
+	ldy beflen
+	jsr lc693
+	jsr lc4cb
+lc607	lda lc15c-1,x
+	jsr chrout
+	lda lc194-1,x
+	jsr chrout
+	lda lc1cc-1,x
+lc616	jsr chrout
+	lda #$20
+	bit adrcode
+	beq lc622
+	jsr space2	; output 2 x space
+lc622	ldx #$20
+	lda #$04
+	bit adrcode
+	beq lc62c
+	ldx #$28
+lc62c	txa
+	jsr chrout
+	bit adrcode
+	bvc lc639
+	lda #$23
+	jsr chrout
+lc639	jsr lc52c
+	dey
+	beq lc655
+	lda #$08
+	bit adrcode
+	beq lc64c
+	lda #$4d
+	jsr chrout
+	ldy #$01
+lc64c	lda $ad,y
+	jsr hexout1	; output 2 digit hex address
+	dey
+	bne lc64c
+lc655	ldy #$03
+lc657	lda lc0ac,y
+	bit adrcode
+	beq lc667
+	lda lc0af,y
+	ldx lc0b2,y
+	jsr charr1
+lc667	dey
+	bne lc657
+lc66a	lda beflen
+lc66c	jsr pcinc
+	sec
+	sbc #$01
+	bne lc66c
+	rts
+; ----------------------------------------- 
+; 7673			clear screen row
+lc675	ldy $d3		; column
+	lda #$20
+lc679	sta ($d1),y	; screen row
+	iny
+	cpy #$28
+	bcc lc679
+	rts
+
+; ----------------------------------------- 
+; 767f
+lc681	cpx adrcode
+	bne lc689
+	ora befcode
+	sta befcode
+lc689	rts
+
+; ----------------------------------------- 
+; 7688
+lc68a	lda $ad,y
+	sta (pcl),y
+	cmp (pcl),y
+	bne lc697
+lc693	dey
+	bpl lc68a
+	rts
+
+; ----------------------------------------- 
+; 7695
+lc697	pla
+	pla
+	rts
+
+; ----------------------------------------- 
+; 7698
+lc69a	bne lc6b8
+	txa
+	ora adrcode
+	sta adrcode
+lc6a1	lda #$04
+	sta $b5
+lc6a5	jsr chrin
+	cmp #$20
+	beq lc6b9
+	cmp #$24
+	beq lc6b9
+	cmp #$28
+	beq lc6b9
+	cmp #$2c
+	beq lc6b9
+lc6b8	rts
+
+lc6b9	dec $b5
+	bne lc6a5
+	rts
+
+; ----------------------------------------- 
+; 76bc
+lc6be	cpx #$18
+	bmi lc6d0
+	lda $ae
+	sec
+	sbc #$02
+	sec
+	sbc pcl
+	sta $ae
+	ldy #$40
+lc6d0	rts
+
+; ----------------------------------------- 
+; --------- assemble (a) ------------------------------------
+; ----------------------------------------- 
+; 76cd
+assembler	jsr getadr1
+	sta $fd
+	lda pch
+	sta $fe
+lc6da	jsr return 	; next line
+lc6dd	jsr lc6e4
+	bmi lc6dd
+	bpl lc6da
+lc6e4	lda #$00
+	sta $d3
+	jsr space		; output space
+	jsr hexout	; output as 4 digit hex
+	jsr space		; output space
+	jsr chrin
+	lda #$01
+	sta $d3
+	ldx #$80
+	bne lc701
+
+; ----------------------------------------- 
+; --------- hidden command comma (,) ------------------------
+; ----------------------------------------- 
+; 76f8
+comma	ldx #$80
+	stx mem
+lc701	stx flag
+	jsr getadr1
+	lda #$25
+	sta $c8
+	bit $02b1
+	bpl lc717
+	ldx #$0a
+lc711	jsr chrin
+	dex
+	bne lc711
+lc717	lda #$00
+	sta mem
+	jsr lc6a1
+	cmp #$46
+	bne lc739
+	lsr flag
+	pla
+	pla
+	ldx #$02
+lc729	lda $fa,x
+	pha
+	lda pch,x
+	sta $fa,x
+	pla
+	sta pch,x
+	dex
+	bne lc729
+	jmp lc564
+; 7735
+lc739	cmp #$2e
+	bne lc74e
+	jsr getbyt1
+	ldy #$00
+	sta (pcl),y
+	cmp (pcl),y
+	bne lc74c
+	jsr pcinc
+	iny
+lc74c	dey
+	rts
+; 774a
+lc74e	ldx #$fd
+	cmp #$4d
+	bne lc76d
+	jsr getbyt1
+	ldy #$00
+	cmp #$3f
+	bcs lc74c
+	asl
+	tay
+	lda pcl
+	sta buf1,y
+	lda pch
+	iny
+	sta buf1,y
+lc76a	jsr lc6a1
+lc76d	sta $a9,x
+	cpx #$fd
+	bne lc777
+	lda #$07
+	sta $b7
+lc777	inx
+	bne lc76a
+	ldx #$38
+lc77c	lda $a6
+	cmp lc15c-1,x
+	beq lc788
+lc783	dex
+	bne lc77c
+	dex
+	rts
+; 7784
+lc788	lda $a7
+	cmp lc194-1,x
+	bne lc783
+	lda $a8
+	cmp lc1cc-1,x
+	bne lc783
+	lda lc111,x
+	sta befcode
+	jsr lc6a1
+	ldy #$00
+	cpx #$20
+	bpl lc7ad
+	cmp #$20
+	bne lc7b0
+	lda lc14d,x
+	sta befcode
+lc7ad	jmp lc831
+; 77ac
+lc7b0	ldy #$08
+	cmp #$4d
+	beq lc7d6
+	ldy #$40
+	cmp #$23
+	beq lc7d6
+	jsr aschex
+	sta $00ae
+	sta $00af
+	jsr lc6a1
+	ldy #$20
+	cmp #$30
+	bcc lc7e9
+	cmp #$47
+	bcs lc7e9
+	ldy #$80
+	dec $d3
+lc7d6	jsr lc6a1
+	jsr aschex
+	sta $00ae
+	jsr lc6a1
+	cpy #$08
+	beq lc7e9
+	jsr lc6be
+lc7e9	sty adrcode
+	ldx #$01
+	cmp #$58
+	jsr lc69a
+	ldx #$04
+	cmp #$29
+	jsr lc69a
+	ldx #$02
+	cmp #$59
+	jsr lc69a
+	lda befcode
+	and #$0d
+	beq lc810
+	ldx #$40
+	lda #$08
+	jsr lc681
+	lda #$18
+	!by $2c
+lc810	lda #$1c
+	ldx #$82
+	jsr lc681
+	ldy #$08
+	lda befcode
+	cmp #$20
+	beq lc828
+lc81f	ldx lc204-1,y
+	lda lc20c-1,y
+	jsr lc681
+lc828	dey
+	bne lc81f
+	lda adrcode
+	bpl lc830
+	iny
+lc830	iny
+lc831	jsr lc68a
+	dec $b7
+	lda $b7
+	sta $d3
+	jmp lc597
+
+; ----------------------------------------- 
+; --------- setprinter (p) ----------------------------------
+; ----------------------------------------- 
+; 7839
+setprinter
+	jsr getbyt
+	sta prnno
+	rts
+
+; ----------------------------------------- 
+; --------- io set (i) --------------------------------------
+; ----------------------------------------- 
+; 7840
+ioset	jsr getbyt
+	sta iono
+	rts
+
+lserror	jmp error
+
+; ----------------------------------------- 
+; --------- load/save (l/s) ---------------------------------
+; ----------------------------------------- 
+; 784a
+loadsave	ldy #$02
+	sty $bc		; name at $0201
+	dey
+	sty $b9		; sa: 1
+	sty $bb
+	dey
+	sty $b7		; len: 0
+	jsr getchrerr	; get input
+	cmp #$22		; start quote?
+	bne lserror	; no, error
+
+lsi	jsr getchrerr	; yes, store name to $0201
+	sta ($bb),y
+	iny
+	inc $b7		; count len
+	cmp #$22		; end quote?
+	bne lsi
+
+	dec $b7		; final len
+	lda iono		; set drive number
+	sta $ba
+	lda command
+	cmp #$53		; s? (save)
+	beq save
+
+; ----------------------------------------- 
+; 7876
+load_s	jsr getret	; l (load): adress follows?
+	beq load1
+	ldx #$c3		; yes, set start address
+	jsr getadr
+	lda #$00		; sa: 0
+	sta $b9
+
+load1	lda #$00
+	jmp sysload		; load 
+
+; --------- .....save (..s) ---------------------------------
+; 7889
+save	ldx #$c1
+	jsr getadr
+	ldx #$ae
+	jsr getadr
+	jmp syssave
+
+; ----------------------------------------- 
+; --------- add/sub (?) -------------------------------------
+; ----------------------------------------- 
+; 7896
+addsub	jsr getadr1
+	jsr getchrerr
+	eor #$02
+	lsr
+	lsr
+	php
+	jsr getadr
+	jsr return		 ; next line
+	plp
+	bcs lc8ba
+	lda $fd
+	adc pcl
+	tax
+	lda $fe
+	adc pch
+lc8b7	sec
+	bcs lc8c3
+lc8ba	lda pcl
+	sbc $fd
+	tax
+	lda pch
+	sbc $fe
+lc8c3	tay
+lc8c4	txa
+lc8c5	sty pch
+	sta pcl
+	sty $62
+	sta $63
+	php
+	lda #$00
+	sta $d3
+	jsr lc675
+	lda pch
+	bne lc8e8
+	jsr space2	; output 2 x space
+	lda pcl
+	jsr hexout1	; output 2 digit hex address
+	lda pcl
+	jsr chngbin
+	beq lc8eb
+lc8e8	jsr hexout	; output as 4 digit hex
+lc8eb	jsr space		; output space
+	ldx #$90
+	lda $01
+	sta mem
+	lda #$37
+	sta $01
+	plp
+	jsr add
+	jsr flpstr
+	ldx mem
+	stx $01
+	jmp print
+
+; ----------------------------------------- 
+; --------- convert hex ($) ---------------------------------
+; ----------------------------------------- 
+; 7904
+befhex	jsr getbyt
+	tax
+	ldy $d3
+	lda ($d1),y
+	eor #$20
+	beq lc8b7
+	txa
+	tay
+	jsr getbyt1
+lc919	sec
+	bcs lc8c5
+
+; ----------------------------------------- 
+; --------- convert binary (%) ------------------------------
+; ----------------------------------------- 
+; 7918
+befbin	jsr skipspace
+	ldy #$08
+lc921	pha
+	jsr getchrerr
+	cmp #$31
+	pla
+	rol
+	dey
+	bne lc921
+	beq lc919
+
+; ----------------------------------------- 
+; --------- convert decimal (#) -----------------------------
+; ----------------------------------------- 
+; 792a
+befdec	jsr skipspace
+	ldx #$00
+	txa
+lc934	stx pcl
+	sta pch
+	tay
+	jsr chrin
+	cmp #$3a
+	bcs lc8c4
+	sbc #$2f
+	bcs lc948
+	sec
+	jmp lc8c4
+; 7944
+lc948	sta $fd
+	asl pcl
+	rol pch
+	lda pch
+	sta $fe
+	lda pcl
+	asl
+	rol $fe
+	asl
+	rol $fe
+	clc
+	adc pcl
+	php
+	clc
+	adc $fd
+	tax
+	lda $fe
+	adc pch
+	plp
+	adc #$00
+	jmp lc934
+
+; ----------------------------------------- 
+; --------- basicdata (b) -----------------------------------
+; ----------------------------------------- 
+; 7968
+basicdata	jsr get2adr
+	lda #$37
+	sta $01
+	ldx #$04
+lc975	lda datatab,x
+	sta flag,x
+	dex
+	bpl lc975
+dataloop	jsr return	; next line
+	ldx flag
+	lda adrcode
+	jsr intout
+	inc flag
+	bne lc98d
+	inc adrcode
+lc98d	lda #$44
+	jsr chrout
+	lda #$c1
+lc994	jsr chrout
+	ldy #$00
+	lda (pcl),y
+	sty $62
+	sta $63
+	jsr intout1
+	jsr cmpend
+	ldx #$03
+	bcs lc9b3
+	lda #$2c
+	ldx $d3
+	cpx #$49
+	bcc lc994
+	ldx #$09
+lc9b3	stx $c6
+lc9b5	lda sys172-1,x
+	sta $0276,x
+	dex
+	bne lc9b5
+	jmp exit
+
+; ----------------------------------------- 
+; --------- occupy (o) --------------------------------------
+; ----------------------------------------- 
+; 79bd
+occupy	jsr get2adr
+	jsr getbyt
+_occupy	ldx #$00		; entrance from e-command
+lc9c9	sta (pcl,x)
+	pha
+	jsr cmpend
+	pla
+	bcc lc9c9
+	rts
+
+; ----------------------------------------- 
+; --------- write (w) ---------------------------------------
+; ----------------------------------------- 
+; 79cf
+write	jsr get3adr
+_write	lda $a6		; entrance from y-command
+	bne lc9dc
+	dec $a7
+lc9dc	dec $a6
+	jsr lca30
+	stx $b5
+	ldy #$02
+	bcc lc9eb
+	ldx #$02
+	ldy #$00
+lc9eb	clc
+	lda $a6
+	adc loper
+	sta flag
+	lda $a7
+	adc hoper
+	sta adrcode
+lc9f8	lda ($a4,x)
+	sta ($a8,x)
+	eor ($a8,x)
+	ora $b5
+	sta $b5
+	lda $a4
+	cmp $a6
+	lda $a5
+	sbc $a7
+	bcs lca29
+lca0c	clc
+	lda $a4,x
+	adc offset,y
+	sta $a4,x
+	lda $a5,x
+	adc offset+1,y
+	sta $a5,x
+	txa
+	clc
+	adc #$04
+	tax
+	cmp #$07
+	bcc lca0c
+	sbc #$08
+	tax
+	bcs lc9f8
+lca29	lda $b5
+	beq lca3c
+	jmp error
+; 7a2c
+lca30	sec
+	ldx #$fe
+lca33	lda flag,x
+	sbc $a6,x
+	sta $b0,x
+	inx
+	bne lca33
+lca3c	rts
+
+; ----------------------------------------- 
+; --------- convert (c) -------------------------------------
+; ----------------------------------------- 
+; 7a39
+convert	jsr lca62
+	jmp _write
+
+; ----------------------------------------- 
+; --------- verschieb (v) -----------------------------------
+; ----------------------------------------- 
+; 7a3f
+verschieb	jmp lca62
+
+lca46	cmp $a7
+	bne lca4c
+	cpx $a6
+lca4c	bcs lca61
+	cmp $a5
+	bne lca54
+	cpx $a4
+lca54	bcc lca61
+	sta $b4
+	txa
+	clc
+	adc loper
+	tax
+	lda $b4
+	adc hoper
+lca61	rts
+; 7a5e
+lca62	jsr get3adr
+	jsr get2adr
+_verschieb
+	jsr lca30		; entrance from y-command
+lca6b	jsr lc4cb
+	iny
+	lda #$10
+	bit adrcode
+	beq lca9b
+	ldx pcl
+	lda pch
+	jsr lca46
+	stx flag
+	lda (pcl),y
+	sta $b5
+	jsr lc54a
+	ldy #$01
+	jsr lca46
+	dex
+	txa
+	clc
+	sbc flag
+	sta (pcl),y
+	eor $b5
+	bpl lcaae
+	jsr return	; next line
+	jsr hexout	; output as 4 digit hex
+lca9b	bit adrcode
+	bpl lcaae
+	lda (pcl),y
+	tax
+	iny
+	lda (pcl),y
+	jsr lca46
+	sta (pcl),y
+	txa
+	dey
+	sta (pcl),y
+lcaae	jsr lc66a
+	jsr cmpend1
+	bcc lca6b
+	rts
+
+; ----------------------------------------- 
+; --------- kontrolle (k) -----------------------------------
+; ----------------------------------------- 
+; 7ab3
+kontrolle	jsr get12adr
+lcaba	ldx #$27
+	jsr charret
+	jsr hexout	; output as 4 digit hex
+	ldy #$08
+	ldx #$00
+	jsr space		; output space
+lcac9	lda (pcl,x)
+	jsr ascii
+	bne lcac9
+	ldx #$00
+	jsr contin
+	beq lcada
+	jmp lcaba
+lcada	rts
+
+; ----------------------------------------- 
+; --------- tick (') -----------------------------------
+; ----------------------------------------- 
+; 7ad7
+tick	jsr getadr1
+	ldy #$03
+lcae0	jsr chrin
+	dey
+	bne lcae0
+lcae6	jsr getchrerr
+	cmp #$2e
+	beq lcaef
+	sta (pcl),y
+lcaef	iny
+	cpy #$20
+	bcc lcae6
+	rts
+
+; ----------------------------------------- 
+; --------- compare (=) -----------------------------------
+; ----------------------------------------- 
+; 7af1
+comp	jsr get2adr
+	ldx #$00
+lcafa	lda (pcl,x)
+	cmp ($fd,x)
+	bne lcb0b
+	jsr pcinc
+	inc $fd
+	bne lcafa
+	inc $fe
+	bne lcafa
+lcb0b	jsr space		; output space
+	jmp hexout	; output as 4 digit hex
+
+; ----------------------------------------- 
+; --------- find (f) ----------------------------------------
+; ----------------------------------------- 
+; 7b0d
+find	lda #$ff
+	ldx #$04
+lcb15	sta $fa,x
+	dex
+	bne lcb15
+	jsr getchrerr
+	ldx #$05
+lcb1f	cmp findtab-1,x
+	beq lcb69
+	dex
+	bne lcb1f
+lcb27	stx $a9
+	jsr lcbb4
+	inx
+	jsr chrin
+	cmp #$20
+	beq lcb27
+	cmp #$2c
+	bne lcb3b
+	jsr get2adr
+lcb3b	jsr return	 ; next line
+lcb3e	ldy $a9
+lcb40	lda (pcl),y
+	jsr lcbd6
+	bne lcb5f
+	dey
+	bpl lcb40
+	jsr hexout	 ; output as 4 digit hex
+	jsr space		; output space
+	ldy $d3
+	cpy #$24
+	bcc lcb5f
+	jsr printer1
+	jsr taste1
+	jsr return		 ; next line
+lcb5f	jsr cmpend
+	bcc lcb3e
+	ldy #$27
+	jmp printer
+; 7b65
+lcb69	lda findflg-1,x
+	sta $a8
+	lda findflg1-1,x
+	sta $a9
+	tax
+	beq lcb7c
+lcb76	jsr lcbb4
+	dex
+	bne lcb76
+lcb7c	jsr get2adr
+lcb7f	jsr lc4cb
+	jsr lc52c
+	lda $a8
+	bit adrcode
+	bne lcb94
+	tay
+	bne lcbaf
+	lda befcode
+	bne lcbaf
+	beq lcba1
+lcb94	ldy $a9
+lcb96	lda befcode,y
+	jsr lcbd6
+	bne lcbaf
+	dey
+	bne lcb96
+lcba1	sty flag
+	jsr lc58c
+	jsr taste
+lcba9	jsr cmpend1
+	bcc lcb7f
+	rts
+; 7bab
+lcbaf	jsr lc66a
+	beq lcba9
+lcbb4	jsr lcbc0
+	sta buf4,x
+	lda buf1,x
+	sta buf2,x
+lcbc0	jsr getchrerr
+	ldy #$0f
+	cmp #$2a
+	bne lcbcb
+	ldy #$00
+lcbcb	jsr aschex1
+	sta buf1,x
+	tya
+	sta buf3,x
+	rts
+; 7bd2
+lcbd6	sta $b4
+	lsr
+	lsr
+	lsr
+	lsr
+	eor buf2,y
+	and buf4,y
+	and #$0f
+	bne lcbf0
+	lda $b4
+	eor buf1,y
+	and buf3,y
+	and #$0f
+lcbf0	rts
+
+; ----------------------------------------- 
+; --------- trace (t) ------- $cbf1 -------------------------
+; ----------------------------------------- 
+; 7bed
+trace	pla
+	pla
+	jsr chrin
+	cmp #$57		; w? (trace walk)
+	bne lcbfd
+	jmp lcd56		; yes, branch
+; 7bf9
+lcbfd	cmp #$42		; b? (trace break)
+	bne lcc04
+	jmp lcdd0
+; 7c00
+lcc04	cmp #$51		; q? (trace quick)
+	bne lcc0b
+	jmp lcd4f
+; 7c07
+lcc0b	cmp #$53		; s? (trace stop)
+	beq lcc12
+	jmp error
+; 7c0e
+lcc12	jsr getbyt
+	pha
+	jsr getbyt
+	pha
+	jsr getstart
+	ldy #$00
+	lda (pcl),y
+	sta $02bc
+	tya
+	sta (pcl),y
+	lda #<lcc36
+	sta brk_lo
+lcc2c	lda #>lcc36
+	sta brk_hi
+	ldx #$fc
+	jmp go2
+; 7c32
+lcc36	ldx #$03
+lcc38	pla
+	sta srsave,x
+	dex
+	bpl lcc38
+	pla
+	pla
+	tsx
+	stx spsave
+	lda pchsave
+	sta pch
+	lda pclsave
+	sta pcl
+	lda $02bc
+	ldy #$00
+	sta (pcl),y
+	lda #<break
+	sta brk_lo
+lcc5b	lda #>break
+	sta brk_hi
+	lda #$52		; r (registers)
+	jmp cmdstore	; store and compare command
+; 7c61
+lcc65	jsr return	; next line
+	lda vic_ctrl1	; switch screen on
+	ora #$10
+	sta vic_ctrl1
+lcc70	rts
+; 7c6d
+	sta aksave
+	php
+	pla
+	and #$ef
+	sta srsave
+	stx xrsave
+	sty yrsave
+	pla
+	clc
+	adc #$01
+	sta pclsave
+	pla
+	adc #$00
+	sta pchsave
+	lda #$80
+	sta $02bc
+	bne lcca5
+; 7c91
+lcc95	jsr lcde5		; set sys irq
+	jsr en_timer	; enable timer	
+	cld
+	ldx #$05		; save register values
+lcc9e	pla
+	sta pchsave,x
+	dex
+	bpl lcc9e
+; 7ca1
+lcca5	lda irq_lo	; save copy of irq vec
+	sta $02bb
+	lda irq_hi
+	sta $02ba
+	tsx
+	stx spsave	; save stack pointer
+	cli
+	lda srsave	; break?
+	and #$10
+	beq lccc5
+; 7cb9
+lccbd	jsr lcc65		; yes: cr, r (registers)
+	lda #$52
+	jmp cmdstore	; store and compare command
+; 7cc1
+lccc5	bit $02bc		; no: flag?
+	bvc lcce9
+	sec
+	lda pclsave
+	sbc $02bd
+	sta mem
+	lda pchsave
+	sbc $02be
+	ora mem
+	bne lcd46
+	lda $02bf
+	bne lcd43
+	lda #$80
+	sta $02bc
+; 7ce5
+lcce9	bmi lccfd
+	lsr $02bc
+	bcc lccbd
+	ldx spsave
+	txs
+lccf4	lda #>lcc70	; to cc71
+	pha
+	lda #<lcc70
+	pha
+	jmp lcdba
+; 7cf9
+lccfd	jsr lcc65		; cr, screen on
+	lda #$a8
+	sta pcl
+	lda #$02
+	sta pch
+	jsr space		; output space
+	ldy #$00
+lcd0d	lda (pcl),y
+	jsr hexout1	; output 2 digit hex address
+	iny
+	cpy #$07
+	beq lcd20
+	cpy #$01
+	beq lcd0d
+	jsr space		; then output space
+	bne lcd0d
+lcd20	lda pclsave
+	ldx pchsave
+	sta pcl
+	stx pch
+	jsr space2	; output 2 x space
+	jsr lc4cb
+	jsr lc5c7    
+lcd33	jsr getin
+	beq lcd33
+	cmp #$4a		; j? (run subroutine)
+	bne lcd46
+	lda #$01		; yes
+	sta $02bc
+	bne lcd72
+; 7d3f
+lcd43	dec $02bf
+lcd46	lda $91		; stop?
+	cmp #$7f
+	bne lcd72
+	jmp lccbd		; yes, show regs
+; 7d4b
+lcd4f	jsr lcdf2
+	lda #$40
+	bne lcd60
+; 7d52			trace walk
+lcd56	jsr lcdf2
+; korrektur
+	nop
+	nop
+	nop
+	nop
+	nop
+			 ; php
+			 ; pla
+			 ; sta srsave
+	lda #$80
+lcd60	sta $02bc
+	tsx
+	stx spsave
+	jsr getstart	; read start address
+	jsr lcc65		; cr, screen on
+	lda $02bc
+	beq lcda9
+; 7d6e
+lcd72	ldx #$00		; is screen on?
+	lda vic_ctrl1
+	tay
+	and #$10
+	beq lcd8c
+	tya			; yes, switch off
+	and #$ef
+	sta vic_ctrl1
+	nop
+	nop
+	ldy #$0c		; wait
+lcd86	dex
+	bne lcd86
+	dey
+	bne lcd86
+; 7d88
+lcd8c	sei
+
+!ifdef cia_n {		; at 7d8a:
+	lda #$49		; this is the timing value for the new cia 
+} else {
+	lda #$47		; this is the timing value for the old cia    
+}   
+	sta timera_lo
+	stx timera_hi	; .x=0
+	lda ctrl_rega	; start timer
+	and #$80
+	ora #$11
+	sta ctrl_rega
+	lda #<lcc95	; set vec to sys irq
+lcda1	ldx #>lcc95
+	sta $02bb
+	stx $02ba
+lcda9	ldx spsave	; restore stack pointer
+	txs
+	sei
+	lda $02bb		; restore sys irq
+	ldx $02ba
+	sta irq_lo
+	stx irq_hi
+lcdba	lda pchsave	; get pc
+	pha
+	lda pclsave
+	pha
+	lda srsave	; get pstatus byte
+	pha
+	lda aksave	; get .a
+	ldx xrsave	; get .x
+	ldy yrsave	; get .y
+	rti		; end of irq
+; 7dcc
+lcdd0	jsr getbyt
+	sta $02be
+	jsr getbyt
+	sta $02bd
+	jsr getbyt
+	sta $02bf
+	jmp execute	; go back, wait for next input
+; 7de1
+lcde5	lda tracebuf
+	ldx tracebuf+1
+	sta irq_lo
+	stx irq_hi
+	rts
+; 7dee
+lcdf2	lda irq_lo
+	ldx irq_hi
+	sta tracebuf
+	stx tracebuf+1
+	lda #<lcc95
+	sta brk_lo
+lce03	lda #>lcc95
+	sta brk_hi
+lce08	rts
+
+; ----------------------------------------- 
+; --------- diskmonitor (z) ---------------------------------
+; ----------------------------------------- 
+; 7e05			dmon (z)
+dmon	lda #$07
+	sta border
+	lda #$36
+	sta $01
+	ldx #$00
+lce14	lda lcfe4,x
+	sta dcmdst,x
+	inx
+	cpx #$0d
+	bcc lce14
+; 7e1b
+lce1f	ldx #$2a
+	jsr charret
+dce24	jsr chrin
+	cmp #$2a
+	beq dce24
+	ldx #$06
+lce2d	cmp lcfd2,x
+	bne lce43
+	stx savex
+	txa
+	asl
+	tax
+	inx
+	lda lcfd8,x
+	pha
+	dex
+	lda lcfd8,x
+	pha
+	rts
+; 7e3f
+lce43	dex
+	bpl lce2d
+	jmp lce1f
+; 7e45
+lce49	lda #<diskbuf	; show buffer $c000
+	sta pcl
+	lda #>diskbuf
+	sta pch
+	sta $fe
+lce53	lda pcl
+	adc #$04
+	sta $fd
+	jsr memdump1
+lce5c	jsr stopt		; stop?
+	beq dce70
+	lda $028d		; shift?
+	beq lce5c
+	lda #$00
+	sta $c6
+	lda pch
+	cmp #>(diskbuf+256)	; one page?
+	bcc lce53
+dce70	jmp lce1f
+; 7e6f
+lce73	jsr getadr1
+	ldy #$20
+	ldx #$00
+lce7a	jsr getchrerr
+	jsr getbyt1
+	sta (pcl,x)
+	jsr ascii
+	bne lce7a
+	jsr return	; next line
+	jmp dce24
+; 7e89
+lce8d	jsr lcf55		; open "#"
+	lda savex
+	cmp #$02		; r or w?
+	bne lce9a
+	jmp lceeb
+; 7e96
+lce9a	ldx #$00		; r
+	lda diskbuf,x
+	sta tmpsecto	; save track
+	inx
+	lda diskbuf,x	; save sector
+	sta $02c4
+	txa
+	jmp lcecb
+; 7ea9			read
+lcead	jsr getret	; check for return
+	bne lceb5
+	jmp lce8d
+; 7eb1
+lceb5	jsr getbyt	; input  track
+	sta tmpsecto
+	jsr getbyt	; input sector
+	sta $02c4
+	jsr lcf55		; open "#"
+	lda savex
+	cmp #$02		; r or w?
+	beq lceeb
+
+; ----------------------------------------- 
+; 7ec7
+lcecb	jsr lcf0d		; read sector
+	ldx #$0d
+	jsr chkin
+	ldy #$00
+lced5	jsr chrin
+	nop
+	nop
+	nop
+	nop
+	sta diskbuf,y
+	iny
+	bne lced5
+	jsr clrchn
+	jsr lcfbc		; close
+	jmp lce49		; show
+
+; ----------------------------------------- 
+; 7ee7			write
+lceeb	jsr lcf40		; w: set bufferpointer
+	ldx #$0d
+	jsr chkout
+	ldy #$00
+lcef5	lda diskbuf,y
+	jsr chrout
+	ldx $90
+	bne lcf02
+	iny
+	bne lcef5
+lcf02	jsr clrchn
+	lda #$32
+	jsr lcf0d
+	jmp lcfb6
+
+; ----------------------------------------- 
+; 7f09
+lcf0d	sta $02d1
+	lda tmpsecto
+	jsr lcf79
+	stx track
+	sta $02d9
+	lda $02c4
+	jsr lcf79
+	stx secto
+	sta secto+1
+	ldx #$0f
+	jsr chkout
+	ldx #$00
+dcf2f	lda dcmdst,x
+	jsr chrout
+	inx
+	cpx #$0d
+	bcc dcf2f
+	jsr clrchn
+	jmp dcf8c
+
+; ----------------------------------------- 
+; 7f3c
+lcf40	ldx #$0f
+	jsr chkout
+	ldx #$00
+lcf47	lda dcff2,x
+	jsr chrout
+	inx
+	cpx #$08
+	bcc lcf47
+	jmp clrchn
+
+; ----------------------------------------- 
+; 7f51
+lcf55	lda #$0f
+	tay
+	ldx iono
+	jsr setlfs
+	lda #$00
+	jsr setnam
+	jsr open
+	lda #$0d
+	tay
+	ldx iono
+	jsr setlfs
+	lda #$01
+	ldx #<lcff1
+	ldy #>lcff1
+	jsr setnam
+	jmp open
+
+; ----------------------------------------- 
+; 7f77
+lcf79	ldx #$30
+	sec
+lcf7c	sbc #$0a
+	bcc lcf83
+	inx
+	bcs lcf7c
+lcf83	adc #$3a
+dcf85	rts
+
+; ----------------------------------------- 
+; 7f84
+dcf86	jsr dcf8c
+	jmp lcfb6
+
+; ----------------------------------------- 
+; 7f8a
+dcf8c	lda #$00
+	sta $90
+	jsr return 	; next line
+	lda iono
+	jsr talk
+	lda #$6f
+	jsr tksa
+	jsr iecin
+	cmp #$30
+	bne lcfaa
+	jmp untalk
+; 7fa6
+lcfa7	jsr iecin
+lcfaa	jsr chrout
+	cmp #$0d
+	bne lcfa7
+	jsr untalk
+	pla
+	pla
+lcfb6	jsr lcfbc
+	jmp lce1f
+; 7fbb
+lcfbc	lda #$0d
+	jsr close
+	lda #$0f
+	jmp close
+
+; ----------------------------------------- 
+; 7fc5			leave dmon
+lcfc6	lda #$06
+	sta border
+	lda #$37
+	sta $01
+	jmp execute	; go back, wait for next input
+
+; ----------------------------------------- 
+; 7fd1
+lcfd2	!by $3a,$52,$57,$4d,$58	; ":rwmx" , new floppy commands
+; 7fd6
+	!by $40		; "@"   used in normal fmon mode    
+; 7fd7
+lcfd8	!by <lce73-1
+	!by >lce73-1
+	!by <lcead-1
+	!by >lcead-1   
+	!by <lcead-1
+	!by >lcead-1
+	!by <lce49-1
+	!by >lce49-1
+	!by <lcfc6-1
+	!by >lcfc6-1
+	!by <dcf85	; address for normal fmon command
+	!by >dcf85    
+; 7fe3
+lcfe4	!by $55,$31,$3a,$31,$33,$20,$30,$20	; "u1:13 0 "
+	!by $31,$38,$20,$30,$30		; "18 00"
+; 7ff0
+lcff1	!by $23				; "#"
+; 7ff1
+dcff2	!by $42,$2d,$50,$20,$31,$33,$20,$30	; "b-p 13 0"
+
+; 7ff9
+; -----------------------------------------------------------
+; --------- end fcom/fmon part ------------------------------
+; -----------------------------------------------------------
+
