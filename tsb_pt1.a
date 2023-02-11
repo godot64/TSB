@@ -211,16 +211,16 @@ into	jsr cold1		; set drive 8 and LOAD/SAVE vectors
 	sta basvecs,x
 	dex
 	bpl -
-	ldx #$81
-	stx $fffa+1	; sys nmi vector hi ($8118)
+	ldx #$81		; (hard) nmi vector hi ($8117)
+	stx $fffa+1	; (in case kernal is off at reset)
 	inx
 	stx nmivec+1	; NMI = $82f9
 	inx
 	stx brkvec+1
 	lda #<sbrk	; SBRK = $8314!
 	sta brkvec
-	lda #$18
-	sta $fffa		; sys nmi vector lo
+	lda #$17		; sys nmi vector lo
+	sta $fffa		; (in case kernal is off at reset)
 	lda #<snmi
 	sta nmivec
 	cli

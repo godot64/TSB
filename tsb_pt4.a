@@ -1238,16 +1238,17 @@ befpause	jsr chrget
 	sta zaesec
 	sta zaeirq
 -	jsr $ffe4		; sys getin keyboard
-	bne +
+			; patch here:
+	!by $d0,$0b	; (TSB: bne +)
+			; to $24,$0b:
+			; (SB:  bit $0b)
+	cmp #$0d		; return?
+	beq +		; yes, leave
 	lda zaesec	; check timer
 	cmp int
 	bne -
 
 +	jmp endsmb
-
-; ----------------------------------------- 
-; a80f
-	!by 0,0,0,0
 
 ; ----------------------------------------- Part of FETCH
 ; a816
