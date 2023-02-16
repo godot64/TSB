@@ -282,7 +282,7 @@ sip0	lda musicadr	; get adr of music string
 	sta $fd
 	ldy musicz1	; get pointer into string
 	cpy musiclen	; at end of string?
-	bcs sip2		; yes, end PLAY
+	bcs playend	; yes, end PLAY
 
 	lda ($fc),y
 	cmp #$8d		; beyond f8? (code for longest note)
@@ -292,7 +292,7 @@ sip0	lda musicadr	; get adr of music string
 	sbc #$84		; code valid, set individ. note duration
 	sta musicz2
 	sta musicz3
-	lda musicdau
+	lda musicdau	; general tempo (the shorter the faster)
 	sta musicz4
 	bne sip4		; uncond. branch
 ; 8a9f
@@ -323,7 +323,7 @@ sip9	cmp #$93		; clr (code for select voice)?
 	lda ($fc),y
 	ldx #$00
 	stx musicz4
-	cmp #$33		; beyond voice 3?
+	cmp #$34		; beyond voice 3?
 	bcs sip5
 	cmp #$31		; below voice 1?
 	bcc sip5
@@ -331,7 +331,7 @@ sip9	cmp #$93		; clr (code for select voice)?
 	tax
 	dex
 	lda #$d4		; set $d4xx (from voice)
-	sta mregadr+1	; 
+	sta mregadr+1
 	lda mregs,x	; pointer to voice 1..3
 	sta mregadr
 	stx stimmenr
@@ -345,7 +345,7 @@ sip5	cmp #$47		; code "g": voice off?
 	ldy stimmenr
 	lda wavetab,y
 	and #$fe
-	ldy #4		; same code as below!
+	ldy #4
 sip11	sta ($fe),y
 	pla
 	tay
