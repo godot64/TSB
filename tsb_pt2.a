@@ -309,12 +309,11 @@ sip2	sty musicz5	; store pointer into string
 sip4	cpy musiclen	; at end of music string?
 	bcs playend	; yes
 	iny		; no, advance
-	sty musicz1
-	rts
+	bne +
 ; 8abd
-playend	lda #0		; clear play flag
-	sta musicz1
-	sta playflag
+playend	ldy #0		; clear play flag
+	sty playflag
++	sty musicz1
 	rts
 
 sip9	cmp #$93		; clr (code for select voice)?
@@ -422,15 +421,15 @@ svmregadr	ldy mregadr
 
 ; ----------------------------------------- 
 ; 8b87
-mregs	!by $00,$07,$0e
+mregs	!by $00,$07,$0e,$15,$15
 ; 8b8a
 nottab	!by $43,$c3,$44,$c4,$45,$46,$c6,$47
 	!by $c7,$41,$c1,$42,$5a,$ac,$b1,$bb
 	!by $a5,$b0,$bf,$bc
 ; 8b9e
-frqtabl	!by $12,$23,$34,$46,$5a,$6e,$84,$9b
-	!by $b3,$cd,$e9,$06,$00,$23,$46,$5a
-	!by $84,$b3,$e9,$06
+frqtabl	!by $16,$27,$39,$4b,$5f,$74,$8a,$a1
+	!by $ba,$d4,$f0,$0e,$00,$27,$4b,$5f
+	!by $8a,$ba,$f0,$0e
 
 ; ----------------------------------------- 
 ; 8bb2

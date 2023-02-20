@@ -719,17 +719,6 @@ blockzei	ldx ay		; exchange x and y of top left edge...
 
 ; ----------------------------------------- 
 ; bca7
-a8plus8	clc
-	lda $a8
-	adc #8
-	sta $a8
-	lda $a9
-	adc #0
-	sta $a9
-	rts
-
-; ----------------------------------------- 
-; bcb5
 plus320	inc $a4
 	lda $a4
 	and #7
@@ -753,7 +742,7 @@ plus320	inc $a4
 	rts
 
 ; ----------------------------------------- part of MEM
-; bcdd			new
+; bccf			new
 memplus	dey		; .y=0
 	jsr chrget
 	lda (progz),y
@@ -784,7 +773,7 @@ memplus	dey		; .y=0
 	jmp execdma	; to $b5ed (this part by P. Hagemann)
 
 ; ----------------------------------------- w/ Parameters
-; bd12
+; bd04
 params	sty helpvc2	; .y=0
 	tax
 	jsr chrget	; advance to parameters:
@@ -803,7 +792,7 @@ params	sty helpvc2	; .y=0
 	jmp swarm		; otherwise: error "Bad Mode",
 
 ; ----------------------------------------- 
-; bd33
+; bd25
 param1	jsr sgetadr	; LEN: get amount
 	sty $df07
 	sta $df08
@@ -855,8 +844,21 @@ param6	jsr sgetbyt1	; CONT: get fix reu flag
 ready	jmp endsmb
 
 ; ----------------------------------------- 
+; bd89
+a8plus8	clc
+	lda $a8
+	adc #8
+	sta $a8
+	lda $a9
+	adc #0
+	sta $a9
+-	rts
+
+; ----------------------------------------- 
 ; bd97
-	!by 0,0,0,0,0,0,0
+chkvoice	cpx #4
+	beq -
+	jmp x123
 
 ; ----------------------------------------- part of COLOUR
 ; bd9e
@@ -1703,7 +1705,7 @@ null	!tx "null"
 ; ca44
 version	!tx "ad86"	; Signature
 	!by $0d
-	!tx "2.30215"	; Version Number
+	!tx "2.30220"	; Version Number
 
 ; ----------------------------------------- 
 ; ca4f

@@ -240,7 +240,7 @@ tsbvecs	!wo warmstart,sloop,zeiumw,slist,sbasbef,sgetari
 ; 81ba
 tsbpudef	!by $2b,$2a,$2c,$2e,$2d,$23	; +*,.-#
 
-; ----------------------------------------- bef DIV (Clear Video)
+; ----------------------------------------- bef DIV/CLS (Clear Video)
 ; 81c0
 befdiv	jsr clear		; clear screen
 	jmp bef0
@@ -732,7 +732,7 @@ lr0	jmp usel6
 ; ----------------------------------------- bef SOUND
 ; 864d			new
 befsound	jsr sgetbytn	; get voice number
-	jsr x123		; is in 1..3?
+	jsr chkvoice	; is in 1..4?
 	jsr setsid	; set SID base address
 	jsr schkcom	; comma?
 	jsr sgetadr	; get frequency value

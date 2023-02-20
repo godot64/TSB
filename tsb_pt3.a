@@ -1249,14 +1249,14 @@ befenvelope
 	ldy #6		; .y=index to sust/release register
 	lda $aa		; re-get sustain/release
 	sta ($20),y	; set value to SID
-	ldy $a6
-	sta srtab,y	; and to buffer
+	sta srtab,x	; and to buffer
 	dey		; index to atck/decay register
 	lda $a8		; re-get attack/decay
 	sta ($20),y	; set value to SID
-	ldy $a6
-	sta adtab,y	; and to buffer
+	sta adtab,x	; and to buffer
 	jmp endsmb
+
+	!by 0,0,0,0
 
 ; ----------------------------------------- 
 ; 99ae
