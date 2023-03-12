@@ -1,4 +1,4 @@
-# TSB.MON 1.03
+# TSB.MON 1.04
 **TSB.MON** is a machine code monitor (and also a disk monitor and a simple direct assembler) which adds to the usefulness of TSB's debugging and analyzing commands. It occupies 4 KB of memory from $7000 (to $7fff). TSB.MON is an enhanced (a little) version of **SMON**, which was first published in German **64'er Magazin** in 1984 to 1985. TSB.MON is derived from the most useful **[SMON Relocatable Source Code repository](https://github.com/LeshanDaFo/SMON-RelocatableSourceCode "Github Link")** of **Claus Schlereth** in its version 1.1.4.007 (of 2023.01.14).   
 
 ## Changes to the original SMON

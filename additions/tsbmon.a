@@ -1,6 +1,6 @@
 ; ###############################################################
 ; #                                                             #
-; #  TSB.MON 1.03	                                            #       
+; #  TSB.MON 1.04	                                            #       
 ; #                                                             #
 ; #  patched for TSB by Arndt Dettke,  2023.01.30               #
 ; #  enhanced by Claus Schlereth, 2023.01.31 and 2023.03.03     #
@@ -630,12 +630,12 @@ hasparm	lda #$ff		; init end address
 	cmp #$0d		; check for return
 	bne m_next	; branch if not
 	jsr m_check	; prepare m without address
-	bne memdump1	; jmp
+	bne memdump0	; jmp
 m_next	dec $d3		; restore pointer for normal m-command
 	jmp get12adr
 
 memdump	jsr hasparm
-memdump0	ldx #$3a		; ':' (hidden command)
+memdump1	ldx #$3a		; ':' (hidden command)
 	jsr charret
 	jsr hexout	; output as 4 digit hex
 	ldy #$20
@@ -647,8 +647,8 @@ memdump2	jsr space		; output space
 	jsr ascii		; output ascii chars
 	bne memdump2
 	jsr contin
-	bcc memdump0
-memdump1	rts
+	bcc memdump1
+memdump0	rts
 
 ; ----------------------------------------- 
 ; --------- colon (:) ---------------------------------------
@@ -2311,6 +2311,7 @@ lcff1	!by $23				; "#"
 dcff2	!by $42,$2d,$50,$20,$31,$33,$20,$30	; "b-p 13 0"
 
 ; 7ff1
+ver	!tx "1.04"
 ; -----------------------------------------------------------
 ; --------- end fcom/fmon part ------------------------------
 ; -----------------------------------------------------------
