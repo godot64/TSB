@@ -20,6 +20,8 @@
 ; patched on 17.07.2ß22 (bugfix in DO..DONE)
 ; patched on 05.10.2021 (new tokenizer, new detokenizer)
 ;
+; further patches here: https://github.com/godot64/TSB
+;
 ; ----------------------------------------- 
 
 	!ct pet
@@ -635,7 +637,7 @@ mobbeweg	lda #0
 	sta ydiff+1
 	sta helpvc2
 	sta helpvc2+1
-; a3c7
+; a3c5
 vloop	lda ax
 	sta $09
 	lda ax+1
@@ -651,11 +653,11 @@ vloop	lda ax
 	jmp vergl
 
 +	jsr punkt		; line
-; a3eb
+; a3e9
 vergl	lda helpvc2
 	ora helpvc2+1
 	beq +
-; a3f3
+; a3ef
 vergl1	jsr ynext
 	jmp vloop
 
@@ -668,7 +670,7 @@ vergl1	jsr ynext
 +	rts
 
 ; ----------------------------------------- 
-; a40a
+; a406
 diff	sec
 	lda ey
 	sbc ay
@@ -724,7 +726,7 @@ diff	sec
 	sta xdiff+1
 	lda #0
 	sta helpvc2+1
-; a472
+; a46d
 -	sta helpvc2
 	sec
 	lda ydiff
@@ -745,7 +747,7 @@ diff	sec
 	inc helpvc2+1
 +	lda helpvc2
 	jmp -
-; a49e
+; a495
 ++	pla
 	pla
 	jsr cmpax
@@ -763,7 +765,7 @@ diff	sec
 +	jmp vergl1
 
 ; ----------------------------------------- 
-; a4cb
+; a4b3
 ynext	lda helpvc2
 	ora helpvc2+1
 	beq cpay
@@ -776,7 +778,7 @@ cpay	jsr cmpay
 	bcs decay
 
 ; ----------------------------------------- 
-; 
+; a4c8
 incay	inc ay		; inc y
 	bne +
 	inc ay+1
@@ -800,7 +802,7 @@ decax	lda ax		; dec x
 	rts
 
 ; ----------------------------------------- 
-; a4fa
+; a4f2
 cmpax	lda ax+1
 	sta vgla+1
 	lda ax
@@ -810,7 +812,7 @@ cmpax	lda ax+1
 	lda ex
 	sta vgle
 	jmp vglae
-; a515
+; a50d
 cmpay	lda ay+1
 	sta vgla+1
 	lda ay
@@ -822,11 +824,7 @@ cmpay	lda ay+1
 	jmp vglae
 
 ; ----------------------------------------- 
-; a520
-	!by 0,0,0,0,0	; 5 bytes
-
-; ----------------------------------------- 
-; a52d
+; a528
 setmobpos	jsr getxy		; get start position
 	jsr chrgot
 	beq +
@@ -835,11 +833,13 @@ smp2	lda #$60		; patch!
 	jsr getxyf	; get target position
 	lda #$20		; unpatch!
 	sta getpktf
+	ldy mobnr
+	sty $aa
  	jmp gpf2		; get/set mobsize
 
 ; ----------------------------------------- Part of MMOB
-; a548
-gmspeed	ldx mobspeed	; get current speed
+; a545
+gmspeed	ldx mobsptab,y	; get current speed
 gnextpar	jsr chrgot	; anything following?
 	beq +		; no, leave with speed in .x 
 	jmp sgetbytc	; yes, get new mob speed to .x
@@ -1165,6 +1165,7 @@ whichdo	bcs waitkey	; "null"? (yes, if .c)
 befrlocm	jsr getx8n	; get sprite number (0..7)
 	stx mobnr2
 	stx mobnr
+	stx $aa
 	asl mobnr2	; and as index into registers
 	lda $d010		; get xpos hibyte
 	ora mbittabs,x
@@ -1174,15 +1175,14 @@ befrlocm	jsr getx8n	; get sprite number (0..7)
 	!by $2c
 +	lda #0
 	sta ax+1
+	sta ay+1
 	ldy mobnr2
 	lda $d000,y	; set current xpos as start address
 	sta ax
 	lda $d001,y	; likewise ypos
 	sta ay
-	lda #0
-	sta ay+1
-	jsr smp2		; get/set target address and size
-	jmp mobcont	; set expand and speed
+	jsr smp2		; get/set target address (and size)
+	jmp mobc2		; set size and speed
 
 ; ----------------------------------------- bef CMOB
 ; a79d			original
@@ -1267,7 +1267,7 @@ showcrsr	lda fcursor,x
 	rts
 
 ; ----------------------------------------- bef NRM
-; a82a			enhanced
+; a82c			enhanced
 befnrm	jsr nrm00
 	jmp nrm2
 
@@ -1304,7 +1304,7 @@ moboff	and mbittabl,x	; OFF
 	jmp endsmb
 
 ; ----------------------------------------- bef OFF
-; a87a			enhanced
+; a873			enhanced
 endflash	jsr dec7a
 befoff	ldx #0
 -	lda flashing

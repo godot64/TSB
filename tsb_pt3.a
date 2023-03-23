@@ -35,6 +35,8 @@
 ; patched on 17.09.2022 (de/tokenizer: added CLS token and keyword)
 ; patched on 18.09.2022 (bugfix im command MOB SET)
 ;
+; further patches here: https://github.com/godot64/TSB
+;
 ; ----------------------------------------- 
 
 	!ct pet
@@ -123,11 +125,7 @@ ipr5	jsr incbasbz	; process tsb command:
 
 ; ----------------------------------------- bef HIRES
 ; 9208			optimized
-befhires	ldy #$01		; x-limit: 319
-	sty xmaxhigh
-	lda #$3f
-	sta xmaxlow
-	dey
+befhires	jsr sethiresm	; x-limit: 319 (returns .y=0)
 	sty $a6		; $a6/7: $e000 (bitmap)
 	sty lowcolflag
 	lda #$e0
@@ -157,7 +155,7 @@ setmod	jsr clrhicols
 	beq ++
 
 ; ----------------------------------------- func MEMPEEK
-; 9248
+; 9240
 csgetarik	bne +		; MEMPEEK?
 
 fnmempeek	jsr getpeek	; yes, PEEK in overall RAM
@@ -175,8 +173,16 @@ fnmempeek	jsr getpeek	; yes, PEEK in overall RAM
 	jmp sxyflp3
 
 ; ----------------------------------------- 
-; 9262
+; 925a
 +	jmp csgetariend	
+
+; ----------------------------------------- part of MOB SET
+; 925d
+gpf3	txa		; .x=mobsize
+	ldy $aa
+	sta mobsztab,y	; store individual mobsize
+	plp
+	rts
 
 ; ----------------------------------------- bef PLOT
 ; 9265			recoded
@@ -712,11 +718,11 @@ befmmob	jsr getx8n	; get sprite number (0..7)
 	jsr schkcom
 	jsr dec7a
 	jsr setmobpos	; get start/target position and size
-	beq mmba
+mobc2	beq mmba
 ; 95e4
-mobcont	ldx mobnr		; with mob number:
-	jsr chkexp	; set sprite size
-	jsr setspeed	; get/set mob speed and:
+mobcont	ldy mobnr		; with mob number:
+	jsr chkexp	; get (/set) sprite size (keeps .y)
+	jsr setspeed	; get (/set) mob speed and:
 
 mmba	lda #$f0		; (set mob flag)
 	sta mobbew
@@ -726,7 +732,7 @@ mmba	lda #$f0		; (set mob flag)
 
 ; ----------------------------------------- 
 ; 95fa
-chkexp	lda mobsize	; mob size in .a
+chkexp	lda mobsztab,y	; mob size in .a
 	bne mmb1
 
 mmb0	jsr mobexl	; 0: not expanded
@@ -755,8 +761,11 @@ use1	jsr sgetstr	; get ctrl string
 
 ; ----------------------------------------- 
 ; 962c
-mobposs	ldx #0
-mmb6	cpx mobspeed	; first slowdown
+mobposs	ldy $aa
+	lda mobsptab,y
+	sta helpvec
+	ldx #0
+mmb6	cpx helpvec	; first slowdown
 	beq mmb5
 	inx
 	ldy #0
@@ -768,23 +777,23 @@ mmb7	cpy #10
 mmb5	ldy mobnr2
 	lda $09		; x position lo
 	sta $d000,y
-	lda $0a		; x position hi
-	cmp #1		; > 256?
-	bne mmb8
 
-	ldy mobnr		; yes, set accordingly
 	lda $d010
-	ora mbittabs,y
-mmb9	sta $d010
-	lda $a4
+	ldx mobnr
+	ldy $0a		; x position hi > 256?
+	beq mmb8
+	ora mbittabs,x	; yes, set accordingly
+	bne +
+mmb8	and mbittabl,x
++	sta $d010
+	lda $a4		; and now y position
 	ldy mobnr2
 	sta $d001,y
 	rts
 
-mmb8	ldy mobnr		; no, set accordingly
-	lda $d010
-	and mbittabl,y
-	jmp mmb9
+; ----------------------------------------- 
+; 9669
+	!by 0,0,0		; 3 bytes
 
 ; ----------------------------------------- bef BFLASH
 ; 966c			recoded
@@ -899,9 +908,9 @@ msk0	jsr sgetbytc	; get mob color
 +	and mbittabl,y	; type 0 (hires)
 ++	sta $d01c
 ; 9743
-	jsr gpf2		; get/set mob size
-	ldx $aa		; of MOB nr .x
-	jsr chkexp	; set sprite size
+	jsr gpf2		; get/set mob size (mobnr in .y)
+	ldy $aa		; of MOB nr .y
+	jsr chkexp	; set sprite size (keeps .y)
 	jsr setspeed	; get/set mobspeed
 
 	lda helpvec	; activate MOB? (number in .x)
@@ -1047,7 +1056,7 @@ sirq3	lda $d4
 	beq wasf5
 	cmp #3		; F7?
 	beq wasf7
-; 9857
+; 9854
 	lda #0		; none of these
 	sta inkey
 	beq sirq4
@@ -1120,7 +1129,7 @@ sirq5	lda playflag
 	cmp #10
 	bne +
 	jsr sirqplay
-; 98df
+; 98dc
 +	pla		; restore $fc to $ff
 	sta $fc
 	pla
@@ -1256,17 +1265,20 @@ befenvelope
 	sta adtab,x	; and to buffer
 	jmp endsmb
 
-	!by 0,0,0,0
+; ----------------------------------------- 
+; 99aa
+g2nsafe	jsr repchrget	; repair chrget
+	bne get2nyb	; uncond. branch
 
 ; ----------------------------------------- 
-; 99ae
+; 99af
 flinend	jsr chrget
 	cmp #0
 	bne flinend
 	rts
 
 ; ----------------------------------------- 
-; 99b6
+; 99b7
 get2nybc	jsr iskomma	; comma?
 get2nyb	jsr sgetbytn	; get value
 get2nyb2	jsr xnyb		; is below 16?
@@ -1284,12 +1296,12 @@ get2nyb2	jsr xnyb		; is below 16?
 	rts
 
 ; ----------------------------------------- bef CGOTO
-; 99d2			original
+; 99d3			original
 befcgoto	jsr incbasbz
 cgoto0	jsr sfrmnum
 	jsr sfacadr
 	jsr sgoto1
-	jmp endsmb
+	bne +
 
 ; ----------------------------------------- bef WAVE
 ; 99e1			optimized
@@ -1311,7 +1323,7 @@ bwv0	ldx $aa		; get voice number
 +	jmp endsmb
 
 ; ----------------------------------------- 
-; 9a02
+; 9a0a
 bincon	ldy #0		; pointer into panel
 	sty $a8		; init result byte
 -	lda (progz),y
@@ -1331,7 +1343,7 @@ err24	ldx #$24		; no, error "not binary char"
 	jmp sbzply
 
 ; ----------------------------------------- 
-; 9a2e
+; 9a2c
 setsid	lda mregs,x	; set oscillator address
 	sta $20
 	lda #$d4
@@ -1339,7 +1351,7 @@ setsid	lda mregs,x	; set oscillator address
 	rts
 
 ; ----------------------------------------- part of WAVE
-; 9a38
+; 9a36
 getpanel	jsr schkcom	; comma? digit following?
 	bcc +
 -	jsr sgetbyt1	; no, get expression
@@ -1421,14 +1433,14 @@ testdot	lda ($a8),y	; no, is 11 (test)
 	and gbittabs,x
 	beq +
 	lda #2
-	sta $90		; result in status, bits 0 and 1
+	sta status	; result in status, bits 0 and 1
 +	inx
 tdot0	lda ($a8),y
 	and gbittabs,x
 	beq +
-	lda $90
+	lda status	; !!! inc status !!! (4 bytes)
 	ora #1
-	sta $90
+	sta status
 +	rts
 
 ; ----------------------------------------- bef DRAW TO
@@ -1562,13 +1574,13 @@ inif	jsr schdo		; then search for DO in same line
 	jmp endsmb
 
 ; ----------------------------------------- 
-; 9b9a
+; 9b98
 iftrue	jsr doiftrue	; true: process THEN
 	bcs +
 	jmp cgoto0	; sb goto (when digits)
 
 ; ----------------------------------------- 
-
+; 9ba0
 fnddo	jsr mkwahr	; found DO
 	dey
 	iny

@@ -71,12 +71,12 @@
 	autoflag		= $c5b2		; Flag für AUTO
 	gmemflag		= $c5b3		; Flag für Grafik/MOB
 	mobbew		= $c5b4		; Flag bei MOB-Bewegungen
-	mobspeed		= $c5b5		; Speed bei MOB-Bewegungen
-	mobsize		= $c5b6		; TSB: Expand-Größe eines Sprites
-					; ! unused (4 bytes)
-	mobnr2		= $c5bb		; Index in $d000
-	mobnr		= $c5bc		; MOB-Nummer
-					; ! unused (7 Bytes)
+	mobspeed		= $c5b5		; ! unused (formerly: Speed bei MOB-Bewegungen)
+	mobsize		= $c5b6		; ! unused (formerly: TSB: Expand-Größe eines Sprites)
+	mobsptab		= $c5b7		; Tabelle der MOB-Speeds (8 Bytes)
+	mobnr2		= $c5bf		; Index in $d000
+	mobnr		= $c5c0		; MOB-Nummer
+					; ! unused (3 Bytes)
 	flashsp		= $c5c4		; Speed für FLASH
 	flashzae		= $c5c5		; Counter bei FLASH
 	flashfl		= $c5c6		; Flag für FLASH
@@ -84,7 +84,7 @@
 					; ! unused (3 bytes)
 	ifflag		= $c5cb		; Wahrheitswert der letzten IF-Abfrage
 	justif		= $c5cc		; Flag für IF in DO..DONE
-					; ! unused (8 bytes)
+	mobsztab		= $c5cd		; Tabelle der MOB-Sizes (8 bytes)
 	lcode		= $c5d5		; part of LIST
 	inkey		= $c5d6		; Nummer der Funktionstaste
 	bflashsp		= $c5d7		; Speed bei BFLASH

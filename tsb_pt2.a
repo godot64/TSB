@@ -501,11 +501,11 @@ chkdrv	lda #0
 -	rts
 
 ; ----------------------------------------- 
-; 8c21
-gpf2	ldx mobsize	; get current mobsize
+; 8c20
+gpf2	ldx mobsztab,y	; get current mobsize
 	jsr gnextpar	; get new one to .x (or keep .x and skip)
-gpf3	stx mobsize	; set new mobsize
-	rts
+	php		; save result (of gnextpar)
+	jmp gpf3		; set new mobsize
 
 ; ----------------------------------------- 
 ; 8c2a
@@ -518,20 +518,20 @@ err05	ldx #5		; drive not ready
 ; ----------------------------------------- 
 ; 8c34
 mobexs	lda $d01d
-	ora mbittabs,x
+	ora mbittabs,y
 	bne +
 
 mobeys	lda $d017
-	ora mbittabs,x
+	ora mbittabs,y
 	bne ++
 
 mobexl	lda $d01d
-	and mbittabl,x
+	and mbittabl,y
 +	sta $d01d
 	rts
 
 mobeyl	lda $d017
-	and mbittabl,x
+	and mbittabl,y
 ++	sta $d017
 	rts
 

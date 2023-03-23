@@ -22,6 +22,8 @@
 ; patched on 14.08.2022 (command: DISPLAY able to show 16 chars)
 ; patched on 17.09.2022 (de/tokenizer: added CLS token and keyword)
 ;
+; further patches here: https://github.com/godot64/TSB
+;
 ; ----------------------------------------- 
 
 	!ct pet
@@ -363,7 +365,7 @@ ren2	ldy #0		; find PRG end
 
 ; ----------------------------------------- 
 ; b9ef
-open14	jsr sclose	; ### shorter!
+open14	jsr sclose	; close 1
 	lda #1		; open 1,4
 	ldx #4
 	ldy #$ff
@@ -372,8 +374,18 @@ open14	jsr sclose	; ### shorter!
 	ldx #1		; cmd 1
 	jmp $ffc9
 
-; ----------------------------------------- bef COPY
+; ----------------------------------------- 
 ; ba03			recoded
+sethiresm	ldy #$01		; x-limit: 319
+	sty xmaxhigh
+	lda #$3f
+	sta xmaxlow
+	dey		; .y=0
+	sty multijn
+	rts
+
+; ----------------------------------------- bef COPY
+; ba12			recoded
 befcopy	jsr incbasbz
 	lda xmaxlow
 	pha
@@ -381,16 +393,11 @@ befcopy	jsr incbasbz
 	pha
 	lda multijn
 	pha
-	ldx #0
-	stx multijn
-	inx
-	stx xmaxhigh	; set 319
-	lda #$3f
-	sta xmaxlow
 
-	jsr open14
+	jsr sethiresm	; returns .y=0
+	jsr open14	; keeps .y
 
-	lda #0
+	tya
 	sta $f8
 cploop	sta $22
 	sta $61
@@ -449,7 +456,7 @@ cploop1	lda #160
 	cmp #$c8		; 200?
 	bcc cploop	; not yet
 
-	lda #$0f		; close printer
+	lda #$0f		; close mps printer
 	jsr bsout
 	jsr return
 	jsr sclose
@@ -463,11 +470,11 @@ cploop1	lda #160
 	jmp endsmb
 
 ; ----------------------------------------- 
-; bab5
+; bab8
 grprntab	!by $08,$35,$31,$10,$0f,$0d
 
 ; ----------------------------------------- part of COLOUR
-; babb
+; babe
 docolor2	beq colc0		; no, set paper and border to blk
 
 	cmp #$2c		; comma?
@@ -493,7 +500,7 @@ colc1	jsr sgetbytc	; get param3
 
 ; (41)
 ; ----------------------------------------- part of DO
-; bae4
+; bae6
 isnull	sty indoloop	; .y=0, clear DO flag
 	sty justif	; clear flag for additional IFs
 	dey
@@ -505,12 +512,12 @@ isnull	sty indoloop	; .y=0, clear DO flag
 	jmp whichdo	; or DONE?
 
 ; ----------------------------------------- bef REC
-; baf8			recoded
+; bafb			recoded
 befrec	jsr getxyxyf	; get x (AX), y (AY), Breite (EX), Höhe (EY) und Farbe ($f7)
 
 	lda ey		; ey retten
 	sta $61
-	lda ay		; ey=ay (ay retten)
+	lda ay		; ey=ay (und ay retten)
 	sta $62
 	sta ey
 	clc		; ax plus Breite (gleich Endpunkt X) -> 5f/60 
@@ -525,7 +532,7 @@ befrec	jsr getxyxyf	; get x (AX), y (AY), Breite (EX), Höhe (EY) und Farbe ($f7)
 	sta $60		; merken Hi
 	sta ex+1
 	jsr linzei	; obere Linie (von ax nach ex auf ay) = AB
-; bb24
+; bb27
 	pla
 	tax
 	sta ax+1
@@ -541,7 +548,7 @@ befrec	jsr getxyxyf	; get x (AX), y (AY), Breite (EX), Höhe (EY) und Farbe ($f7)
 	sta ey
 	jsr incax
 	jsr linzei	; untere Linie (von ax nach ex auf ay+ey) = DC
-; bb42
+; bb45
 	pla
 	sta ax+1
 	sta ex+1
@@ -549,7 +556,7 @@ befrec	jsr getxyxyf	; get x (AX), y (AY), Breite (EX), Höhe (EY) und Farbe ($f7)
 	sta ax
 	sta ex
 	jsr chkcrnr	; linke Linie (von ay nach ey auf ax) = AD	
-; bb53
+; bb56
 	lda $5f		; ax=ex
 	sta ax
 	sta ex
@@ -564,38 +571,36 @@ befrec	jsr getxyxyf	; get x (AX), y (AY), Breite (EX), Höhe (EY) und Farbe ($f7)
 	jmp endsmb
 
 ; ----------------------------------------- 
-; bb70
+; bb73
 chkcrnr	lda $62		; check if height=0 (returns .e)
 	sta ay
 	jsr cpay
 	jmp linzei	; draw line if not
 
 ; ----------------------------------------- part of BLOCK
-; bb7b
-mblock	lda ex		; multi BLOCK
-	cmp #$9f		; 159?
-	bcc +
-	lda #$9f
-	sta ex
-+	lda ey
-	cmp #$c7		; 199?
-	bcc +
-	lda #$c7
-	sta ey
+; bb7e
+mblock	lda #$9f		; multi BLOCK
+	cmp ex		; 159? (horiz max multi)
+	bcs +
+	sta ex		; yes, delimit
++	lda #$c7
+	cmp ey		; 199? (vert max)
+	bcs +
+	sta ey		; yes, delimit
 +	lda $09
 	sta $6f
 	and #3
 	asl
 	tax
 	jmp mbl0
-; bb9e
+; bb9d
 -	lda $09
 	and #3
 	asl
 	tax
 	bne mbl0
 	jsr a8plus8
-; bba9
+; bba8
 mbl0	lda $a4
 	and #7
 	tay
@@ -615,13 +620,13 @@ mbl0	lda $a4
 	rts
 
 ; ----------------------------------------- bef BLOCK
-; bbce			enhanced
+; bbcd			enhanced
 befblock	jsr getxyxyf	; get top left and bottom right edges
 	jsr blockzei
 	jmp endsmb
 
 ; ----------------------------------------- 
-; bbd7
+; bbd6
 blockzei	ldx ay		; exchange x and y of top left edge...
 	lda ax
 	sta ay
@@ -640,7 +645,7 @@ blockzei	ldx ay		; exchange x and y of top left edge...
 	sta $a4		; ...done
 	lda #$ff		; set flag: don't colorize,
 	sta gflag
-; bc08
+; bc07
 	jsr punkt		; just check if x/y-values are plausible
 			; and compute address
 	lda #0
@@ -649,7 +654,7 @@ blockzei	ldx ay		; exchange x and y of top left edge...
 	cmp #8
 	bne +
 	jmp swarm		; error: bad mode (not plausible)
-; bc19
+; bc18
 +	sec
 	lda $a8
 	sbc $63
@@ -669,8 +674,7 @@ blockzei	ldx ay		; exchange x and y of top left edge...
 	lda $a9
 	sta $ab
 	lda multijn	; in multi?
-	cmp #$2c
-	bne +
+	beq +
 	jmp mblock	; yes
 --
 +	lda $09
@@ -716,6 +720,10 @@ blockzei	ldx ay		; exchange x and y of top left edge...
 	beq --
 	bcc --
 +	rts
+
+; ----------------------------------------- 
+
+	!by 0,0,0
 
 ; ----------------------------------------- 
 ; bca7
@@ -1391,10 +1399,12 @@ outx	lda #0
 outx0	jsr chkscolon
 	jmp endsmb
 
-	!by 0,0,0
+; ----------------------------------------- 
+; c839
+	!by 0,0,0		; 3 bytes
 
 ; ----------------------------------------- bef LIN
-; c83a			new
+; c83c			new
 beflin	jsr chkdrv	; is drive present?
 	jsr incbasbz	; yes, you can save
 	jsr del1
@@ -1502,7 +1512,7 @@ fnnrm	jsr getint	; sys check "("
 	stx progz
 	sty progz+1
 	jsr fromnrm	; patch 11.01.20
-; c8fe
+; c8fd
 	ldx #0
 	ldy $69		; .y= len
 	cpy #8		; 8 (or 16) must be binary
@@ -1520,7 +1530,7 @@ fnnrm	jsr getint	; sys check "("
 +	jmp nrm0
 
 ; ----------------------------------------- 
-; c921
+; c91d
 ++	cmp #$24		; leading "$" in string?
 	bne +		; no
 	jsr chrget	; yes, skip "$"
@@ -1535,13 +1545,13 @@ nrm0	lda $69
 	jmp intback	; ")"?
 
 ; ----------------------------------------- bef DELAY
-; c93c			enhanced
+; c938			enhanced
 befdelay 	jsr chkonoff
 	stx delay
 	jmp endsmb
 
 ; ----------------------------------------- bef SECURE
-; c945			enhanced
+; c941			enhanced
 befsecure	jsr chkonoff
 	lda #$41		; search code for DISAPA
 	sta $22
@@ -1566,7 +1576,7 @@ befsecure	jsr chkonoff
 	bne -
 
 ; ----------------------------------------- bef END LOOP
-; c973			original
+; c96f			original
 befendloop
 	ldy sploop
 	cpy #2
@@ -1582,7 +1592,7 @@ err27	ldx #$27		; error "end loop w/o loop"
 	jmp bef0
 
 ; ----------------------------------------- 
-; c98d
+; c989
 stateofdo	ldy doflag	; DO active?
 	beq do4		; no, leave
 ; c992
@@ -1676,13 +1686,13 @@ befinst	ldx #<nameext	; load "tsb.ext"
 	jmp setbmode	; unlink vectors: PLACE/RENUMBER
 
 ; ----------------------------------------- 
-; ca1f
+; ca1b
 nrm3	jsr kerromein
 	cli
 	jmp $ce6c		; repair CHRGET (inside DOS Wedge!)
 
 ; ----------------------------------------- 
-; ca26
+; ca22
 loadext	stx helpvec
 	jsr chkdrv	; drive ready?
 	ldx helpvec
@@ -1698,14 +1708,14 @@ loadext	stx helpvec
 	jmp $f4a5		; sys LOAD
 
 ; ----------------------------------------- 
-; 
+; ca3f
 null	!tx "null"
 
 ; ----------------------------------------- 
-; ca44
+; ca43
 version	!tx "ad86"	; Signature
 	!by $0d
-	!tx "2.30220"	; Version Number
+	!tx "2.30323"	; Version Number
 
 ; ----------------------------------------- 
 ; ca4f
@@ -1730,19 +1740,17 @@ repchrget	lda progz+2	; chrget changed (by INST)?
 
 ; ----------------------------------------- 
 ; ca78
-g2nsafe	jsr repchrget	; repair chrget
-	jmp get2nyb
-
-; ----------------------------------------- 
-; ca7e
 byte2	cmp #2
 	bcc byte1		; max position? if not: continue
 	jmp incbasbz	; yes, out
-; ca85
-setspeed	jsr gmspeed	; used by MMOB and RLOCMOB
-	stx mobspeed
+; ca7f
+setspeed	jsr gmspeed	; mobnr in .y (from MOB SET, MMOB and RLOCMOB)
+	ldy $aa
+	txa
+	sta mobsptab,y
 	rts
-; ca8c
+
+; ca89
 fromnrm	ldx #1		; c8fd: jsr fromnrm
 	ldy $69		; len of digit string?
 	cpy #4		; less than 4?
@@ -1750,7 +1758,7 @@ fromnrm	ldx #1		; c8fd: jsr fromnrm
 	dex
 +	stx $a5		; set byte counter accordingly
 	jsr dec7a
-; ca9a
+; ca97
 byte1	jsr chrget	; next char: decimal digit?
 	bcc ++		; yes, leave byte1 (so CLC)
 	pha		; no, is token? (so SEC)
@@ -1759,6 +1767,10 @@ byte1	jsr chrget	; next char: decimal digit?
 	jmp ishex		; no, is hex?
 +	sec
 ++	rts
+
+; ----------------------------------------- 
+; caa5
+	!by 0,0,0		; 3 bytes
 
 ; ----------------------------------------- Part of bef LOCAL
 ; caa8 (former address ca7f)
