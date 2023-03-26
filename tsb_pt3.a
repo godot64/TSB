@@ -718,7 +718,7 @@ befmmob	jsr getx8n	; get sprite number (0..7)
 	jsr schkcom
 	jsr dec7a
 	jsr setmobpos	; get start/target position and size
-mobc2	beq mmba
+	beq mmba
 ; 95e4
 mobcont	ldy mobnr		; with mob number:
 	jsr chkexp	; get (/set) sprite size (keeps .y)

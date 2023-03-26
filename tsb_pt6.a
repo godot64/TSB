@@ -376,7 +376,7 @@ open14	jsr sclose	; close 1
 
 ; ----------------------------------------- 
 ; ba03			recoded
-sethiresm	ldy #$01		; x-limit: 319
+sethiresm	ldy #$01		; x-limit: 319 (hires)
 	sty xmaxhigh
 	lda #$3f
 	sta xmaxlow
@@ -387,87 +387,93 @@ sethiresm	ldy #$01		; x-limit: 319
 ; ----------------------------------------- bef COPY
 ; ba12			recoded
 befcopy	jsr incbasbz
-	lda xmaxlow
+	lda xmaxlow	; save current X limit
 	pha
 	lda xmaxhigh
 	pha
 	lda multijn
 	pha
 
+	jsr open14	; open printer and set to hires
 	jsr sethiresm	; returns .y=0
-	jsr open14	; keeps .y
 
-	tya
+	tya		; init gather byte
 	sta $f8
-cploop	sta $22
-	sta $61
+
+cploop	sta $22		; save last Y ordinate
+	sta $61		; $61: Y ordinate
 	ldx #6
--	lda grprntab-1,x	; init printer
+-	lda grprntab-1,x	; init printer line
 	jsr bsout
 	dex
 	bne -
-	stx $5f
+	stx $5f		; init X ordinate (=0)
 	stx $60
-cploop1	lda #160
+
+cploop1	lda #160		; line counter (twice 160)
 	sta helpvec
 	bne +
---	inc $5f
+
+--	inc $5f		; outer scan loop (one row)
 	bne +
 	inc $60
-+	lda #7
++	lda #7		; rasterline counter (7 needles)
 	sta helpvec+1
 	bne +
+
 -	inc $61
-+	lda $5f
-	sta $09
++	lda $5f		; inner scan loop:
+	sta $09		; set X
 	lda $60
 	sta $0a
-	lda $61
+	lda $61		; set Y
 	sta $a4
-	lda #11		; test
+	lda #11		; set test value
 	sta $f7
-	jsr punkt
+	jsr punkt		; pixel set?
 	jsr kerromein
-	lda status
+	lda status	; if 8 or 0: not set
 	beq +
 	cmp #8
 	beq +
 	lda $f8
-	ldy helpvec+1
+	ldy helpvec+1	; otherwise: pixel set
 	ora gbittabs,y
-	sta $f8
-+	dec helpvec+1
+	sta $f8		; and gather in $f8
++	dec helpvec+1	; count needles
 	bne -
-	lda $f8
+
+	lda $f8		; then print
 	ora #$80
 	jsr bsout
-	lda #0
+	lda #0		; reset gather byte
 	sta $f8
-	lda $22
+	lda $22		; reset Y (to 7 rasterline above)
 	sta $61
-	dec helpvec
+	dec helpvec	; count X
 	bne --
-	inc $5f
-	lda $60
-	beq cploop1
-	lda $22
+
+	inc $5f		; reached half of row 
+	lda $60		; second time? ($60=1)
+	beq cploop1	; no, continue scan
+	lda $22		; yes, add 7 to Y
 	clc
 	adc #7
-	cmp #$c8		; 200?
-	bcc cploop	; not yet
+	cmp #$c8		; reached 200?
+	bcc cploop	; not yet, so loop
 
-	lda #$0f		; close mps printer
+	lda #$0f		; yes, set mps printer to char mode
 	jsr bsout
 	jsr return
-	jsr sclose
+	jsr sclose	; and close
 
-	pla		; restore
+	pla		; restore X limit
 	sta multijn
 	pla
 	sta xmaxhigh
 	pla
 	sta xmaxlow
-	jmp endsmb
+	jmp endsmb	; finished
 
 ; ----------------------------------------- 
 ; bab8
@@ -1715,7 +1721,7 @@ null	!tx "null"
 ; ca43
 version	!tx "ad86"	; Signature
 	!by $0d
-	!tx "2.30323"	; Version Number
+	!tx "2.30325"	; Version Number
 
 ; ----------------------------------------- 
 ; ca4f

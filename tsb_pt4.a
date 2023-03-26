@@ -1182,7 +1182,7 @@ befrlocm	jsr getx8n	; get sprite number (0..7)
 	lda $d001,y	; likewise ypos
 	sta ay
 	jsr smp2		; get/set target address (and size)
-	jmp mobc2		; set size and speed
+	jmp mobcont	; set size and speed
 
 ; ----------------------------------------- bef CMOB
 ; a79d			original
