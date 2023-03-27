@@ -1373,6 +1373,8 @@ befhrdcpy	jsr open14	; open printer
 	jsr lineout	; .y=0
 
 hdy1	lda ($20),y	; read char from screen
+	cmp #$ff		; is it PI?
+	beq hdy3		; yes
 	cmp #$80		; is it rvs?
 	bcc hdy0
 	eor #$80		; yes, so:
@@ -1385,9 +1387,7 @@ hdy0	cmp #$20		; char is upper case or no letter?
 	ora #$40		; no, make it PETSCII lower
 	bne hdy2
 
-+	cmp #$5e		; is it PI?
-	beq hdy3		; yes
-	cmp #$40		; no, is a upper case or a graphic char?
++	cmp #$40		; no, is a upper case or a graphic char?
 	bcc hdy2		; no
 	ora #$80		; yes, prepare to print it
 	!by $2c
@@ -1444,7 +1444,7 @@ lineout	ldy #5		; patch to #6 (no line gaps anymore)
 ; ----------------------------------------- 
 ; b55b
 quotetab	!by $80,$80,$83,$80,$83,$80,$08
-nline	!by $35,$31,$10,$0f,$0d,$08
+nline	!by $31,$32,$10,$0f,$0d,$08
 
 ; ----------------------------------------- 
 ; b568
