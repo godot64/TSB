@@ -1433,7 +1433,7 @@ charmode	pha
 
 ; ----------------------------------------- 
 ; b54a
-lineout	ldy #6
+lineout	ldy #5		; patch to #6 (no line gaps anymore)
 -	lda nline-1,y
 	jsr bsout
 	dey
