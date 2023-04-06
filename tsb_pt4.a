@@ -43,7 +43,8 @@ return	lda #$0d		; Return
 	
 ; ----------------------------------------- 
 ; 9f4b
-	!by 0,0,0,0,0
+chkdirmd	stx numkeys
+	jmp stestdirm
 
 ; ----------------------------------------- bef DUMP
 ; 9f50			enhanced

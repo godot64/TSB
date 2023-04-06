@@ -415,8 +415,12 @@ fillmt	sta movetab,y
 	bpl fillmt
 	rts
 
-; ----------------------------------------- Retrieve Parameters
+; ----------------------------------------- 
 ; aeba
+	!by 0,0,0
+
+; ----------------------------------------- Retrieve Parameters
+; aebd
 getrcwd	jsr sgetbytn	; get row
 	cpx #25		; >24? 
 	bcs err32		; yes, bad mode
@@ -438,9 +442,8 @@ getrcwd	jsr sgetbytn	; get row
 	stx zeilenanz
 
 ; ----------------------------------------- Compute Addresses
-; aee0
+; aee3
 movez	ldy #0
-	sty zaehler	; unused
 	sty $20		; init dest
 	sty $a5
 	lda $a6		; which pass?

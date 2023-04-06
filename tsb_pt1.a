@@ -202,7 +202,7 @@ befcold	jsr basromei
 	tax
 -	sta faststack,x
 	sta settings1,x
-	sta settings2,x
+	sta $d400,x	; init SID
 	inx
 	bne -
 into	jsr cold1		; set drive 8 and LOAD/SAVE vectors
@@ -217,9 +217,9 @@ into	jsr cold1		; set drive 8 and LOAD/SAVE vectors
 	stx nmivec+1	; NMI = $82f9
 	inx
 	stx brkvec+1
-	lda #<sbrk	; SBRK = $8314!
+	lda #<sbrk	; SBRK = $8313
 	sta brkvec
-	lda #$17		; sys nmi vector lo
+	lda #$17		; sys nmi vector lo ($8117)
 	sta $fffa		; (in case kernal is off at reset)
 	lda #<snmi
 	sta nmivec

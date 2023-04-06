@@ -433,7 +433,7 @@ keyget	jsr chrget	; nächstes Zeichen holen
 	jmp chrgot	; get last byte
 ;9401
 get	ldx #0		; ### v2.20528
-	stx numkeys
+	jsr chkdirmd
 -	ldx numkeys	; yes, Taste gedrückt?
 	beq -
 	jsr chrget
@@ -443,18 +443,17 @@ get	ldx #0		; ### v2.20528
 	jmp scd5		; Stack bereinigen, Ende	
 
 ; ----------------------------------------- 
-; 9418
+; 9419
+kerromein	lda pport
+	ora #2
+	bne +
+
+; ----------------------------------------- 
+; 941f
 kerromaus	sei
 	lda pport
 	and #$fd
-	sta pport
-	rts
-
-; ----------------------------------------- 
-; 9420
-kerromein	lda pport
-	ora #2
-	sta pport
++	sta pport
 	rts
 
 ; ----------------------------------------- 
