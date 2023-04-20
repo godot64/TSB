@@ -1320,7 +1320,7 @@ cerrln	cmp #$4c		; no, "l" (errln)?
 ; ----------------------------------------- func ERRN 
 ; 912f
 cerrn	ldy errn
-	ldx #0
+cen0	ldx #0
 	beq ++
 
 +	jsr errnln	; "n" (errln)?

@@ -1721,7 +1721,7 @@ null	!tx "null"
 ; ca43
 version	!tx "ad86"	; Signature
 	!by $0d
-	!tx "2.30406"	; Version Number
+	!tx "2.30410"	; Version Number
 
 ; ----------------------------------------- 
 ; ca4f
@@ -1785,7 +1785,31 @@ localtab	!fill 88
 
 ; ----------------------------------------- 
 ; cb00
-	!fill 256		; sb variables
+	!fill 199		; free space
+
+; ----------------------------------------- func USE
+; cbc7
+csgetaril	cpy #$2c		; USE?
+	bne +
+	jsr dec7a
+	ldy $be		; get drive number
+	jmp cen0		; convert
+
+; ----------------------------------------- 
+; cbd3
++	jmp csgetariend
+
+; ----------------------------------------- Part of DO..DONE
+; cbd6
+stackdo	!fill 20		; DO-Stack (20 bytes)
+; cbea
+dobooles	!fill 10		; Wahrheitswerte der DO-Strukturen
+; cbf4
+doindex	!by 0		; Index in DO-Stack	(0..9)
+; cbf5
+stackelse	!fill 10		; ELSE-Stack (10 Bytes)
+; cbff
+elseindex	!by 0		; Index in ELSE-Stack
 
 ; ----------------------------------------- 
 ; cc00 extension area

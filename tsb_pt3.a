@@ -174,7 +174,7 @@ fnmempeek	jsr getpeek	; yes, PEEK in overall RAM
 
 ; ----------------------------------------- 
 ; 925a
-+	jmp csgetariend	
++	jmp csgetaril	
 
 ; ----------------------------------------- part of MOB SET
 ; 925d

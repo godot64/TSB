@@ -170,17 +170,9 @@
 
 ; ----------------------------------------- 
 ;
-;	ab $cb00 neuer Code möglich bis $cbcb
+;	ab $cb00 neuer Code möglich bis $cbd5
 ; 	die Page $cb wird nicht mehr gelöscht
 ;
-; ----------------------------------------- 
-
-	stackdo		= $cbcc	; DO-Stack (20 bytes)
-	dobooles		= $cbe0	; Wahrheitswerte der DO-Strukturen
-	doindex		= $cbea	; Index in DO-Stack	(0..9)
-	stackelse		= $cbeb	; ELSE-Stack (20 Bytes)
-	elseindex		= $cbff	; Index in ELSE-Stack
-
 ; ----------------------------------------- 
 ;
 ; End of part 8
