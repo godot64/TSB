@@ -365,7 +365,7 @@ charzei	ldy #0
 	tya
 	adc $ac		; plus $d000 to ey (address of char)
 	sta ey
-	lda #$d0
+	lda #$d0		; patch!
 	adc $ad
 	sta ey+1
 
@@ -1333,24 +1333,25 @@ arc1	jsr incbasbz
 	lda #0
 	sta drehsinn
 	sta ueberdreh
-	jsr sgetadr
+	jsr sgetadr	; get center x
 	sty kmx
 	sta kmx+1
 	jsr schkcom
-	jsr sgetadr
+	jsr sgetadr	; get center y
 	sty kmy
 	jsr schkcom
-	jsr sgetadr
+	jsr sgetadr	; get start angle
 	sty $a8
 	sta $a9
 	jsr schkcom
-	jsr sgetadr
+	jsr sgetadr	; get end angle
 	sty $ac
 	sta $ad
 	jsr schkcom
-	jsr sgetadr
+	jsr sgetadr	; get angle step
 	sta winksw+1
 	sty winksw
+
 	lda $a9
 	sta vgla+1
 	lda $a8
@@ -1376,17 +1377,18 @@ arc1	jsr incbasbz
 	sta strz1
 	lda $ad
 	sta strz2
-getrxryf	jsr sgetbytc
+
+getrxryf	jsr sgetbytc	; get radius x
 	stx krx
-	jsr sgetbytc
+	jsr sgetbytc	; get radius y
 	stx kry
-	jsr getpktf
+	jsr getpktf	; get mode
 ; a923
-kreis	lda #$13
+kreis	lda #$13		; draw
 	sta $21
 	jsr kreis1
 	inc $21
-	bne kreis1
+	bne kreis1	; uncond. branch
 
 ; ----------------------------------------- Fallback from HIRES
 ; a92e
@@ -1409,66 +1411,82 @@ csm0	ldx video
 csetmem	pha
 	jsr nrm01
 	pla
-	bne csm0
+	bne csm0		; uncond. branch
 
 ; ----------------------------------------- 
 ; a950
-kreis1	lda $a8
+kreis2	jsr vglae
+	beq kreis1
+	bcs kreis1
+	lda ueberdreh
+	cmp #$0a
+	bne kreis1
+	rts
+
+; ----------------------------------------- 
+; a95f
+kreis1	lda $a8		; save angle
 	pha
 	lda $a9
 	pha
-	jsr a8a9div90
-	jsr sinmalkrx
+	jsr a8a9div90	; which quadrant?
+	jsr sinmalkrx	; get x
 	sty $aa
 	sta $ab
-	jsr cosmalkry
+	jsr cosmalkry	; get y
 	sty $ae
 	sta $af
-	jsr pkber
+	jsr pkber		; compute start pos
 	lda $ae
 	sta ay
 	lda $aa
 	sta ax
 	lda $ab
 	sta ax+1
+
 	lda ax
 	pha
 	lda ay
 	pha
 	lda ax+1
 	pha
-	lda $21
-	cmp #$13
+
+	lda $21		; operation flag: $0a= ANGLE
+	cmp #$13		; $13/$14= CIRCLE/ARC
 	beq +
-	jsr linzei
+	jsr linzei	; when $13: skip draw line
 	jsr kerromein
-+	pla
+
++	pla		; move start pos to end pos
 	sta ex+1
 	pla
 	sta ey
 	pla
 	sta ex
-	pla
+	pla		; restore angle
 	sta $a9
 	pla
 	sta $a8
-	lda $21
+
+	lda $21		; CIRCLE/ARC: 1st pass?
 	cmp #$14
 	beq +
-	rts
+	rts		; yes, return for 2nd pass
 
-+	lda drehsinn
-	cmp #$0a
++	lda drehsinn	; no, do all other passes
+	cmp #$0a		; turning left/right?
 	bne +
-	sec
-	lda $a8
+
+	sec		; turning left:
+	lda $a8		; update angle (angle minus step)
 	sbc winksw
 	sta $a8
 	lda $a9
 	sbc winksw+1
 	sta $a9
 	bcs ++
-	lda #$0a
+
+	lda #$0a		; if below 0: set 360
 	sta ueberdreh
 	lda #$68		; 360°
 	sta $a8
@@ -1476,75 +1494,82 @@ kreis1	lda $a8
 	sta $a9
 	jmp ++
 
-+	clc
-	lda $a8
++	clc		; turning right:
+	lda $a8		; update angle (angle plus step)
 	adc winksw
 	sta $a8
 	lda $a9
 	adc winksw+1
 	sta $a9
-++	sta vgla+1
+
+++	sta vgla+1	; reached end angle?
 	lda $a8
 	sta vgla
 	lda $ad
 	sta vgle+1
 	lda $ac
 	sta vgle
+
 	lda drehsinn
 	cmp #$0a
 	bne +
-	jmp kreis2
+	jmp kreis2	; compare if turning left
 
-+	jsr vglae
++	jsr vglae		; compare if turning right
 	beq +
 	bcc +
 	rts
 
-+	jmp kreis1
++	jmp kreis1	; loop
 
 ; ----------------------------------------- 
-; aa08
+; aa17
+cosmalkry	jsr a8a9bogm
+	jsr scos
+	jsr sfacarg
+	lda kry
+	jmp scm0
+; aa26
 sinmalkrx	jsr a8a9bogm
 	jsr ssin
 	jsr sfacarg
 	lda krx
+; aa32
 scm0	sta $63
 	lda $a9
 	sta $62
 	jsr scflp
 	jsr sfmult
 	jmp sfacadr
-; aa23
-cosmalkry	jsr a8a9bogm
-	jsr scos
-	jsr sfacarg
-	lda kry
-	jmp scm0
-; aa32
+
+; ----------------------------------------- 
+; aa41
 scflp	ldx #$90
 	sec
 	jmp sxflp
-;aa38
-a8a9bogm	lda $a8
-	sta $63
+
+; ----------------------------------------- 
+;aa47
+a8a9bogm	lda $a8		; convert degree to radian
+	sta $63		; get angle
 	lda $a9
 	sta $62
 	jsr scflp
 	jsr sfacarg
-	lda #$a8		; sys PI
+	lda #$a8		; sys get PI
 	ldy #$ae
 	jsr sfldfack
-	jsr sfmult
-	jsr sfacarg	; returns .x=0
+	jsr sfmult	; rad = angle times PI...
+	jsr sfacarg	; (returns .x=0)
 	stx $62
 	lda #$b4		; 180 to 62/63
 	sta $63
 	jsr scflp
-	lda $61
+	lda $61		; ...div 180
 	jmp jsfdiv
 
 ; ----------------------------------------- part of DIR
-; aa61
+; aa70
 fileopen	jsr $ffbd		; sys setnam
 	ldx $ba
 	lda #1
@@ -1557,25 +1582,15 @@ fileopen	jsr $ffbd		; sys setnam
 +	jmp chkin1	; 9f35
 
 ; ----------------------------------------- 
-; aa79
-pkber	lda $20
+; aa88
+pkber	lda $20		; quadrant 0 (N->E)
 	bne +
 	jsr kmyminus
 	jmp kmxplus
-
-+	cmp #1
+; aa92
++	cmp #1		; quadrant 1 (E->S)
 	bne +
 	jsr kmyplus
-	jmp kmxplus
-
-+	cmp #2
-	bne +
-	jsr kmxminus
-	jmp kmyplus
-
-+	jsr kmxminus
-	jmp kmyminus
-; aa9d
 kmxplus	clc
 	lda $aa
 	adc kmx
@@ -1584,13 +1599,26 @@ kmxplus	clc
 	adc kmx+1
 	sta $ab
 	rts
-; aaad
+; aaa9
++	cmp #2		; quadrant 2 (S->W)
+	bne +
+	jsr kmxminus
 kmyplus	clc
 	lda $ae
 	adc kmy
 	sta $ae
 	rts
-; aab6
+; aab9
++	jsr kmxminus	; quadrant 3 (W->N)
+kmyminus	sec
+	lda kmy
+	sbc $ae
+	sta $ae
+	bcs +
+	lda #0
+	sta $ae
++	rts
+; aacb
 kmxminus	sec
 	lda kmx
 	sbc $aa
@@ -1603,17 +1631,10 @@ kmxminus	sec
 	sta $aa
 	sta $ab
 +	rts
-; aace
-kmyminus	sec
-	lda kmy
-	sbc $ae
-	sta $ae
-	bcs +
-	lda #0
-	sta $ae
-+	rts
-; aadd
-a8a9div90	lda #$5a		; 90
+
+; ----------------------------------------- 
+; aae3
+a8a9div90	lda #$5a		; divide angle by 90: in which quadrant?
 	sta idivsor
 	lda #0
 	sta idivsor+1
@@ -1626,60 +1647,54 @@ a8a9div90	lda #$5a		; 90
 	sta $a8
 	lda idivrest+1
 	sta $a9
-	lda idivdend
+	lda idivdend	; result in $20: 0..3 (0 = N->E)
 	sta $20
 	cmp #1
 	beq +
 	cmp #3
 	beq +
 	rts
-; ab0c
+; ab12
 +	sec
-	lda #$5a
+	lda #$5a		; Winkel = 90 minus Winkel
 	sbc $a8
 	sta $a8
 	lda $20
 	rts
 
 ; ----------------------------------------- bef ANGL
-; ab16			original
+; ab1c			original
 befangl	jsr incbasbz
-	jsr sgetadr
+	jsr sgetadr	; get center x
 	sty kmx
 	sty ex
 	sta kmx+1
 	sta ex+1
-	jsr schkcom
+	jsr schkcom	; get center y
 	jsr sgetadr
 	sty kmy
 	sty ey
 	sta kmy+1
 	sta ey+1
-	jsr schkcom
+	jsr schkcom	; get Winkel in Grad
 	jsr sgetadr
 	sty $a8
 	sta $a9
-	jsr sgetbytc
+	jsr sgetbytc	; get radius x
 	stx krx
-	jsr sgetbytc
+	jsr sgetbytc	; get radius y
 	stx kry
-	jsr getpktf
-doarc	lda #$0a
+	jsr getpktf	; get mode
+; ab59
+doarc	lda #$0a		; set flag for ANGLE
 	sta $21
-	jsr kreis1
-	jmp endsmb
+	jsr kreis1	; draw radius
+	jmp endsmb	; finished
 
 ; ----------------------------------------- 
-; ab5d
-kreis2	jsr vglae
-	beq +
-	bcs +
-	lda ueberdreh
-	cmp #$0a
-	bne +
-	rts
-
-+	jmp kreis1
+; ab63
+	!by 0,0,0,0,0,0,0,0	; 12 bytes
+	!by 0,0,0,0
 
 ; ------------------------------------------------------------ 
 ;  tsb tokenizer (from $a579 via $0304/05)
