@@ -542,7 +542,7 @@ chkdost	lda doindex	; stack pointer DO
 	bcs faildo
 	jmp dec7a
 
-faildo	jmp err2a		; "stack too large"
+faildo	jmp err0f		; "overflow"
 
 ; ----------------------------------------- 
 ; 8c65

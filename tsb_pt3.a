@@ -1481,7 +1481,7 @@ inca8a9	inc $a8
 befrepeat	ldy sprepeat
 	cpy #20
 	bcc +
-err2a	ldx #$2a		; error "stack too large"
+err0f	ldx #$0f		; error "overflow"
 	!by $2c
 err29	ldx #$29		; error "until w/o repeat"
 	jmp ($0300)
@@ -1678,7 +1678,7 @@ befexec	lda progz		; save basic pz to stack
 	ldy spexec	; EXEC stack full?
 	cpy #20
 	bcc +
-	jmp err2a		; yes, STACK TOO LARGE ERROR
+	jmp err0f		; yes, OVERFLOW ERROR
 
 +	lda progz		; no, save new basic pz to EXEC stack
 	sta execstack,y	; (return address after END PROC)
@@ -2000,7 +2000,7 @@ res2	iny
 befloop	ldy sploop
 	cpy #20
 	bcc +
-	jmp err2a		; error "stack too large"
+	jmp err0f		; error "overflow"
 
 +	lda progz
 	sta stackloop,y

@@ -475,7 +475,7 @@ befmerge	jsr incbasbz
 	sta $0a
 	jsr $e1d4		; sys get params for LOAD/SAVE
 	lda $0a
-	ldx $2d		; get basic start
+	ldx $2d		; get start of variables as prg start
 	ldy $2e
 	jsr load
 	bcs +
@@ -623,8 +623,9 @@ tabbef	!tx "hireS"	; 1
 	!tx "looP"
 	!tx "delaY"
 	!tx "clS"		; <
+	!tx ">"
 	!by $be		; =
-	!by $be		; >
+	!tx "maP"		; >
 	!by $be		; ?
 	!tx "securE"
 	!tx "disapA"	; 65
@@ -692,21 +693,20 @@ tabbef	!tx "hireS"	; 1
 	!tx "ouT"
 	!by 0
 
-
 ; ----------------------------------------- 
-; 8616
+; 8619
 klgetadr	jsr $aefa		; sys "("?
 	jmp sgetadr2
 
 ; ----------------------------------------- 
-; 8624
+; 8627
 xipr3	sty doindex
 	sty elseindex	; ### 2.20821
 	sty sprepeat
 	rts
 
 ; ----------------------------------------- Part of USE
-; 862e
+; 8631
 userr	bmi +		; ### 2.20915
 	pla
 	pla
@@ -719,7 +719,7 @@ userr	bmi +		; ### 2.20915
 	lda #$f7		; value does not fit format
 	sta toul3+1
 	jmp noround
-; 8612
+; 8645
 longround	ldy $44
 	lda linenum+2,x	; get digit right after last format char (#)
 	cmp #$35		; lower than 5?
@@ -730,7 +730,7 @@ longround	ldy $44
 lr0	jmp usel6
 
 ; ----------------------------------------- bef SOUND
-; 864d			new
+; 8650			new
 befsound	jsr sgetbytn	; get voice number
 	jsr chkvoice	; is in 1..4?
 	jsr setsid	; set SID base address
@@ -741,7 +741,7 @@ befsound	jsr sgetbytn	; get voice number
 	jmp endsmb
 
 ; ----------------------------------------- part of WAVE
-; 8664			new
+; 8667			new
 optpulse	jsr schkcom
 	jsr sgetadr	; returns .a=hi, .y=lo from INT
 	ldy #3		; index to pulse high
@@ -750,10 +750,6 @@ optp1	sta ($20),y
 	lda int
 	sta ($20),y
 	rts
-
-; ----------------------------------------- 
-; 
-	!by 0,0,0		; 3 bytes
 
 ; ----------------------------------------- Part of RENUMBER
 ; 8677 
@@ -866,7 +862,7 @@ vecplace	!wo befplace-1	;  16 place    (changed from 86e2)
 	!wo befdelay-1	;  59 delay
 	!wo befdiv-1	;  60 cls (<)
 	!wo swarm-1	;     (=)
-	!wo swarm-1	;     (>)
+	!wo err2a-1	;  62 map (>)
 	!wo swarm-1	;     (?)
 	!wo befsecure-1	;  64 secure
 	!wo bef0-1	;  65 disapa
@@ -944,7 +940,7 @@ tsbf6	!tx "end proc without exeC"	; 38 / $26
 tsbf7	!tx "end loop without "	; 39 / $27
 tsbf8	!tx "looP"		; 40 / $28
 tsbf9	!tx "until without repeaT"	; 41 / $29
-tsbfa	!tx "stack overfloW"	; 42 / $2a
+tsbfa	!tx "cmd not activE"	; 42 / $2a
 tsbfb	!tx "too few lineS"		; 43 / $2b
 tsbfc	!tx "bad char for a moB"	; 44 / $2c
 ;	    "array not found	; 45 / $2d (pt 7)

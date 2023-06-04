@@ -1405,12 +1405,8 @@ outx	lda #0
 outx0	jsr chkscolon
 	jmp endsmb
 
-; ----------------------------------------- 
-; c839
-	!by 0,0,0		; 3 bytes
-
 ; ----------------------------------------- bef LIN
-; c83c			new
+; c839			new
 beflin	jsr chkdrv	; is drive present?
 	jsr incbasbz	; yes, you can save
 	jsr del1
@@ -1475,7 +1471,7 @@ beflin	jsr chkdrv	; is drive present?
 bl01	jmp endsmb
 
 ; ----------------------------------------- 
-; c8b5
+; c8b2
 renum0	sta ay+1		; .a: step (hi)
 	sec
 	lda $a4		; start line minus step
@@ -1494,7 +1490,7 @@ rnn1	lda $2b		; get start of basic prog
 	rts		; 10
 
 ; ----------------------------------------- 
-; c8d4
+; c8d1
 ren4	ldy #0
 	jsr rnn1		; basic start to a8/9
 	jmp rbnc		; renumber in line
@@ -1504,7 +1500,7 @@ ren4	ldy #0
 shwerttab	!by $00,$01,$08,$09
 
 ; ----------------------------------------- func NRM
-; c8e0
+; c8dd
 fnnrm	jsr getint	; sys check "("
 	jsr sgetstr1
 	lda #0
@@ -1518,7 +1514,7 @@ fnnrm	jsr getint	; sys check "("
 	stx progz
 	sty progz+1
 	jsr fromnrm	; patch 11.01.20
-; c8fd
+; c8fa
 	ldx #0
 	ldy $69		; .y= len
 	cpy #8		; 8 (or 16) must be binary
@@ -1536,7 +1532,7 @@ fnnrm	jsr getint	; sys check "("
 +	jmp nrm0
 
 ; ----------------------------------------- 
-; c91d
+; c91a
 ++	cmp #$24		; leading "$" in string?
 	bne +		; no
 	jsr chrget	; yes, skip "$"
@@ -1551,13 +1547,13 @@ nrm0	lda $69
 	jmp intback	; ")"?
 
 ; ----------------------------------------- bef DELAY
-; c938			enhanced
+; c935			enhanced
 befdelay 	jsr chkonoff
 	stx delay
 	jmp endsmb
 
 ; ----------------------------------------- bef SECURE
-; c941			enhanced
+; c93e			enhanced
 befsecure	jsr chkonoff
 	lda #$41		; search code for DISAPA
 	sta $22
@@ -1582,12 +1578,14 @@ befsecure	jsr chkonoff
 	bne -
 
 ; ----------------------------------------- bef END LOOP
-; c96f			original
+; c96c			original
 befendloop
 	ldy sploop
 	cpy #2
 	bcs +
 err27	ldx #$27		; error "end loop w/o loop"
+	!by $2c
+err2a	ldx #$2a		; error ": cmd inactive"
 	jmp ($0300)
 
 +	dey
@@ -1721,7 +1719,7 @@ null	!tx "null"
 ; ca43
 version	!tx "ad86"	; Signature
 	!by $0d
-	!tx "2.30426"	; Version Number
+	!tx "2.30525"	; Version Number
 
 ; ----------------------------------------- 
 ; ca4f

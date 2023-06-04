@@ -283,52 +283,52 @@ befdraw	jsr drawto	; check if DRAW TO
 	jsr kerromein
 +	jmp --
 
-; ----------------------------------------- 
+; ----------------------------------------- bef ROT
 ; a120
 
-tabrot	!by $01,$00,$00,$ff,$00,$ff,$01,$00
-	!by $01,$01,$ff,$ff,$01,$ff,$01,$ff
-	!by $00,$01,$ff,$00,$01,$00,$00,$ff
-	!by $ff,$01,$ff,$01,$01,$01,$ff,$ff
-	!by $ff,$00,$00,$01,$00,$01,$ff,$00
-	!by $ff,$ff,$01,$01,$ff,$01,$ff,$01
-	!by $00,$ff,$01,$00,$ff,$00,$00,$01
-	!by $01,$ff,$01,$ff,$ff,$ff,$01,$01
-
-; ----------------------------------------- bef ROT
-; a160			original
-befrot	jsr sgetbytn
+befrot	jsr sgetbytn	; get direction: 0=N, 1=NO, ..., 7=NW
 	cpx #8
 	bcc +
-	jmp swarm		; error bad mode
-+	txa
-	asl
-	asl
-	asl
-	tax
-	ldy #0
--	lda tabrot,x
-	sta drawtabx,y
-	inx
-	iny
+	jmp swarm
++	ldy #0		; get dir indicators:
+	lda tabrot1,x	; positive (if bit set)
+	sta helpvec
+	lda tabrot2,x	; negative (if bit set)
+	sta helpvec+1
+-	lda #0		; init .a to 0
+	rol helpvec+1
+	bcc +		; first: negative?
+	lda #$ff		; yes, set
++	rol helpvec
+	bcc +		; second: positive?
+	ora #1		; yes, set
++	sta drawtabx,y	; store result
+	iny		; until 8 dir values
 	cpy #8
-	bmi -
-	jsr sgetbytc
+	bcc -
+	jsr sgetbytc	; get step width
 	stx rotgr
-	jmp endsmb
+	jmp endsmb	; finished
+	
+tabrot1	!by $96,$ff,$69,$ff,$96,$ff,$69,$ff
+tabrot2	!by $14,$35,$21,$a3,$82,$ca,$48,$5c
 
 ; ----------------------------------------- 
-; a186
+
+	!by 0,0,0,0,0,0,0,0	; 34 bytes
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0
+
+; ----------------------------------------- 
+; a187
 spz2done	tya		; .y minus 5
 	sbc #5
 	tay
 	bcs +
 	dec progz+1
 +	jmp sbzply	; add to PZ
-
-; ----------------------------------------- 
-; a191
-	!by 0
 
 ; ----------------------------------------- bef CHAR
 ; a192			original
