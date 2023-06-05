@@ -1,0 +1,156 @@
+
+	*= $cb00
+
+; ----------------------------------- bef MAP
+;
+; MAP column, row , pattern$, colors%(n) [; expression]
+;
+; COLUMN and ROW are screen positions. They get internally
+; doubled, so max length of PATTERN$ is 20.
+; PATTERN$ contains a map for tiles in a playing ground
+; (and may (or should) be an array), base code is 35 (#).
+; The tiles are character set based, every 4 chars
+; build a 2x2 tile and get addressed by PATTERN$ bytes.
+; COLORS% contains the base color of each tile in the map
+; (and *must* be an array of integers, max N for one
+; tileset is 48).
+; Optional parameter EXPRESSION could transport a tile string
+; from an array or just a (literal) string or something like
+; AT(col,row)"text" (all kinds of PRINT parameters).
+;
+; -----------------------------------
+
+	int	= $14		; word, integer value
+	progz	= $7a		; basic program pointer
+	helpvec	= $b0
+	helpvc2	= $b2
+	helpvc3	= $b4
+	video	= $0288		; current address of video (high byte)
+	schkcom	= $8030		; checks for comma
+	chkscolon	= $813e		; checks for all following data
+	sgetbytc	= $81fc		; get byte value (to .x) after checking for comma
+	sgetbytn	= $8202		; get byte value (to .x) after proceeding 1 byte
+	endsmb	= $8229		; finish TSB command
+	incbasbz	= $83d8		; increment basic pointer
+	sgetstr	= $86b6		; get string
+
+
+; ----------------------------------- MAP: FILL with 2x2 tiles derived from pattern$
+; every 4 pattern values must be consecutive (1, then 2..3..4)
+
+fillpat	lda video		; get video address hi
+	sta setvram+2
+	lda #$d8		; get color ram address hi
+	sta setcram+2
+
+	jsr sgetbytn	; get value COLUMN to .x
+	txa		; times 2
+	asl
+	sta setvram+1	; store to video...
+	sta setcram+1	; and to color ram pointers (self modification)
+
+	jsr sgetbytc	; get value ROW to .x
+torow	dex		; if 0: skip computation of screen row
+	bmi writemap	; continue
+	clc		; compute screen row address (add 80 .x times)
+	lda setvram+1
+	adc #80
+	sta setvram+1
+	bcc +
+	inc setvram+2
+	clc		; add 80 to color ram respectively
++	lda setcram+1
+	adc #80
+	sta setcram+1
+	bcc torow
+	inc setcram+2
+	bne torow		; loop to reach correct row
+
+; ----------------------------------- 
+
+writemap	jsr schkcom	; get pattern string (e.g. string array MA$):
+	jsr sgetstr	; len 69, adr 22/3
+	sta helpvec+1
+	stx helpvec
+	lda $69
+	pha		; save len (to check for len=0 later)
+	sta patlen+1	; set individual LEN (other than 20)
+
+	jsr sgetbytc	; get color array (e.g. array CO%, returns addr in $47/8)
+	ldx $47		; get addr of 1st value in array...
+	ldy $48
+	inx
+	stx colors+1
+	bne +
+	iny
++	sty colors+2	; ...and set address (self modification)
+	pla		; reget len of string
+	beq empty		; if 0: skip map output
+
+; ----------------------------------- Map output
+; cb5e
+	ldy #0		; init .x and .y
+	ldx #0
+
+loop	lda (helpvec),y	; get pattern from MA$
+	cmp #32		; skip pattern "space"...
+	beq skip2
+	cmp #160		; ...or pattern "shift space" (saves time)
+	bcs skip2
+
+	sec		; subtract base value 35 from pattern value
+	sbc #35
+	stx helpvc3	; save .x
+	asl		; double pattern value (for CO%)
+	tax		; shift pattern value to .x
+; cb73
+colors	lda $0000,x	; get color value from CO% (self modified earlier)
+	sta pcolor+1	; store for whole tile
+
+	txa		; add 64 to pattern value in .a
+storex	ldx helpvc3	; and reget .x
+	asl
+	clc
+	adc #$40
+	jsr setvram	; store pattern and color
+	adc #1		; proceed to next pattern, same color,
+	inx		; next position:
+	jsr setvram	; store, we now have pattern: "ab"
+	adc #1
+	pha		; save pattern to stack
+	txa		; add 39 to .x (position)
+	adc #39
+	tax
+	pla		; reget pattern
+	jsr setvram	; store pattern and color one row below
+	adc #1		; proceed to next pattern, same color,
+	inx		; next position:
+	jsr setvram	; store, we now have pattern: "ab"
+			; 		          "cd"
+	txa		; subtract 41 from .x (position)
+	sec
+	sbc #41
+	tax
+
+skip2	inx		; add 2 to .x for color values (are in an INT array)
+	inx
+	iny		; add 1 to .y (for next pattern)
+patlen	cpy #20		; reached LEN? (all patterns?)
+	bcc loop		; no, loop to proceed
+
+empty	jsr chkscolon	; anything following? (output if yes)
+
+	jmp endsmb	; command finished
+
+; ----------------------------------- Store to Screen
+
+setvram	sta $0000,x	; store .a to video (self modified earlier)
+	pha		; keep value
+pcolor	lda #0		; color (preset: blk)
+setcram	sta $0000,x	; store to color ram (self modified earlier)
+	pla		; reget value
+	rts
+
+; ----------------------------------- 
+
+
