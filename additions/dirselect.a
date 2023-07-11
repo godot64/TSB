@@ -1,0 +1,605 @@
+
+;
+; "dirselect": Dateiauswahldialog für TSB
+;
+; Original von Dieter Bayer aus dem 64'er SH15 (1987)
+; mit Korrekturen von Peter Hagemann (1988/2022/2023)
+; und Änderungen von Arndt Dettke (2023)
+; Pufferort und -länge wählbar mit POKEs in 780 und 781
+; Länge d. Ausgabeliste optional wählbar als letzter Parameter
+; (geändert gegenüber Hagemann-Version, dort konnte der Floppydrive
+;  angegeben werden, was hier aber mit USE eingestellt werden kann)
+;
+; Diese Version ist nicht unter BASIC V2 verwendbar (benutzt TSB-Vektoren)
+;
+; aktuelles Anwendungsbeispiel
+; (gibt alle Dateien, die mit "f" beginnen, aus):
+;
+; dl=49152: sys dl,"$:f*",f$,ln
+;
+; .a = peek(780): Pufferadresse High-Byte, Default = $6a
+; .x = peek(781): Pufferlänge in Pages, Default = 6 (96 Einträge)
+; f$ = speichert mit Return ausgewählten Dateinamen
+; ln = Anzahl Ausgabezeilen der Dateiliste (Headerzeile zählt nicht mit)
+;
+
+	!ct pet
+	* = $c000		; nur, wenn keine Grafik verwendet wird (sonst: $7000, dann 56 auf $70!)
+
+	pport	= $01
+	status	= $90
+	toprow	= $a7	; top-of-page Zeile (RAM-Index 0 bis max)
+	ramrow	= $a8 	; aktueller RAM-Eintrag
+	currow	= $a9 	; aktuelle Bildschirmzeile
+	drive	= $be
+	numkeys	= $c6
+
+	sgetvar	= $80bd	; TSB-Vektoren: Variable suchen
+	sgetbytc	= $81fc	; holt Byte-Wert nach .x
+	sgetstr	= $86b6	; fasst frmevl und frestr zusammen
+
+	chrgot	= $0079	; Kernal-Vektoren
+	errout	= $a43a
+	chkcom	= $aefd
+	home	= $e566
+	chknext	= $e206
+	iecin 	= $ffa5
+	setpar	= $ffba
+	setfnp	= $ffbd
+	open 	= $ffc0
+	clrchn 	= $ffcc
+	close 	= $ffc3
+	chkin 	= $ffc6
+	basout 	= $ffd2
+	getin 	= $ffe4
+
+;------------------------------------------------------------------------
+; Einsprung: SYS basisadresse, dir$, zielvar$ [, listlen]
+
+	jmp start
+
+; offset 3
+_in_	jsr setram
+	jmp _in	; ausgewählte Datei in Variable übernehmen: SYS in
+
+; offset 9
+_ct_	jmp _ct	; Diashow fortsetzen: SYS ct
+
+;------------------------------------------------------------------------
+
+;offset 12
+exit 	!by $00	; Rückgabewert bei Tastendrücken (n, Pfeil links, h)
+selrow	!by $00	; ausgewählte Zeile (Index im RAM)
+maxrow	!by $00	; maximale Anzahl Eingträge + 1
+buffer	!by $6a	; Adresse des Puffers (High-Byte: $6a00)
+limit	!by $60	; Grenze für Anzahl erlaubter Einträge (96)
+varlo	!by $00
+varhi	!by $00
+svarlo	!by $00
+svarhi	!by $00
+curdev	!by $08	; aktuelles Laufwerk
+topout	!by 0	; oberste Ausgabezeile
+lines	!by 24	; Anzahl Ausgabezeilen ohne Header (default: 24)
+half	!by 12	; Hälfte der Ausgabeliste (default: 12)
+startcol	!by 22	; Startspalte der Ausgabeliste auf Screen
+endcol	!by 40 	; letzte Bildschirmspalte (für Selektorbalken)
+diskname	!fill 19,32
+
+;------------------ Dirselect
+
+start	lda $030c 	; 780 (.a) = 0? 781 (Anz. Pages) in .x
+	bne +
+	lda #$6a		; Defaultpuffer: $6a00
++	cpx #0		; Anzahl Pages = 0?
+	bne +
+	ldx #6		; dann Defaultanzahl Einträge: 96 (bis $6fff, 6*16)
++	jsr setbuffer
+	lda #24		; Anzahl Ausgabezeilen vorbesetzen (default: 24)
+	sta lines
+	lsr
+	sta half		; halbe Höhe (für _cont)
+	lda #16 		; String-Länge: generell 16
+	jsr $b47d 	; macht Platz für String
+	stx svarlo
+	sty svarhi	; (Länge wird verworfen, da immer 16)
+	jsr getparam	; weitere Parameter holen
+			; (Directory-String, Ablage-Variable und ggf. Länge der Ausgabeliste)
+
+;------------------------------------------------------
+
+	lda #$7f		; open 127,dir$,0
+	ldx drive
+	ldy #$60
+	jsr setpar
+	jsr open
+	ldx #$7f
+	jsr chkin
+
+	ldx #4 		; 4 Bytes überlesen
+-	jsr iecin
+	bit status
+	bvs break		; EOF?
+	dex
+	bne -
+	beq ++		; wenn alles in Ordnung: Directory einlesen
+
+;------------------ Directory-Kanal schließen
+
+break	jsr clrchn
+	lda #$7f
+	jsr close
+	lda maxrow	; Anzahl zutreffender Directory-Einträge
+	bne filesout 	; Einträge vorhanden? (ja, dann ausgeben)
+	jmp finish 	; nein, dirselect beenden
+
+
+;------------------ Directory einlesen
+
+++	jsr setbuf 	; Zeiger auf Puffer (Default $6a00)
+	jsr iecin		; skip 2 bytes
+	jsr iecin
+	ldx #19		; 19 Bytes ausgeben: RVSON, Quote, filename16, Quote (Diskname)
+	ldy #0
+-	jsr iecin
+	jsr basout
+	sta diskname,y	; ausgeben an Cursorposition (!)
+	iny
+	dex
+	bne -
+	jsr skip12	; 12 Bytes im Directory überlesen
+	ldx #8 		; erstes Anführungszeichen suchen
+-	jsr iecin
+	cmp #$22
+	beq entry 	; gefunden, dann Filenamen einlesen
+	bit status	; Status Bit 6?
+	bvs break 	; eof, dann Abbruch
+	dex
+	bne - 		; nächstes Byte
+	beq break 	; alle 12 durch: Abbruch, kein Quote gefunden
+
+;------------------ Dateinamen einlesen
+
+entry	ldy #00
+-	jsr iecin 	; (16 Zeichen)
+	sta ($50),y	; in RAM-Puffer ablegen (Default $6a00)
+	iny
+	cpy #16
+	bne -
+	lda #$ff	 	; Ende-Markierung setzen
+	sta ($50),y
+	dey
+	lda ($50),y	; Byte davor
+	beq break 	; = 0 dann fertig
+	clc
+	lda $50
+	adc #$10 		; nächste 16 Bytes im Puffer
+	sta $50
+	bcc +
+	inc $51
++	inc maxrow
+	lda maxrow	; Anzahl Einträge erhöhen
+	cmp limit 	; Limit erreicht?
+	bcc +
+	ldx #16 		; ja, out of memory
+	jmp ($0300)
+
++	jsr skip12	; nein, 12 Bytes überlesen
+-	jsr iecin
+	bit status
+	bvs break 	; eof, dann fertig: Ende des Einlesens
+	cmp #$22 		; sonst bis zum Anführungszeichen
+	bne -
+	beq entry	 	; nächster Dateieintrag
+
+;------------------ Dateinamensliste ausgeben
+
+filesout	lda #0		; Aufruf aus BREAK, Dateinamen vorhanden: ausgeben
+	sta exit		; exit marker (0 oder 64)
+	sta selrow
+	sta toprow
+	sta ramrow
+	lda #1		; Ausgabestart bei Nummer 1 der Liste
+	sta currow
+
+_wa	jsr ram2scr	; Ausgabe des Dateinamens
+	jsr color 	; Farbe setzen
+	jsr invert	; ersten Eintrag markieren (invertieren)
+	lda #$00		; POKE 198,0
+	sta numkeys
+keys	jmp keyget	; warten auf Tastendruck (WAIT 198,1)
+
+;------------------
+; Init Zeiger auf Dateinamen im RAM-Puffer (Default $6a00)
+
+setbuf	lda #$00		; Zeiger $50/51 auf Puffer setzen
+	sta maxrow
+	sta $50
+	lda buffer
+	sta $51
+setram	lda #$36 		; BASIC-ROM ausschalten (für eventuelle Daten unter dem ROM)
+	sta pport
+	lda #$80 		; für alle Tasten:
+	sta $028a 	; Tastenwiederholung ein (?)
+	rts
+
+;------------------ Dateinamen ausgeben
+
+ram2scr	jsr ramptr 	; Zeiger in Puffer berechnen
+	jsr set1strow	; Startausgabezeile berechnen
+	ldx lines		; Anzahl Ausgabezeilen holen
+--	ldy #$00
+-	lda ($50),y	; Byte aus Puffer holen (Dateinamen)
+	cmp #$ff	 	; Puffer-Ende-Kennung?
+	beq ++		; ja, Ende der Ausgabe
+	cmp #$22 		; nein, Anführungszeichen?
+	bne +
+	lda #$20 		; ja, Anführungszeichen durch Leerzeichen ersetzen
++	jsr bscode 	; Byte Umwandeln in BSCode
+	sta ($52),y	; Byte in Bildschirm schreiben
+	iny
+	cpy #16 		; Stringlänge 16 erreicht?
+	bne -
+	clc
+	lda $50 		; dann Pufferzeiger auf nächsten Eintrag
+	adc #$10
+	sta $50
+	bcc +
+	inc $51
++	jsr addrows	; Ausgabezeile erhöhen bis Ende der Liste
+	bne --
+++	rts
+
+;------------------
+; Zeiger in RAM-Puffer setzen (Default $6a00) für Auswahlbereich
+
+selptr	lda selrow	; selrow: aktuell selektierter Eintrag in Liste
+	!by $2c
+ramptr	lda toprow	; Zeiger in Puffer setzen (toprow: zuerst angezeigter Eintrag)
+	sta $50
+	lda #$00
+	sta $51
+	asl $50
+	rol $51
+	asl $50
+	rol $51
+	asl $50
+	rol $51
+	asl $50
+	rol $51 		; mal 16 (Namenslänge)
+	clc
+	lda $51
+	adc buffer
+	sta $51
+	rts
+
+;------------------
+; Zeiger auf Bildschirm-Startzeile berechnen
+
+set1strow	lda #0		; Zeiger auf Bildschirmausgabe setzen
+	sta $52
+	sta $53
+	ldx topout	; Position auf Screen, oberste Zeile; Start bei Zeile 0?
+	beq +		; ja, auf 1 erhöhen (wg. Headerzeile)
+-	jsr addrows	; nein, nächste Zeile anpeilen bis Zielzeile erreicht
++	bpl -
+	inc $52 		; Spalte Low-Byte
+	lda $52
+	clc
+	adc startcol
+	sta $52
+	sta $f3		; ebenso für Farben
+	bcc +
+	inc $53
++	lda $53
+	dec $f3
+	clc
+	pha
+	adc $0288
+	sta $53 		; Spalte High-Byte
+	pla
+	clc
+	adc #$d8		; ebenso für Farben
+	sta $f4
+	rts
+
+;------------------
+; Zeile ansteuern
+
+addrows	clc
+	lda $52 		; nächste Ausgabezeile 40 Zeichen weiter
+	adc #$28
+	sta $52
+	bcc +
+	inc $53
++	dex		; bis Zielzeile erreicht
+	rts
+
+;------------------ Auswahlbalken
+; Auswahlbereich im Bildschirm invertieren
+
+invert	lda topout	; oberste Zeile (auf Screen)
+	clc
+	adc currow 	; plus aktuell markierte Position
+	tax
+	jsr $e9f0 	; Video-Adress-Zeiger d1/d2 setzen
+	ldy startcol	; ab Startspalte...
+-	lda ($d1),y
+	eor #$80 		; ...invertieren bis ...
+	sta ($d1),y
+	iny
+	cpy endcol	; ...Endspalte
+	bne -
+	rts
+
+;------------------ Filenamen in Variable übernehmen
+
+getfname	clc
+	lda currow	; bei Druck auf Returntaste:
+	adc toprow
+	sta selrow
+	dec selrow
+
+_in	jsr varptr	; Variable ansteuern
+	jsr selptr
+	ldy #$00
+-	lda ($50),y 	; 16 Zeichen aus Puffer holen
+	cmp #$22 		; zweites Anführungszeichen: Ende
+	beq +
+	sta ($fc),y	; in Eingabe-String schreiben
+	iny
+	cpy #$10		; max 16 Zeichen
+	bne -
++	tya 		; String-Parameter in Variable übertragen: Länge...
+	ldy #$00
+	sta ($fa),y
+	lda $fc		; ...und Adresse
+	iny
+	sta ($fa),y
+	lda $fd
+	iny
+	sta ($fa),y
+	ldy #$00
+	beq + 		; uncond. branch
+
+;------------------ Ende
+
+finish	jsr varp		; Init Zeiger auf Variable für Filenamen
+	ldy #$00
+	tya
+	sta ($fa),y	; setzt Stringlänge auf 0 (Filenamen ungültig machen)
++	sty $c7 		; rvs off
+	lda #$37
+	sta pport 	; ROM ein
+	lda #0		; .a und .x für nächsten SYS initialisieren (!)
+	ldx #0
+	rts 	 	; Ende
+
+;------------------ PETSCII to Screencode
+; Umwandeln in BSCode (ohne Pi-Berücksichtigung)
+
+bscode	eor #$e0
+	clc
+	adc #32
+	bpl +
+	adc #64
+	bpl +
+	eor #$a0
++	rts
+
+;------------------
+
+skip12	lda #12 		; 12 Bytes...
+	sta $a7
+-	jsr iecin
+	dec $a7
+	bne -	 	; ...überlesen
+	rts
+
+;------------------ Tastaturabfrage
+
+keyget	jsr getin
+	beq keyget
+	cmp #$56 		; "V": Neustart (78, vormals: "N")
+	beq ex
+	cmp #$5f 		; "Pfeil links": dirselect beenden (95)
+	beq ex
+	cmp #$48 		; "H": Hilfeseite aufrufen (72)
+	beq ex
+	cmp #$20 		; "Leertaste": Ausgabe beenden (32)
+	bne +
+
+ex	sta exit		; Tastendruck merken (für Abfrage im Basic-Programm)
+	jsr clrchn
+	lda #$7f 		; File #127 schließen
+	jsr close
+	jmp finish 	; dirselect beenden
+
++	cmp #$0d 		; Return: Datei auswählen
+	bne +
+	jmp getfname	; Filenamen in Variable übertragen
+
++	cmp #$91	 	; bleibt noch: Cursor up...
+	beq crsrup
+	cmp #$11 		; ...oder Cursor down
+	bne keyget 	; nichts davon: Loop keyget
+
+;------------------
+; down
+	jsr invert	; Filenamen de-invertieren
+	inc ramrow
+	inc currow
+	lda ramrow
+	cmp maxrow 	; letzte Zeile?
+	bne ++
+	dec currow	; ja, dort bleiben
+	dec ramrow
+	jmp uninv		; (nächsten) Filenamen invertieren
+
+;------------------
+; up
+crsrup	jsr invert	; Filenamen de-invertieren
+	dec ramrow
+	dec currow
+	lda ramrow
+	cmp #$ff 		; oberste Zeile?
+	bne +
+	inc currow 	; ja, dort bleiben
+	inc ramrow
+-	jmp uninv		; (nächsten) Filenamen invertieren
+
++	lda currow	; nein, oberste Zeile?
+	bne -
+	inc currow	; ja, Liste eins vorrollen
+	dec toprow
+	jmp uninv2
+
+;------------------
+
+++	ldx currow	; unterste Zeile?
+	dex
+	cpx lines
+	bcc uninv
+	dec currow	; ja, Liste eins zurückrollen
+	inc toprow
+uninv2	jsr ram2scr
+uninv	jsr invert
+	beq keyget 	; uncond. branch: Loop Tastaturabfrage
+
+;------------------------------------------------------
+; Farbe im Ausgabebereich setzen (festlegen mit COLOUR,farbe)
+
+color	ldx lines		; Anzahl Ausgabezeilen
+scl	lda $0286 	; Zeichenfarbe
+	ldy #$00
+sc2	sta ($f3),y 	; Farbe setzen
+	iny
+	cpy #18 		; Länge 16 plus 2 Quotes
+	bne sc2
+; nächste Zeile
+	clc
+	lda $f3		; Zeile tiefer
+	adc #40
+	sta $f3
+	bcc sc3
+	inc $f4
+sc3	dex
+	bne scl
+	rts
+
+;------------------ Puffergröße berechnen
+
+setbuffer	sta buffer
+	txa		; Anzahl Pages aus Speicherstelle 781 (wenn 0: default 6 aus .x)
+	beq +
+	asl		; mal 16 (Filenamenslänge)
+	asl
+	asl
+	asl
+	sta limit 	; Obergrenze der möglichen Einträge (bei 6: 96)
++	rts
+
+;------------------
+
+varptr	ldx svarlo	; Stringadressen eintragen
+	ldy svarhi
+	stx $fc
+	sty $fd
+varp	ldx varlo
+	ldy varhi
+	stx $fa
+	sty $fb
+	rts
+
+;------------------ Continue (Directory-Liste nicht neu einlesen)
+
+_ct	ldx topout	; Cursor setzen
+	ldy startcol
+	clc
+	jsr $fff0
+	ldx #0		; Tastendrücke initialisieren
+	stx exit
+
+diskloop	lda diskname,x	; Disk-Header ausgeben
+	jsr basout
+	inx
+	cpx #19
+	bcc diskloop
+			; dann Liste ausgeben:
+	lda selrow	; selektierter Eintrag in zweiter Ausgabehälfte?
+	sta ramrow
+	cmp half
+	bcs cmpmax
+	lda #0		; nein, dann Liste ab Eintrag 0
+	sta toprow
+	beq setscr
+
+cmpmax	lda maxrow	; Ende der Liste minus selektierter Eintrag...
+	sec
+	sbc selrow
+	cmp half		; ...in zweiter Ausgabehälfte?
+	bcs other
+	lda maxrow	; ja, dann oberste Ausgabezeile so setzen, dass letzter Eintrag unten
+	sec
+	sbc lines
+	sta toprow
+	jmp setscr
+
+other	lda selrow	; nein, dann oberste Zeile für Ausgabe berechnen
+	sec
+	sbc half
+	sta toprow
+
+setscr	lda selrow	; und setzen
+	sec
+	sbc toprow
+	tax
+	cpx lines		; wenn über Listenlänge hinaus...
+	bcc +
+	ldx lines		; Cursor auf untersten Eintrag berechnen
+	dex
++	stx currow
+	inc currow
+	jsr setram
+	jmp _wa		; und Liste ausgeben
+
+;------------------ Ausrufparameter einlesen
+
+getparam	ldx $d3		; aktuelle Cursorspalte als Ausgabespalte holen (max 22!)
+	cpx #23
+	bcc +
+	ldx #22
++	stx startcol
+	txa
+	clc
+	adc #18
+	sta endcol 	; ergibt Endespalte: Startspalte + 18 (max 40)
+
+	ldx $d6		; aktuelle Cursorzeile als Ausgabezeile holen
+	stx topout	; (Boundaries werden z.B. von INSERT oder FILL überwacht!)
+
+	jsr chkcom 	; Directory-String holen (muss einen Filter enthalten, z.B. "$*"!)
+	jsr sgetstr
+	jsr setfnp
+
+	jsr chkcom
+	jsr sgetvar 	; Filenamens-String holen
+	sta varlo
+	sty varhi
+	lda $0d		; richtiger Variablentyp?
+	beq ++		; nein, "type mismatch"
+
+	jsr chrgot	; folgt nach dem String noch was?
+	beq +
+	jsr sgetbytc	; ja, Anzahl Ausgabezeilen holen (sonst default: 24)
+	stx lines		; (Listenlänge wird hierbei *nicht* automatisch überwacht!)
+	rts
+
++	lda lines		; nein: Höhe so begrenzen, dass Ausgabe nicht über unterste Zeile hinausgeht
+	sec
+	sbc topout
+	sta lines
++	rts
+
+++	ldx #22 		; Fehler 22 (type mismatch)
+	jmp errout
+
