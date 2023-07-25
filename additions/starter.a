@@ -1,0 +1,159 @@
+;
+; -----------------------------------------
+;
+; Exomizer-Aufruf für einen TSB-Onefiler:
+;
+; exomizer sfx $1900 "onefile.prg" -o "fertig.prg" -x "dec $d020 inc $d020"
+;
+;
+; benötigt wird der...
+; ----------------------------------------- Starter
+
+	pport	= $01
+	src	= $fb
+	dst	= $fd
+	exec	= $0600
+	pages	= exec+$c0
+	tuned	= $9a50
+	init	= $033c
+	kopieren	= into+$7d
+
+; -----------------------------------------
+
+*=$1900
+
+; -----------------------------------------
+
+into	ldy #0
+	lda #<move	; copy 'move' to $0600
+	sta src
+	lda #>move
+	sta src+1
+	sty dst
+	lda #>exec
+	sta dst+1
+	ldx #1
+	jsr kopieren	; (copy 1 page)
+
+	lda #<(initit-$3c)
+	ldx #>(initit-$3c)
+	sta src
+	stx src+1
+	lda #<(init-$3c)
+	ldx #>(init-$3c)
+	sta dst
+	stx dst+1
+	ldy #$3c
+	ldx #1
+	jsr kopieren
+	jmp exec		; continue at exec/move
+
+; -----------------------------------------
+
+move
+!pseudopc exec {
+
+
+start	sei
+	lda #$30		; switch to all RAM
+	sta pport
+
+	lda #>into+1	; first copy TSB-PRG to basic start
+	ldy #0		; source at $1800
+	sty src
+	sty dst
+	ldx pages
+	sta src+1
+	inc dst		; target at $0801
+	lda #8
+	sta dst+1
+c02	jsr copy
+	dec dst
+
+	ldx pages+1	; then reverse copy TSB to $8000
+	txa
+	clc
+	adc src+1
+	sta merk
+	sta src+1
+	dec src+1
+	lda #$cf		; starting at $cfxx
+	sta dst+1
+c01	jsr rvscopy
+
+	ldx pages+2	; copy additional data to $e000
+	bmi +		; if present
+	lda #$e0		; target at $e000
+	sta dst+1
+c03	jsr copy
+
+	ldx pages+3	; copy more data to $exxx
+	bmi +		; if present
+c04	jsr copy
+
++	lda #$37		; finished distribution, switch back
+	sta pport
+	cli
+	jmp init
+
+; -----------------------------------------
+
+copy	lda (src),y	; Kopierroutine 1 (vorwärts)
+	sta (dst),y
+	iny
+	bne copy
+	inc src+1
+	inc dst+1
+	dex
+	bne copy
+	rts
+
+; -----------------------------------------
+
+rvscopy	lda (src),y	; Kopierroutine 2 (rückwärts)
+	sta (dst),y
+	dey
+	bne rvscopy
+	dec src+1
+	dec dst+1
+	dex
+	bpl rvscopy
+	lda merk
+	sta src+1
+	rts
+
+merk	!by 0
+
+}
+
+; ----------------------------------------- Init
+
+initit	lda #$60		; RTS-Befehl für vorzeiten Ausstieg aus TSB-Init einpatchen
+	sta $81a5
+	jsr $8147		; TSB Initialisieren
+	lda #$20
+	sta $81a5		; Init wiederherstellen
+
+	sei
+	lda #$9e		; TSB-IRQ aktivieren
+	sta $0314
+	lda #$96
+	sta $0315
+
+	jsr $e1b5		; Zeiger auf Basic-Anfang setzen
+	lda #$60
+	sta tuned+13
+	jsr tuned		; Groß-Klein-Schrift fixieren
+
+	jmp $a7ae		; und dann in die TSB-Interpreterschleife springen (RUN)
+
+; -----------------------------------------
+
+	!align 255,0	; PAGES is in this area
+
+; -----------------------------------------
+; und natürlich der Onefiler, so aufgebaut:
+; 1. TSB-Programm    (Länge an $06c0 in Pages)
+; 2. tsb.obj         (Länge $5000 Bytes - 80 Pages)
+; 3. Additional PRGs (Länge an $06c2 in Pages..., Ende der Liste mit $ff, max 4 PRGs)
+;
