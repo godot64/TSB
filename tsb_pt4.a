@@ -308,21 +308,36 @@ befrot	jsr sgetbytn	; get direction: 0=N, 1=NO, ..., 7=NW
 	bcc -
 	jsr sgetbytc	; get step width
 	stx rotgr
-	jmp endsmb	; finished
+-	jmp endsmb	; finished
 	
 tabrot1	!by $96,$ff,$69,$ff,$96,$ff,$69,$ff
 tabrot2	!by $14,$35,$21,$a3,$82,$ca,$48,$5c
 
-; ----------------------------------------- 
+; ----------------------------------------- bef D!POKE
 
-	!by 0,0,0,0,0,0,0,0	; 34 bytes
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0
+befdpoke	jsr chrget	; skip TSB-Token for d!
+	cmp #$97		; now: POKE?
+	beq +
+	rts		; no, return to d!
+
++	pla		; yes, remove call from d!
+	pla
+	jsr sgetadrn	; D!POKE: get adr
+	sty helpvec
+	sta helpvec+1
+	jsr schkcom
+	jsr sgetadr2	; get value
+	pha
+	tya
+	ldy #0
+	sta (helpvec),y	; store value to adr
+	pla
+	iny
+	sta (helpvec),y
+	bne -		; uncond. branch
 
 ; ----------------------------------------- 
-; a187
+; a188
 spz2done	tya		; .y minus 5
 	sbc #5
 	tay
@@ -331,7 +346,7 @@ spz2done	tya		; .y minus 5
 +	jmp sbzply	; add to PZ
 
 ; ----------------------------------------- bef CHAR
-; a192			original
+; a193			original
 befchar	jsr getxy		; get X/Y
 	jsr schkcom
 	jsr sgetadr	; screen code
@@ -341,7 +356,7 @@ befchar	jsr getxy		; get X/Y
 	jsr sgetbytc	; zoom
 	txa
 	bne +
-	ldx #1		; min: 1
+	inx		; min: 1
 +	stx chgr
 	jsr charzei
 	jmp endsmb

@@ -2122,11 +2122,11 @@ bend	rts
 	!by 0
 
 ; ----------------------------------------- bef RCOMP
-; 9f21			original
-befrcomp	jsr incbasbz
+; 9f21			modified
+befrcomp	jsr incbasbz	; skip token
 	jsr basromei
-	jsr incbasbz
-	lda ifflag
+	jsr chrgot	; advance to content of line
+	lda ifflag	; following latest IF
 	sta $61
 	jmp inif
 

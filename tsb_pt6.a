@@ -220,7 +220,7 @@ ateval	jsr incbasbz
 
 ; ----------------------------------------- bef D!
 ; b8ea			new
-befdelete	jsr incbasbz
+befdelete	jsr befdpoke
 	jsr del1
 	beq +
 	jmp swarm		; error bad mode
@@ -1719,7 +1719,7 @@ null	!tx "null"
 ; ca43
 version	!tx "ad86"	; Signature
 	!by $0d
-	!tx "2.30525"	; Version Number
+	!tx "2.30803"	; Version Number
 
 ; ----------------------------------------- 
 ; ca4f
