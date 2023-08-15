@@ -975,8 +975,11 @@ beftext	jsr getxy		; get X/Y
 	jsr getpktf	; anything following? yes, get MODE (0=clear, 1=set...) to $f7
 	ldx #1		; preset to 1
 	jsr gnextpar	; anything following? yes, get ZOOM factor (.x to $cb6e)
-	stx chgr
-+	ldx #8		; preset to 8
+	txa
+	bne +
+	inx
++	stx chgr
+	ldx #8		; preset to 8
 	jsr gnextpar	; anything following? yes, get KERNING (.x to $c644)
 	stx krx		; .y=0
 
@@ -1034,7 +1037,7 @@ txloop	lda $a4		; (loop:) yes, save Y...
 
 txl1	eor $6a		; care for RVS
 	sta $ac
-	lda schrart	; care for mode
+	lda schrart	; care for mode (1= 2nd part of charset)
 	sta $ad
 	tya		; save string index .y
 	pha
@@ -1061,18 +1064,13 @@ txcont1	ldx #1		; (1: yes, ctrl code, don't inc)
 	lda $09
 	adc krx		; add kerning to X
 	sta $09
-	lda $0a
-	adc #$00
-	sta $0a
+	bcc +
+	inc $0a
 
 +	iny 		; proceed to next char in string
 txtst	cpy helpvec
 	bne txloop
 	rts		; finished
-
-; ----------------------------------------- 
-
-	!by 0,0		; 2 bytes
 
 ; ----------------------------------------- 
 ; b2db
