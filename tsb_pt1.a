@@ -940,7 +940,7 @@ tsbf6	!tx "end proc without exeC"	; 38 / $26
 tsbf7	!tx "end loop without "	; 39 / $27
 tsbf8	!tx "looP"		; 40 / $28
 tsbf9	!tx "until without repeaT"	; 41 / $29
-tsbfa	!tx "cmd not activE"	; 42 / $2a
+tsbfa	!tx "not yet activE"	; 42 / $2a
 tsbfb	!tx "too few lineS"		; 43 / $2b
 tsbfc	!tx "bad char for a moB"	; 44 / $2c
 ;	    "array not found	; 45 / $2d (pt 7)
