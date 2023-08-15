@@ -970,81 +970,62 @@ beftext	jsr getxy		; get X/Y
 	stx $20
 	lda $69
 	sta helpvec
-	jsr getpktf	; get mode (0=clear, 1=set...) to $f7
-	jsr sgetbytc	; get zoom factor (.x to $cb6e)
-	txa
-	bne +		; if 0: force 1!
-	inx
-+	stx chgr
-	jsr sgetbytc	; get kerning (standard: 8)
-	stx krx
 
-	ldy #0
-	sty schrart
-	sty $6a		; rvs flag
+	ldx #1		; preset to 1
+	jsr getpktf	; anything following? yes, get MODE (0=clear, 1=set...) to $f7
+	ldx #1		; preset to 1
+	jsr gnextpar	; anything following? yes, get ZOOM factor (.x to $cb6e)
+	stx chgr
++	ldx #8		; preset to 8
+	jsr gnextpar	; anything following? yes, get KERNING (.x to $c644)
+	stx krx		; .y=0
 
-txloop	lda $a4		; store X/Y/zoom
+	jsr textit	; write text
+
+	jmp endsmb	; until finished
+
+; ----------------------------------------- 
+
+textit	ldy #0
+	sty schrart	; preset textmode
+	sty $6a		; init rvs flag
+	beq txtst		; uncond. branch, any text ?
+
+txloop	lda $a4		; (loop:) yes, save Y...
 	pha
-	lda $09
+	lda $09		; X...
 	pha
 	lda $0a
 	pha
-	lda chgr
+	lda chgr		; and ZOOM
 	pha
 
 	lda ($20),y	; get char from string (.y: index into string)
 
-	cmp #$12		; ctrl code: rvs on?
+	cmp #$12		; rvs on?
 	beq +
-	cmp #$92		; ctrl code: rvs off?
+	cmp #$92		; rvs off?
 	bne ++
-	lda #0
+	lda #0		; no
 	!by $2c
-+	lda #$80
-	sta $6a		; ...set flag
++	lda #$80		; yes
+	sta $6a		; so set rvs flag
 
-txcont1	ldx #1		; flag for ctrl codes (1: yes)
-	!by $2c
-txcont0	ldx #0		; (0: no)
-	pla		; restore X/Y/zoom
-	sta chgr
-	pla
-	sta $0a
-	pla
-	sta $09
-	pla
-	sta $a4
-	txa
-	bne +
-	clc		; proceed to next X position
-	lda $09
-	adc krx
-	sta $09
-	lda $0a
-	adc #$00
-	sta $0a
-+	iny 		; and to next char in string
-	cpy helpvec
-	bne txloop
-	jmp endsmb	; until finished
+++	tax		; ctrl a (upper-graph)?
+	dex
+	beq +		; yes, flag is already set
+	dex 		; ctrl b (upper-lower)?
+	bne ++		; no, is any char
+	ldx #1		; yes, set flag to 1
++	stx schrart
+	jmp txcont1	; and get next char
 
-++	cmp #1		; ctrl code: ctrl a (upper-graph)?
-	beq +
-	cmp #2		; ctrl code: ctrl b (upper-lower)?
-	bne ++
-	lda #1
-	!by $2c
-+	lda #0
-	sta schrart	; ...set flag
-	jmp txcont1
-
-++	sta $ac		; store char
-	cmp #$ff		; PI?
+++	cmp #$ff		; PI?
 	bne +
 	lda #$5e		; bcode for PI
 	bne txl1
 
-+	cmp #$60		; convert to bcode
++	cmp #$60		; just a char: convert to bcode
 	bcc +
 	and #$7f
 	ora #$40
@@ -1055,17 +1036,46 @@ txl1	eor $6a		; care for RVS
 	sta $ac
 	lda schrart	; care for mode
 	sta $ad
-
-	tya		; output char
+	tya		; save string index .y
 	pha
-	jsr charzei
+	jsr charzei	; output char
 	pla
-	tay
+	tay		; get .y back
 
-txl2	jmp txcont0
+txcont0	ldx #0		; flag for ctrl codes (0: inc X)
+	!by $2c
+txcont1	ldx #1		; (1: yes, ctrl code, don't inc)
+
+	pla		; reget ZOOM...
+	sta chgr
+	pla		; X...
+	sta $0a
+	pla
+	sta $09
+	pla		; and Y
+	sta $a4
+	txa		; get ctrl code flag
+	bne +
+
+	clc		; set, so skip to next X position
+	lda $09
+	adc krx		; add kerning to X
+	sta $09
+	lda $0a
+	adc #$00
+	sta $0a
+
++	iny 		; proceed to next char in string
+txtst	cpy helpvec
+	bne txloop
+	rts		; finished
 
 ; ----------------------------------------- 
-; b2da
+
+	!by 0,0		; 2 bytes
+
+; ----------------------------------------- 
+; b2db
 doelse	ldy #0
 	ldx doindex	; is DO active?
 	beq +		; no, skip ELSE, cont. prg
@@ -1085,7 +1095,7 @@ doelse	ldy #0
 +	jmp befproc	; yes, true, skip rest of line
 
 ; ----------------------------------------- 
-; b2fe
+; b2ff
 skipif	jsr schelse	; search for single ELSE:
 	tax
 	beq -		; found line end (yes, leave)
@@ -1097,7 +1107,7 @@ skipif	jsr schelse	; search for single ELSE:
 	jmp fndelse+4
 
 ; ----------------------------------------- 
-; b30e
+; b30f
 chkstate	jsr $ffcf
 	ldx status
 	beq nrm04
@@ -1106,13 +1116,9 @@ chkstate	jsr $ffcf
 	jmp ss5
 
 ; ----------------------------------------- 
-; b31a
+; b31b
 jstifoff	sty justif
 	jmp chrget
-
-; ----------------------------------------- 
-; b320
-	!by 0		; 1 byte
 
 ; ----------------------------------------- bef CSET
 ; b321			modified
