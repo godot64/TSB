@@ -347,18 +347,17 @@ spz2done	tya		; .y minus 5
 
 ; ----------------------------------------- bef CHAR
 ; a193			original
-befchar	jsr getxy		; get X/Y
+befchar	jsr getxy		; get X/Y position
 	jsr schkcom
-	jsr sgetadr	; screen code
+	jsr sgetadr	; get screen code to $ac/d
 	sty $ac
 	sta $ad
-	jsr getpktf	; color to $f7
-	jsr sgetbytc	; zoom
-	txa
-	bne +
-	inx		; min: 1
+	ldx #1		; preset: 1
+	jsr getpktf	; get mode to $f7
+	ldx #1		; preset: 1
+	jsr gnextpar	; get zoom
 +	stx chgr
-	jsr charzei
+	jsr charzei	; write char
 	jmp endsmb
 
 ; ----------------------------------------- 
