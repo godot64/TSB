@@ -355,7 +355,7 @@ befchar	jsr getxy		; get X/Y position
 	ldx #1		; preset: 1
 	jsr getpktf	; get mode to $f7
 	ldx #1		; preset: 1
-	jsr gnextpar	; get zoom
+	jsr gnextpar	; get zoom (never use 0!)
 +	stx chgr
 	jsr charzei	; write char
 	jmp endsmb
@@ -424,7 +424,7 @@ charzei	ldy #0
 
 	lda $ad		; size matches?
 	cmp chgr
-	bne +		; no, stay in line
+	bcc +		; no, stay in line
 	inc drx		; yes, inc drx to next line
 	lda #0
 	sta $ad		; init size index to 1

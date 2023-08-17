@@ -399,8 +399,8 @@ befcopy	jsr incbasbz
 
 	tya		; init gather byte
 	sta $f8
-
-cploop	sta $22		; save last Y ordinate
+; ba2a
+cploop	sta $22		; save last Y ordinate (0..200)
 	sta $61		; $61: Y ordinate
 	ldx #6
 -	lda grprntab-1,x	; init printer line
@@ -409,20 +409,20 @@ cploop	sta $22		; save last Y ordinate
 	bne -
 	stx $5f		; init X ordinate (=0)
 	stx $60
-
-cploop1	lda #160		; line counter (twice 160)
+; ba3d
+cploop1	lda #160		; X counter (twice 160 = 320 pixels)
 	sta helpvec
 	bne +
 
---	inc $5f		; outer scan loop (one row)
+--	inc $5f		; inc X, outer scan loop (one row)
 	bne +
 	inc $60
 +	lda #7		; rasterline counter (7 needles)
 	sta helpvec+1
 	bne +
-
--	inc $61
-+	lda $5f		; inner scan loop:
+; ba4f
+-	inc $61		; inc Y
++	lda $5f		; inner scan loop, feed TSB graphics:
 	sta $09		; set X
 	lda $60
 	sta $0a
@@ -430,25 +430,25 @@ cploop1	lda #160		; line counter (twice 160)
 	sta $a4
 	lda #11		; set test value
 	sta $f7
-	jsr punkt		; pixel set?
+	jsr punkt		; check: pixel set?
 	jsr kerromein
 	lda status	; if 8 or 0: not set
 	beq +
-	cmp #8
+	cmp #8		; (8: error)
 	beq +
-	lda $f8
-	ldy helpvec+1	; otherwise: pixel set
-	ora gbittabs,y
+	lda $f8		; build gather byte
+	ldy helpvec+1	; get rasterline for set pixel
+	ora mbittabs,y
 	sta $f8		; and gather in $f8
 +	dec helpvec+1	; count needles
-	bne -
+	bpl -
 
-	lda $f8		; then print
+	lda $f8		; then print gathered byte
 	ora #$80
 	jsr bsout
 	lda #0		; reset gather byte
 	sta $f8
-	lda $22		; reset Y (to 7 rasterline above)
+	lda $22		; reset Y (to 7 rasterlines above)
 	sta $61
 	dec helpvec	; count X
 	bne --
@@ -478,6 +478,7 @@ cploop1	lda #160		; line counter (twice 160)
 ; ----------------------------------------- 
 ; bab8
 grprntab	!by $08,$35,$31,$10,$0f,$0d
+; from r to l: CR, Char mode, Tab "15", Graphic mode
 
 ; ----------------------------------------- part of COLOUR
 ; babe
@@ -1719,7 +1720,7 @@ null	!tx "null"
 ; ca43
 version	!tx "ad86"	; Signature
 	!by $0d
-	!tx "2.30815"	; Version Number
+	!tx "2.30816"	; Version Number
 
 ; ----------------------------------------- 
 ; ca4f

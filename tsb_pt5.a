@@ -1013,6 +1013,7 @@ txloop	lda $a4		; (loop:) yes, save Y...
 	!by $2c
 +	lda #$80		; yes
 	sta $6a		; so set rvs flag
+	jmp txcont1	; and get next char
 
 ++	tax		; ctrl a (upper-graph)?
 	dex
@@ -1073,7 +1074,7 @@ txtst	cpy helpvec
 	rts		; finished
 
 ; ----------------------------------------- 
-; b2db
+; b2de
 doelse	ldy #0
 	ldx doindex	; is DO active?
 	beq +		; no, skip ELSE, cont. prg
@@ -1093,7 +1094,7 @@ doelse	ldy #0
 +	jmp befproc	; yes, true, skip rest of line
 
 ; ----------------------------------------- 
-; b2ff
+; b302
 skipif	jsr schelse	; search for single ELSE:
 	tax
 	beq -		; found line end (yes, leave)
@@ -1105,7 +1106,7 @@ skipif	jsr schelse	; search for single ELSE:
 	jmp fndelse+4
 
 ; ----------------------------------------- 
-; b30f
+; b312
 chkstate	jsr $ffcf
 	ldx status
 	beq nrm04
@@ -1114,12 +1115,12 @@ chkstate	jsr $ffcf
 	jmp ss5
 
 ; ----------------------------------------- 
-; b31b
+; b31e
 jstifoff	sty justif
 	jmp chrget
 
 ; ----------------------------------------- bef CSET
-; b321			modified
+; b324			modified
 befcset	jsr sgetbytn
 	txa		; cset 0?
 	beq +
@@ -1145,14 +1146,8 @@ nrm03	lda #$3b		; CSET 2: bits for hires mode
 	sta gmemflag
 nrm04	rts
 
-; ----------------------------------------- bef VOL
-; b34f			enhanced
-befvol	jsr chkonoff
-	stx $d418
-	jmp endsmb
-
 ; ----------------------------------------- bef DISK
-; b358			recoded
+; b35b			recoded
 befdisk	jsr chkdrv	; is drive there? 
 	jsr sgetstrn	; yes, get string
 	lda $69
@@ -1176,6 +1171,10 @@ befdisk	jsr chkdrv	; is drive there?
 	beq +
 	jsr dec7a
 	jmp flpmsg2	; bfc5 yes, to bef ERROR
+; ----------------------------------------- bef VOL
+; b34f			enhanced
+befvol	jsr chkonoff
+	stx $d418
 +	jmp endsmb	; no, end command
 
 ; ----------------------------------------- main part of USE
