@@ -438,10 +438,10 @@ cploop1	lda #160		; X counter (twice 160 = 320 pixels)
 	beq +
 	lda $f8		; build gather byte
 	ldy helpvec+1	; get rasterline for set pixel
-	ora mbittabs,y
+	ora mbittabs-1,y
 	sta $f8		; and gather in $f8
 +	dec helpvec+1	; count needles
-	bpl -
+	bne -
 
 	lda $f8		; then print gathered byte
 	ora #$80
@@ -1720,7 +1720,7 @@ null	!tx "null"
 ; ca43
 version	!tx "ad86"	; Signature
 	!by $0d
-	!tx "2.30816"	; Version Number
+	!tx "2.30818"	; Version Number
 
 ; ----------------------------------------- 
 ; ca4f
