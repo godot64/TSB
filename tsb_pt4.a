@@ -1705,15 +1705,21 @@ doarc	lda #$0a		; set flag for ANGLE
 	jsr kreis1	; draw radius
 	jmp endsmb	; finished
 
-; ----------------------------------------- 
+; ----------------------------------------- bef MEMCLR
 ; ab63
-	!by 0,0,0,0,0,0,0,0	; 12 bytes
-	!by 0,0,0,0
+memclr	jsr sgetadrn	; get adress (to INT)
+	sty helpvec	; transfer adr to helpvec
+	sta helpvec+1
+	jsr schkcom	; comma?
+	jmp cmemclr
+; ----------------------------------------- 
+; ac70
+	!by 0		; 1 byte
 
 ; ------------------------------------------------------------ 
 ;  tsb tokenizer (from $a579 via $0304/05)
 ; ------------------------------------------------------------ 
-; ab6f
+; ab71
 tokenize	ldy #4
 next	iny
 next1	lda $01fb,y
@@ -1830,7 +1836,7 @@ mt13	inx
 tonext	jmp next
 
 ; ----------------------------------------- part of ELSE
-; ac34
+; ac36
 fromelstk	ldx elseindex
 	dex
 	lda stackelse,x
@@ -1839,17 +1845,13 @@ fromelstk	ldx elseindex
 	rts
 
 ; ----------------------------------------- 
-; ac40
+; ac42
 leave2	jsr dec7a
 leave1	pla
 	pla
 	pla
 	pla
 	jmp bef0
-
-; ----------------------------------------- 
-; ac4a
-	!by 0,0		; 2 bytes
 
 ; ----------------------------------------- part of USE
 ; ac4c

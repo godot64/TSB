@@ -729,11 +729,7 @@ blockzei	ldx ay		; exchange x and y of top left edge...
 +	rts
 
 ; ----------------------------------------- 
-
-	!by 0,0,0
-
-; ----------------------------------------- 
-; bca7
+; bca4
 plus320	inc $a4
 	lda $a4
 	and #7
@@ -756,23 +752,30 @@ plus320	inc $a4
 	lda $a4
 	rts
 
+; ----------------------------------------- 
+
+jbmemclr	jmp memclr
+
 ; ----------------------------------------- part of MEM
 ; bccf			new
 memplus	dey		; .y=0
 	jsr chrget
 	lda (progz),y
-	ldx #$ff
-	cmp #$94		; SAVE?
-	bne +
-	ldx #0		; set flag
-+	cmp #$93		; LOAD?
-	bne +
-	ldx #1
-+	cmp #$87		; READ?
-	bne +
 	ldx #2
+	cmp #$94		; SAVE?
+	beq +		; yes, .x=0
+	cmp #$93		; LOAD?
+	beq ++		; yes, .x=1
+	cmp #$87		; READ?
+	beq +++		; yes, .x=2
+	cmp #$9c		; CLR?
+	beq jbmemclr	; yes, go there
 
-+	cpx #$ff		; Parameter?
+	dex		; otherwise: .x=$ff
++	dex
+++	dex
+
++++	cpx #$ff		; Parameter?
 	beq params	; ja, Parameter einlesen
 
 	txa		; sonst: Direktbefehl auslösen
@@ -786,6 +789,10 @@ memplus	dey		; .y=0
 	pha
 	ldx helpvc2
 	jmp execdma	; to $b5ed (this part by P. Hagemann)
+
+; ----------------------------------------- 
+
+	!by 0
 
 ; ----------------------------------------- w/ Parameters
 ; bd04
@@ -864,9 +871,9 @@ a8plus8	clc
 	lda $a8
 	adc #8
 	sta $a8
-	lda $a9
-	adc #0
-	sta $a9
+	bcc +
+	inc $a9
++
 -	rts
 
 ; ----------------------------------------- 
@@ -1720,7 +1727,7 @@ null	!tx "null"
 ; ca43
 version	!tx "ad86"	; Signature
 	!by $0d
-	!tx "2.30818"	; Version Number
+	!tx "2.30910"	; Version Number
 
 ; ----------------------------------------- 
 ; ca4f
@@ -1784,25 +1791,47 @@ localtab	!fill 88
 
 ; ----------------------------------------- 
 ; cb00
-	!fill 199		; free space
+	!fill 183		; free space (temp. used by MAP)
 
 ; ----------------------------------------- func USE
-; cbc7
+; cbb7
 csgetaril	cpy #$2c		; USE?
 	bne +
 	jsr dec7a
 	ldy $be		; get drive number
 	jmp cen0		; convert
++	jmp csgetariend	; back to getari
 
-; ----------------------------------------- 
-; cbd3
-+	jmp csgetariend
+; ----------------------------------------- part of MEMCLR
+; cbc6
+cmemclr	jsr sgetadr	; get amount to INT
+	ldx #0		; preset .x to 0
+	jsr gnextpar	; anything more?
+; 8 cbce
++	txa		; prepare value
+	ldy int+1
+	beq +
+	ldy #0		; amount lo
+-	jsr mstore
+	inc helpvec+1	; 1 page
+	dec int+1		; next page
+	bmi +
+	bne -
++	ldy int		; rest
+	beq +
+	jsr mstore
++	jmp endsmb
+; 33 cbea
+mstore	dey
+	sta (helpvec),y	; write to adr
+	bne mstore
+	rts
 
 ; ----------------------------------------- Part of DO..DONE
 ; cbd6
-stackdo	!fill 20		; DO-Stack (20 bytes)
-; cbea
-dobooles	!fill 10		; Wahrheitswerte der DO-Strukturen
+;stackdo	!fill 20		; DO-Stack (20 bytes)
+; cbf0 (orig: cbea)
+dobooles	!fill 4		; Wahrheitswerte der DO-Strukturen
 ; cbf4
 doindex	!by 0		; Index in DO-Stack	(0..9)
 ; cbf5
