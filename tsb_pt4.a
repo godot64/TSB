@@ -196,16 +196,19 @@ charen0	lda pport
 ; a056
 -	jmp endsmb
 
+; ----------------------------------------- 
+; 8659
+	!by 0,0,0
+
 ; ----------------------------------------- bef DRAW
-; a059			enhanced
+; a05c			enhanced
 befdraw	jsr drawto	; check if DRAW TO
 	jsr sgetstr	; no, just DRAW, get string
 	stx $ac		; address
 	sta $ad
 	lda $69		; len
 	pha
-	jsr schkcom	; comma?
-	jsr sgetadr	; x
+	jsr sgetadrc	; comma, x
 	sty drx
 	sta drx+1
 	jsr sgetbytc	; comma?
@@ -348,8 +351,7 @@ spz2done	tya		; .y minus 5
 ; ----------------------------------------- bef CHAR
 ; a193			original
 befchar	jsr getxy		; get X/Y position
-	jsr schkcom
-	jsr sgetadr	; get screen code to $ac/d
+	jsr sgetadrc	; get screen code to $ac/d
 	sty $ac
 	sta $ad
 	ldx #1		; preset: 1
@@ -359,6 +361,10 @@ befchar	jsr getxy		; get X/Y position
 +	stx chgr
 	jsr charzei	; write char
 	jmp endsmb
+
+; ----------------------------------------- 
+; a1b0
+	!by 0,0,0
 
 ; ----------------------------------------- 
 ; a1b3
@@ -1341,8 +1347,13 @@ befarc	jsr arc1
 	sta $a9
 	jmp doarc
 
-; ----------------------------------------- 
+; ----------------------------------------- bef SOUND
 ; a89c
+	!by 0,0,0,0,0,0,0,0	; 12 bytes
+	!by 0,0,0,0
+
+; ----------------------------------------- 
+; a8a8
 arc1	jsr incbasbz
 	lda #0
 	sta drehsinn
@@ -1350,19 +1361,15 @@ arc1	jsr incbasbz
 	jsr sgetadr	; get center x
 	sty kmx
 	sta kmx+1
-	jsr schkcom
-	jsr sgetadr	; get center y
+	jsr sgetadrc	; get center y
 	sty kmy
-	jsr schkcom
-	jsr sgetadr	; get start angle
+	jsr sgetadrc	; get start angle
 	sty $a8
 	sta $a9
-	jsr schkcom
-	jsr sgetadr	; get end angle
+	jsr sgetadrc	; get end angle
 	sty $ac
 	sta $ad
-	jsr schkcom
-	jsr sgetadr	; get angle step
+	jsr sgetadrc	; get angle step
 	sta winksw+1
 	sty winksw
 
@@ -1678,20 +1685,17 @@ a8a9div90	lda #$5a		; divide angle by 90: in which quadrant?
 
 ; ----------------------------------------- bef ANGL
 ; ab1c			original
-befangl	jsr incbasbz
-	jsr sgetadr	; get center x
+befangl	jsr sgetadrn	; get center x
 	sty kmx
 	sty ex
 	sta kmx+1
 	sta ex+1
-	jsr schkcom	; get center y
-	jsr sgetadr
+	jsr sgetadrc	; get center y
 	sty kmy
 	sty ey
 	sta kmy+1
 	sta ey+1
-	jsr schkcom	; get Winkel in Grad
-	jsr sgetadr
+	jsr sgetadrc	; get Winkel in Grad
 	sty $a8
 	sta $a9
 	jsr sgetbytc	; get radius x
@@ -1699,25 +1703,30 @@ befangl	jsr incbasbz
 	jsr sgetbytc	; get radius y
 	stx kry
 	jsr getpktf	; get mode
-; ab59
+; ab50
 doarc	lda #$0a		; set flag for ANGLE
 	sta $21
 	jsr kreis1	; draw radius
 	jmp endsmb	; finished
 
 ; ----------------------------------------- bef MEMCLR
-; ab63
+; ab5a
 memclr	jsr sgetadrn	; get adress (to INT)
 	sty helpvec	; transfer adr to helpvec
 	sta helpvec+1
-	jsr schkcom	; comma?
+	jsr sgetadrc	; comma, get amount to INT
+	ldx #0		; preset .x to 0
+	jsr gnextpar	; anything more?
++	txa		; prepare value
+	ldy int+1
 	jmp cmemclr
+
 ; ----------------------------------------- 
-; ac70
-	!by 0		; 1 byte
+; ac6f
+	!by 0,0		; 2 byte
 
 ; ------------------------------------------------------------ 
-;  tsb tokenizer (from $a579 via $0304/05)
+;  tsb tokenizer (called from $a579 via $0304/05)
 ; ------------------------------------------------------------ 
 ; ab71
 tokenize	ldy #4

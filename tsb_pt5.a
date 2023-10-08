@@ -1147,7 +1147,7 @@ nrm03	lda #$3b		; CSET 2: bits for hires mode
 nrm04	rts
 
 ; ----------------------------------------- bef DISK
-; b35b			recoded
+; b352			recoded
 befdisk	jsr chkdrv	; is drive there? 
 	jsr sgetstrn	; yes, get string
 	lda $69
@@ -1240,7 +1240,7 @@ use3	lda $69		; len=0?
 	jsr use4		; set string parms (ac46)
 
 ; ----------------------------------------- 
-; b3e8
+; b3eb
 	ldy #0
 use5	sty $44		; current char in ctrl string
 useloop	jsr mkoutstr
@@ -1325,8 +1325,8 @@ mkoutstr	ldy $44		; index to current char
 usea	sty $bd		; store index of found
 	lda #$2c		; running char: comma?
 	jsr use6		; bad mode if not
-	jsr sfrmnum	; get var
-	jsr sfacasc	; convert to digits in linenum
+	jsr sfrmnum	; get var, convert to digits in linenum
+	jsr sfacasc
 
 	ldx #0		; index in linenum
 	stx $61

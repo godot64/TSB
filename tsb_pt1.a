@@ -22,7 +22,7 @@
 ; ----------------------------------------- 
 
 startvec	!wo sstart
-smnivec	!wo sbnmi
+snmivec	!wo sbnmi
 
 ; ----------------------------------------- 
 
@@ -34,150 +34,163 @@ sstart	jmp befcold
 
 ; ----------------------------------------- Calls to BASIC ROM
 ; 800c
-sfrmnum	jsr pspeibe
-	jsr $ad8a		; get numerical expression
-	jmp prestor
-; 8015
-sfacadr	jsr pspeibe
-	jsr $b7f7		; FAC to word (.y=lo, .a=hi, :INT)
-	jmp prestor
-; 801e
-ssin	jsr pspeibe
-	jsr $e26b		; func SIN
-	jmp prestor
-; 8027
-scos	jsr pspeibe
-	jsr $e264		; func COS
-	jmp prestor
-; 8030
-schkcom	jsr pspeibe
-	jsr $aefd		; check for comma
-	jmp prestor
-; 8039
-sfrmevl	jsr pspeibe
-	jsr $ad9e		; retrieve expression
-	jmp prestor
-; 8042
-sfrestr	jsr pspeibe
-	jsr $b6a3		; retrieve string parameters
-	jmp prestor
-; 804b
-noround	jsr usel3		; restore format string
-	lda #$25
-	sta toul3+1
-	rts		; and out, finish
-; 8054
-sgoto1	jsr pspeibe
-	jsr $a8a3		; bef GOTO (to line in INT)
-	jmp prestor
-; 805d
-schkzei	jsr pspeibe
-	jsr $aeff		; check if char in .a is at pz
-	jmp prestor
+romtable:
+	!wo $ad8a		;  0 frmnum: get numerical expression
+	!wo $b7f7		;  1 getadr: FAC to word (.y=lo, .a=hi, :INT)
+	!wo $e26b		;  2 func SIN
+	!wo $e264		;  3 func COS
+	!wo $aefd		;  4 check for comma
+	!wo $ad9e		;  5 frmevl: retrieve expression
+	!wo $b6a3		;  6 frestr: retrieve string parameters
+	!wo $a8a3		;  7 bef GOTO (to line in INT)
+	!wo $aeff		;  8 check if char in .a is at pz
+	!wo $bc44		;! 9 intflt: integer to float (hi: $62, lo: $63, .x:#$90)
+	!wo $a613		; 10 compute address of line start (number in INT)
+	!wo $aef7		; 11 check for "Klammer zu"
+	!wo $bc49		;!12 intflt: convert to FAC (.x=exponent)
+	!wo $bc0c		; 13 FAC to ARG
+	!wo $ba30		; 14 FAC*ARG
+	!wo $bba2		; 15 const (.a=lo, .y=hi) to FAC
+	!wo $bb14		; 16 ARG/FAC
+	!wo $bddd		; 17 FAC to ASCII (in $0100)
+	!wo $b08b		; 18 getvar: get var from basic
+	!wo $b3a6		; 19 check for direct mode (error if yes)
+	!wo $abb5		; 20 clear open device channels
+	!wo $a8f8		; 21 find colon and add to progz
+	!wo $a906		; 22 find colon, offset in .y
+	!wo $ac0d		; 23 bef INPUT
+	!wo $aaca		; 24 print buffer $0200 and cr
+	!wo $a8fb		; 25 progz plus .y
+	!wo $b79e		; 26 getbyt from basic (to .x)
+	!wo $a533		; 27 bind basic lines
+	!wo $ab7b		; 28 GET
+	!wo $a96b		; 30 line# to int
+	!wo $ad8f		; 32 sys check for string
+	!wo newopen	; 34 bef OPEN (with TSB drive)
+	!wo $a3b8		; 36 sys block copy
+
+; ----------------------------------------- Execute ROM Call
+; 804e (offset to ROM table by .x)
+
+; calls that use .x
+sxflppl	stx $ff		; save .x
+	ldx #18
+	bne pspeibe
+sxflp	stx $ff
+	ldx #24
+	bne pspeibe
+sinput1	stx $ff
+	ldx #46
+	bne pspeibe
+spuf0cr	stx $ff
+	ldx #48
+	bne pspeibe
+
 ; 8066
-sxflppl	jsr pspeibe
-	jsr $bc44		; integer to float (hi: $62, lo: $63, .x:#$90)
-	jmp prestor
-; 806f
-sstrpz	jsr pspeibe
-	jsr $a613		; compute address of line start (number in INT)
-	jmp prestor
-; 8078
-sascflp	jmp $bcf3		; digits from basic to float
-; 807b
-sgetari1	jmp $ae92		; get arithmetical expression from basic
-; 807e
-schkklz	jsr pspeibe
-	jsr $aef7		; check for "Klammer zu"
-	jmp prestor
-; 8087
-sxflp	jsr pspeibe
-	jsr $bc49		; convert to FAC (.x=exponent)
-	jmp prestor
-; 8090
-sfacarg	jsr pspeibe
-	jsr $bc0c		; FAC to ARG
-	jmp prestor
-; 8099
-sfmult	jsr pspeibe
-	jsr $ba30		; FAC*ARG
-	jmp prestor
-; 80a2
-sfldfack	jsr pspeibe
-	jsr $bba2		; const (.a=lo, .y=hi) to FAC
-	jmp prestor
-; 80ab
-sfdiv	jsr pspeibe
-	jsr $bb14		; ARG/FAC
-	jmp prestor
-; 80b4
-sfacasc	jsr pspeibe
-	jsr $bddd		; FAC to ASCII (in $0100)
-	jmp prestor
-; 80bd
-sgetvar	jsr pspeibe
-	jsr $b08b		; get var from basic
-	jmp prestor
-; 80c6
-stestdirm	jsr pspeibe
-	jsr $b3a6		; check for direct mode (error if yes)
-	jmp prestor
-; 80cf
-sclrch	jsr pspeibe
-	jsr $abb5		; clear open device channels
-	jmp prestor
-; 80d8
-srem	jsr pspeibe
-	jsr $a8f8		; find colon and add to progz
-	jmp prestor
-; 80e1
-snexttr	jsr pspeibe
-	jsr $a906		; find colon, offset in .y
-	jmp prestor
-; 80ea
-sinput1	jsr pspeibe
-	jsr $ac0d		; bef INPUT
-	jmp prestor
-; 80f3
-spuf0cr	jsr pspeibe
-	jsr $aaca		; write buffer $0200 and cr
-	jmp prestor
-; 80fc
-sbzply	jsr pspeibe
-	jsr $a8fb		; progz plus .y
-	jmp prestor
-; 8105
-sgetbyt1	jsr pspeibe
-	jsr $b79e		; getbyt from basic (to .x)
-	jmp prestor
-; 810e
-sbind	jsr pspeibe
-	jsr $a533		; bind basic lines
-	jmp prestor
-; 8117
+; parameterless calls
+sbind	ldx #54
+	!by $2c
+sopen	ldx #62
+	!by $2c
+sysget	ldx #56
+	!by $2c
+sclrch	ldx #40
+	!by $2c
+srem	ldx #42
+	!by $2c
+snexttr	ldx #44
+	!by $2c
+tsbblcopy	ldx #64
+	!by $2c
+stestdirm	ldx #38
+	!by $2c
+sgoto1	ldx #14
+	!by $2c
+schkzei	ldx #16
+	!by $2c
+sstrpz	ldx #20
+	!by $2c
+schkklz	ldx #22
+	!by $2c
+sfmult	ldx #28
+	!by $2c
+sfldfack	ldx #30
+	!by $2c
+sfdiv	ldx #32
+	!by $2c
+sfacasc	ldx #34
+	!by $2c
+; 8096
+sgetvar	ldx #36
+	!by $2c
+ssin	ldx #4
+	!by $2c
+scos	ldx #6
+	!by $2c
+sgetbyt1	ldx #52
+	!by $2c
+sadr2int	ldx #58
+	!by $2c
+schkstr	ldx #60
+	!by $2c
+sfacarg	ldx #26
+	!by $2c
+sbzply	ldx #50
+	!by $2c
+sfrestr	ldx #12
+	!by $2c
+sfrmevl	ldx #10
+	!by $2c
+sfrmnum	ldx #0
+	!by $2c
+sfacadr	ldx #2
+	!by $2c
+schkcom	ldx #8
+
+; ----------------------------------------- 
+; 80bc
+pspeibe	pha		; save .a
+	lda #$4c		; JMP to 'help'
+	sta help
+	lda pport
+	sta portspei	; save $01
+	jsr basromei
+	lda romtable,x
+	sta help+1
+	inx
+	lda romtable,x
+	sta help+2
+	pla		; restore .a
+	ldx $ff		; restore .x
+
+	jsr help		; excute rom call
+; 80da
+prestor	pha		; save .a
+	lda portspei	; restore $01
+	sta pport
+	lda #0
+	sta $ff
+	pla		; restore .a (.x and .y stay unharmed)
+	rts
+
+; ----------------------------------------- 
+; 80e2
+
+	!fill 68
+
+; ----------------------------------------- 
+; 812a
 ssmni	lda pport
 	sta pspeinmi
 	jsr kerromein
 	jmp $fe43		; sys NMI
-; 8122
-sopen	jsr pspeibe
-	jsr newopen	; bef OPEN (with TSB drive)
-	jmp prestor
 
 ; ----------------------------------------- 
-; 812b
-pspeibe	pha		; save .a
-	lda pport
-	sta portspei	; save $01
-	jsr basromei
-	pla		; restore .a
-	rts
-; 8136
-prestor	pha		; save .a
-	lda portspei	; restore $01
-	sta pport
-	pla		; restore .a
-	rts
+; 8135
+noround	jsr usel3		; restore format string
+	lda #$25
+	sta toul3+1
+	rts		; and out, finish
 
 ; ----------------------------------------- Out Control
 ; 813e
@@ -205,13 +218,14 @@ befcold	jsr basromei
 	sta $d400,x	; init SID
 	inx
 	bne -
+; 8173
 into	jsr cold1		; set drive 8 and LOAD/SAVE vectors
 	ldx #11
 -	lda tsbvecs,x
 	sta basvecs,x
 	dex
 	bpl -
-	ldx #$81		; (hard) nmi vector hi ($8117)
+	ldx #>ssmni	; (hard) nmi vector hi ($812a)
 	stx $fffa+1	; (in case kernal is off at reset)
 	inx
 	stx nmivec+1	; NMI = $82f9
@@ -219,7 +233,7 @@ into	jsr cold1		; set drive 8 and LOAD/SAVE vectors
 	stx brkvec+1
 	lda #<sbrk	; SBRK = $8313
 	sta brkvec
-	lda #$17		; sys nmi vector lo ($8117)
+	lda #<ssmni	; sys nmi vector lo ($812a)
 	sta $fffa		; (in case kernal is off at reset)
 	lda #<snmi
 	sta nmivec
@@ -242,7 +256,7 @@ tsbpudef	!by $2b,$2a,$2c,$2e,$2d,$23	; +*,.-#
 
 ; ----------------------------------------- bef DIV/CLS (Clear Video)
 ; 81c0
-befdiv	jsr clear		; clear screen
+befcls	jsr clear		; clear screen
 	jmp bef0
 
 ; ----------------------------------------- part of USE
@@ -290,7 +304,7 @@ sgetbytn	jsr incbasbz
 
 ; ----------------------------------------- 
 ; 8208
-	jsr incbasbz	; unused
+	!by 0,0,0		; 3 bytes
 
 ; ----------------------------------------- bef USE
 ; 820b			recoded
@@ -441,6 +455,7 @@ snmi	pha
 	pha
 	tya
 	pha
+; 82fe
 sbnmi	jsr kerromein
 	lda #$7f
 	sta $dd0d
@@ -494,9 +509,8 @@ endmrge	jsr $a660		; sys clear
 
 ; ----------------------------------------- 
 ; 8368
-schkstr	jsr pspeibe
-	jsr $ad8f		; sys check for string
-	jmp prestor
+	!by 0,0,0,0,0,0,0,0	; 8 bytes
+	!by 0
 
 ; ----------------------------------------- bef RENUMBER
 ; 8371			recoded
@@ -623,8 +637,7 @@ tabbef	!tx "hireS"	; 1
 	!tx "looP"
 	!tx "delaY"
 	!tx "clS"		; <
-	!tx ">"
-	!by $be		; =
+	!tx "x",$a1	; = (x!)
 	!tx "maP"		; >
 	!by $be		; ?
 	!tx "securE"
@@ -699,14 +712,14 @@ klgetadr	jsr $aefa		; sys "("?
 	jmp sgetadr2
 
 ; ----------------------------------------- 
-; 8627
+; 861f
 xipr3	sty doindex
 	sty elseindex	; ### 2.20821
 	sty sprepeat
 	rts
 
 ; ----------------------------------------- Part of USE
-; 8631
+; 8629
 userr	bmi +		; ### 2.20915
 	pla
 	pla
@@ -719,7 +732,7 @@ userr	bmi +		; ### 2.20915
 	lda #$f7		; value does not fit format
 	sta toul3+1
 	jmp noround
-; 8645
+; 863d
 longround	ldy $44
 	lda linenum+2,x	; get digit right after last format char (#)
 	cmp #$35		; lower than 5?
@@ -734,16 +747,19 @@ lr0	jmp usel6
 befsound	jsr sgetbytn	; get voice number
 	jsr chkvoice	; is in 1..4?
 	jsr setsid	; set SID base address
-	jsr schkcom	; comma?
-	jsr sgetadr	; get frequency value
+	jsr sgetadrc	; comma? get frequency value
 	ldy #1
 	jsr optp1		; write to SID
 	jmp endsmb
 
+; ----------------------------------------- 
+; 8664
+sgetadrc	jsr schkcom	; get address after comma
+	jmp sgetadr
+
 ; ----------------------------------------- part of WAVE
-; 8667			new
-optpulse	jsr schkcom
-	jsr sgetadr	; returns .a=hi, .y=lo from INT
+; 866a			new
+optpulse	jsr sgetadrc	; returns .a=hi, .y=lo from INT
 	ldy #3		; index to pulse high
 optp1	sta ($20),y
 	dey
@@ -764,7 +780,7 @@ isprg	tax		; save .a
 	jmp renum0	; yes, process it
 
 ; ----------------------------------------- Part of IF
-; 868d 
+; 8688 
 toelstk	pha
 	cpx #0
 	beq +
@@ -785,9 +801,8 @@ tuned	!tx $0e,$08," tuned", $0d	; tsb start message
 
 ; ----------------------------------------- 
 ; 86aa
-tsbblcopy	jsr pspeibe
-	jsr $a3b8		; sys block copy
-	jmp prestor
+	!by 0,0,0,0,0,0,0,0	; 9 bytes
+	!by 0 
 
 ; ----------------------------------------- 
 ; 86b3 / 86b6
@@ -860,8 +875,8 @@ vecplace	!wo befplace-1	;  16 place    (changed from 86e2)
 	!wo befresume-1	;  57 resume
 	!wo befloop-1	;  58 loop
 	!wo befdelay-1	;  59 delay
-	!wo befdiv-1	;  60 cls (<)
-	!wo swarm-1	;     (=)
+	!wo befcls-1	;  60 cls (<)
+	!wo err2a-1	;  61 x!  (=)
 	!wo err2a-1	;  62 map (>)
 	!wo swarm-1	;     (?)
 	!wo befsecure-1	;  64 secure
@@ -883,7 +898,7 @@ vecplace	!wo befplace-1	;  16 place    (changed from 86e2)
 	!wo befold-1	;  80 old
 	!wo swarm-1	;     bad mode (fn joy)
 	!wo befmod-1	;  82 mod      (fn mod)
-	!wo befdiv-1	;     div	     (fn div)
+	!wo befcls-1	;     div	     (fn div)
 	!wo befdelete-1	;  84 d!
 	!wo befdup-1	;  85 dup      (fn dup)
 	!wo swarm-1	;     bad mode (fn inkey)

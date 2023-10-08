@@ -1525,15 +1525,15 @@ fnnrm	jsr getint	; sys check "("
 ; c8fa
 	ldx #0
 	ldy $69		; .y= len
-	cpy #8		; 8 (or 16) must be binary
+	cpy #8		; 8/9 (or 16/17) must be binary
 	bcc ++
 
-	cmp #$25		; 8: leading "%"?
+	cmp #$25		; >8: leading "%"?
 	bne +		; no
 	jsr chrget	; yes, skip
 +	jsr bincon
 	ldy $69
-	cpy #16		; 16?
+	cpy #16		; 16/17?
 	bcc +
 	ldx $a8		; yes
 	jsr bincon
@@ -1727,7 +1727,7 @@ null	!tx "null"
 ; ca43
 version	!tx "ad86"	; Signature
 	!by $0d
-	!tx "2.30920"	; Version Number
+	!tx "2.30930"	; Version Number
 
 ; ----------------------------------------- 
 ; ca4f
@@ -1785,13 +1785,14 @@ byte1	jsr chrget	; next char: decimal digit?
 	!by 0,0,0		; 3 bytes
 
 ; ----------------------------------------- Part of bef LOCAL
-; caa8 (former address ca7f)
+; caa8 (former localtab address: ca7f)
 
 localtab	!fill 88
 
 ; ----------------------------------------- 
-; cb00
-	!fill 183		; free space (temp. used by MAP)
+; cb00 (temp. used by MAP)
+
+	!fill 183		; free space
 
 ; ----------------------------------------- func USE
 ; cbb7
@@ -1804,13 +1805,8 @@ csgetaril	cpy #$2c		; USE?
 
 ; ----------------------------------------- part of MEMCLR
 ; cbc6
-cmemclr	jsr sgetadr	; get amount to INT
-	ldx #0		; preset .x to 0
-	jsr gnextpar	; anything more?
-; 8 cbce
-+	txa		; prepare value
-	ldy int+1
-	beq +
+cmemclr	beq +
+
 	ldy #0		; amount lo
 -	jsr mstore
 	inc helpvec+1	; 1 page
@@ -1821,17 +1817,17 @@ cmemclr	jsr sgetadr	; get amount to INT
 	beq +
 	jsr mstore
 +	jmp endsmb
-; 33 cbea
+; cbdf
 mstore	dey
 	sta (helpvec),y	; write to adr
 	bne mstore
 	rts
 
 ; ----------------------------------------- Part of DO..DONE
-; cbd6
-;stackdo	!fill 20		; DO-Stack (20 bytes)
+; cbe5
+stackdo	!fill 10		; DO-Stack (20 bytes)
 ; cbf0 (orig: cbea)
-dobooles	!fill 4		; Wahrheitswerte der DO-Strukturen
+dobooles	!fill 5		; Wahrheitswerte der DO-Strukturen
 ; cbf4
 doindex	!by 0		; Index in DO-Stack	(0..9)
 ; cbf5

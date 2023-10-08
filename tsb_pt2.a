@@ -567,7 +567,7 @@ sgetari	lda #0
 	sta $0d
 	jsr chrget
 	bcs +		; 8c94
-	jmp sascflp
+	jmp $bcf3		; sys: digits from basic to float
 
 +	cmp #$24		; "$"?
 	beq gethex
@@ -575,7 +575,7 @@ sgetari	lda #0
 	beq getbin
 	cmp #$64		; sb token?
 	beq +
-	jmp sgetari1	; no : sys
+	jmp $ae92		; no : sys: get arithmetical expression from basic
 +	jmp csgetari1	; yes: tsb
 
 ; ----------------------------------------- 

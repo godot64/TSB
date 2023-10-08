@@ -437,10 +437,12 @@ get	ldx #0		; ### v2.20528
 -	ldx numkeys	; yes, Taste gedrückt?
 	beq -
 	jsr chrget
-	jsr pspeibe
-	jsr $ab7b   	; dann sys GET
-	jsr prestor
+	jsr sysget   	; dann sys GET
 	jmp scd5		; Stack bereinigen, Ende	
+
+; ----------------------------------------- 
+
+	!by 0,0,0,0,0,0
 
 ; ----------------------------------------- 
 ; 9419
@@ -614,18 +616,18 @@ justmulti	txa
 	jmp endsmb
 
 ; ----------------------------------------- bef COLOUR
-; 952e			recoded
+; 952f			recoded
 befcolour	jsr docolor
 	jmp endsmb
 
 ; ----------------------------------------- part of USE
-; 9534
+; 9535
 usedrv	jsr sgetbyt1	; get drive# (constant[+expression])
 	stx drive		; and set
 +	jmp endsmb
 
 ; ----------------------------------------- 
-; 953c
+; 953d
 ren0	lda $09
 	sta $a8
 	lda $0a
@@ -633,7 +635,7 @@ ren0	lda $09
 	rts
 
 ; ----------------------------------------- bef DIR
-; 9545			enhanced
+; 9546			enhanced
 befdir	jsr sclose	; first: close file
 	jsr chrget	; get next byte
 	jsr fromdir	; check if anything follows (a2d5)
@@ -1297,10 +1299,13 @@ get2nyb2	jsr xnyb		; is below 16?
 ; ----------------------------------------- bef CGOTO
 ; 99d3			original
 befcgoto	jsr incbasbz
-cgoto0	jsr sfrmnum
-	jsr sfacadr
+cgoto0	jsr sgetadr
 	jsr sgoto1
 	bne +
+
+; ----------------------------------------- 
+; 99df
+	!by 0,0,0
 
 ; ----------------------------------------- bef WAVE
 ; 99e1			optimized
@@ -1528,9 +1533,8 @@ befretrace
 
 ; ----------------------------------------- 
 ; 9b50
-sadr2int	jsr pspeibe
-	jsr $a96b		; sys line# to int
-	jmp prestor
+	!by 0,0,0,0,0,0,0,0	; 9 bytes
+	!by 0
 
 ; ----------------------------------------- bef TRACE
 ; 9b59			enhanced
@@ -1619,8 +1623,7 @@ ren1	lda $2b		; get basic start
 ; 9bd4			enhanced
 befauto	jsr get10010	; any parameters?
 	beq aut1
-	jsr sfrmnum	; yes, get start value...
-	jsr sfacadr
+	jsr sgetadr	; yes, get start value...
 	sta autozi+1
 	sty autozi	; and step
 	jsr sgetbytc
@@ -1635,11 +1638,14 @@ aut0	lda #10		; activate auto
 	sta autoflag
 	bne ++		; uncond. branch
 
+; ----------------------------------------- 
+; 9c00
+	!by 0,0,0,0,0,0
+
 ; ----------------------------------------- bef RESET
-; 9c03			original
+; 9c06			original
 befreset	jsr incbasbz
-	jsr sfrmnum
-	jsr sfacadr
+	jsr sgetadr
 	sta int+1
 	sta $40		; sys line# DATA
 	sty int
