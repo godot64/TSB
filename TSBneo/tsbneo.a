@@ -1,0 +1,10471 @@
+; -----------------------------------------
+;
+; Tuned Simons' Basic Neo
+;
+; by Arndt Dettke, 2023
+;
+; based on Simons' Basic by David Simons, 1984
+;
+; -----------------------------------------
+
+; ----------------------------------------- TSB neo
+
+	*=$8000
+	!ct pet
+
+; -----------------------------------------
+;
+	uniprom	= 0
+
+	pport	= $01
+	int	= $14
+	help	= $54
+	progz	= $7a
+	status	= $90
+	helpvec	= $b0
+	helpvc2	= $b4
+	drive	= $be
+	numkeys	= $c6
+
+	chrget	= $0073
+	chrgot	= $0079
+	linenum	= $0100
+	autozi	= $01fe
+	basinbuf	= $0200
+	keybuf	= $0277
+	ramstart	= $0281
+	aktfarb	= $0286
+	video	= $0288
+	outstring	= $02a7
+	basvecs	= $0300
+	irqvec	= $0314
+	brkvec	= $0316
+	nmivec	= $0318
+	iovecs	= $0330
+
+	faststack	= $c400
+	settings1	= $c500
+	settings2	= $cb00
+	extension	= $cc00
+
+	clear	= $e544
+	bsout	= $ffd2
+	load	= $ffd5
+
+; -----------------------------------------
+
+	neustr	= $b47d
+	pushstr	= $b4ca
+	getbytc	= $e200
+
+; -----------------------------------------
+;
+; Section 1: Variables, IRQ, main routines
+;
+; -----------------------------------------
+
+; -----------------------------------------
+;
+;         label                 now       before  purpose
+
+	lpx		= $c500	; 	lightpen x
+	lpy		= $c501	; 	lightpen y
+	rotgr		= $c502	; 	ROTate: Schrittweite für DRAW
+	drgrz		= $c503	; 	Zwischenspeicher für rotgr
+	flashfls		= $c504	; 	Aktivierungsflags für FLASH-Colors (16)
+	detecterg		= $c514	; 	Ergebnis von DETECT (sp-sp oder sp-bg)
+	detectart		= $c515	; 	Detect-Art (0: sp-sp, 1: sp-bg)
+	zaeirq		= $c516	; 	Zähler für IRQ-Ereignisse (60tel-Sekunden)
+	zaesec		= $c517	; 	Sekundenzühler
+	strz1		= $c518	; 	ARC Endwinkel
+	strz2		= $c519	; 	ARC Startwinkel
+	vgle		= $c51a	; 	word: Vergleichswert, Ende erreicht? (MOB, LINE, ARC)
+	indoloop		= $c51c	; 	DO found, flag for ELSE and DONE
+	errln		= $c51d	; 	word: Zeile bei Fehler
+	pos		= $c51f	; 	Positionswert (verschiedene Befehle, z.B. INST)
+	pos1		= $c520	; 	dito bei DUP und CHECK
+	lcfarb12		= $c521	; $cb1b	LOW COL-Farben 1 und 2
+	lcfarb3		= $c522	; $cb1c	LOW COL-Farbe 3
+	vgla		= $c523	; 	word: Vergleichswert, Anfang
+	drstrz		= $c525	; $cb4f	Zeiger in String bei DRAW
+	drstatus		= $c526	; $cb50	Status bei DRAW (9: Ende erreicht)
+	dryanf		= $c527	; $cb51	Startwert Y bei DRAW
+	schrart		= $c528	; $cb4d	Flag: Charset bei TEXT
+	savecont		= $c529	; 	word: Programmzeiger bei RESUME
+	lowcolflag	= $c52b	; 	Flag: LOW COL aktiv (Wert 10)
+	zwisp2		= $c52c	; $cb54	Zwischenspeicher im Tokenizer
+	xmaxlow		= $c52d	; 	Maximalwert X (lo) bei Grafik
+	xmaxhigh		= $c52e	; 	Maximalwert X (hi) bei Grafik
+	ueberdreh		= $c52f	; 	Flag bei Kreisberechnungen
+	prstack		= $c530	; 	Zeiger in den PROC-Stack
+	movetab		= $c531	; $cb1e	enthült Screen-Zeile (bis 41 Bytes)
+	str1		= $c55a	; $cbab	word: Adresse String 1 bei DUP
+	strlen2		= $c55c	; $cbb4	word: Adresse von String 2 bei PLACE
+	strlen1		= $c55e	; $cbb7	word: Adresse von String 1 bei PLACE
+	dolevel		= $c560	;         counter: counts nested DO..DONEs in FALSE branch
+	idivsor		= $c561	; $cbbb	word: Divisor bei DIV
+	idivdend		= $c563	; $cbc0	word: Dividend bei DIV
+	idivrest		= $c565	; $cbc2	word: Rest bei DIV
+	dobooles		= $c567	;         10 bytes:	Wahrheitswerte bei DO
+	stackelse		= $c571	; 	10 bytes:	Wahrheitswerte bei ELSE
+	doindex		= $c57b	; 	Index in DO-Stack	(0..9)
+	drehsinn		= $c57c	; 	Flag bei Kreisberechnungen
+	zwspei1		= $c57d	; 	Zwischenspeicher bei Prozessorport-Umschaltung
+	mregadr		= $c57e	; $cb8c	word: Adresse der Musikregister
+	musicadr		= $c580	; $cb9b	word: Adresse des MUSIC-Strings
+	srtab		= $c582	; $cba0	word: Tabelle für Sustain/Release (4 Bytes)
+	adtab		= $c584	; $cba4	word: Tabelle für Attack/Decay (4 Bytes)
+	chgr		= $c586	; $cb6e	bei CHAR: Zeichengröße
+	fetchanz		= $c587	; $cb6f
+	joywert		= $c588	; $cb70
+	elseindex		= $c589	; $cb71	Index in ELSE-Stack	(former unused zwisp4)
+	fetchlen		= $c58a	; $cb72	Eingabelänge bei FETCH (Wert max 88)
+	pspeinmi		= $c58b	; 	Prozessorport bei NMI
+	pageflag		= $c58c	; 	Flag für PAGE (Wert 10)
+	pagewert		= $c58d	; 	Wert für PAGE
+	drawtabx		= $c58e	; $cb59	DRAW: 4 Bytes (gesetzt durch ROT)
+	drawtaby		= $c592	; $cb5d	DRAW: 4 Bytes (gesetzt durch ROT)
+	portspei		= $c596	; 	Zwischenspeicher bei Prozessorport-Umschaltung
+	ax		= $c597	; 	word: X-Anfangswert
+	ay		= $c599	; 	word: Y-Anfangswert
+	mfreq		= $c59b	; 	word: Frequenz für PLAY
+	procnffl		= $c59d	; 	PROC NOT FOUND (changed from $c597, doesn't interfere with AX)
+	musicz1		= $c59e	; $cb9d	Zeiger in MUSIC-String
+	musicz2		= $c59f	; $cb86	Dauer: Noten
+	musicz3		= $c5a0	; $cb88	Dauer: Noten
+	ydiff		= $c5a1	; 	word: Differenz bei MOB
+	diffv		= $c5a3	; 	word: Differenz vertikal
+	dry		= $c5a5	; 	word: used by DUP
+	xdiff		= $c5a7	; 	word: Differenz horizontal
+	ex		= $c5a9	; 	word: Endwert x
+	ey		= $c5ab	; 	word: Endwert y
+	musicdau		= $c5ad	; $cb96	Dauer von Musik
+	gflag		= $c5ae	; 	Flag für BLOCK
+	musiclen		= $c5af	; $cb9e	Länge des MUSIC-Strings
+	multijn		= $c5b0	; 	Flag für Multi-Modus
+	autoinc		= $c5b1	; 	Inkrement bei AUTO
+	autoflag		= $c5b2	; 	Flag für AUTO (Wert 10)
+	gmemflag		= $c5b3	; 	Flag für Grafik/MOB
+	mobbew		= $c5b4	; 	Flag bei MOB-Bewegungen
+	nesteddo		= $c5b5	; 	zählt Schachtelung bei DO (vorher: mobspeed)
+	nestelse		= $c5b6	; 	wie nesteddo für ELSE     (vorher: mobsize)
+	mobsptab		= $c5b7	; 	Tabelle der MOB-Speeds (8 Bytes)
+	mobnr2		= $c5bf	; 	Index in $d000 (MOB-Nummern)
+	mobnr		= $c5c0	; 	MOB-Nummer
+	drricht		= $c5c1	; $cb61	DRAW: Richtung (aus ROT)
+	drincx		= $c5c2	; $cb65	DRAW
+	drincy		= $c5c3	; $cb69	DRAW
+	flashsp		= $c5c4	; 	Speed für FLASH
+	flashzae		= $c5c5	; 	Counter bei FLASH
+	flashfl		= $c5c6	; 	Flag für FLASH (Wert 10)
+	flashing		= $c5c7	; 	Flag: FLASH aktiv ($00/$80)
+	musicz4		= $c5c8	; $cb8a	Dauer: Noten
+	musicz5		= $c5c9	; $cb9f	Zeiger in MUSIC-String
+	stimmenr		= $c5ca	; $cba8	gewählter SID-Oszillator (1-3)
+	ifflag		= $c5cb	; 	Wahrheitswert der letzten IF-Abfrage
+	justif		= $c5cc	; 	Flag für IF in DO..DONE (ELSE auf gleicher Zeile)
+	mobsztab		= $c5cd	; 	Tabelle der MOB-Sizes (8 bytes)
+	lcode		= $c5d5	; 	part of LIST
+	inkey		= $c5d6	; 	Nummer der Funktionstaste
+	bflashsp		= $c5d7	; 	Speed bei BFLASH
+	bflzae		= $c5d8	; 	Zähler bei BFLASH
+	bflashf1		= $c5d9	; 	Farbe 1 bei BFLASH
+	bflashf2		= $c5da	; 	Farbe 2 bei BFLASH
+	bflashjn		= $c5db	; 	Flag: BFLASH aktiv (Wert 10)
+	optflag		= $c5dc	; 	Flag: OPTION aktiv (Wert 10)
+	pendflag		= $c5dd	; 	Flag für Programmende bei FIND
+	bflashing		= $c5de	; 	BFLASH: ursprüngliche Borderfarbe
+	zeileanf		= $c5df	; $cb76	Startzeile bei MOVE-Befehlen
+	spalteanf		= $c5e0	; $cb77	Startspalte bei MOVE-Befehlen
+	spaltenanz	= $c5e1	; $cb78	Anzahl Spalten bei MOVE-Befehlen
+	zeilenanz		= $c5e2	; $cb79	Anzahl Zeilen bei MOVE-Befehlen
+	playflag		= $c5e3	; $cb91	Flag: PLAY aktiv (Wert 10)
+	codezae		= $c5e4	; 	Zähler bei Tokenisierung
+	drx		= $c5e5	; $cb6d	word: Startwert X bei DRAW
+	onkeypos		= $c5e7	; 	ON KEY: Taste in Control-String?
+	onkeyzeig		= $c5e8	; 	word: Zeiger auf ON-KEY-Befehl
+	onkeyflag		= $c5ea	; 	Flag: ON KEY aktiv (Wert 10)
+	dwert		= $c5eb	; $cbae	Zähler für Vervielfachung bei DUP
+	keyon		= $c5ec	; 	gedrückte Taste bei ON KEY
+	okstring		= $c5ed	; 	word: Zeiger auf ON-KEY-Control-String
+	okstrlen		= $c5ef	; 	Länge ON-KEY-Control-String
+	basbzk		= $c5f0	; 	word: enthält Basic-Programmzeiger $7a/b
+	kmy		= $c5f2	; $cb49	word: Kreis-Mittelpunkt Y
+	kmx		= $c5f4	; $cb4b	word: Kreis-Mittelpunkt X
+	winksw		= $c5f6	; $cb4d	word: Winkelschrittweite
+	delay		= $c5f8	; 	Verzögerungswert bei LIST (DELAY)
+	onerrzeig		= $c5f9	; 	word: Zeiger auf ON-ERROR-Befehl
+	onerrorflag	= $c5fb	; 	Flag: ON ERROR aktiv (Wert 10)
+	errn		= $c5fc	; 	Error-Nummer
+	plpos		= $c5fd	; $cbb1	Position des gesuchten Strings bei PLACE
+;
+;			= $c5fe	; 	store .y, verwendet bei LIST
+;			= $c5ff	; 	store .x, verwendet bei LIST
+
+; -----------------------------------------
+
+	stack		= $c600	; 	enthält Wert des Prozessor-Stacks
+	traceflag		= $c601	; 	Flag: TRACE aktiv (Wert 10)
+	doflag		= $c602	; 	Flag: welche Art von DO
+	stackrepeat	= $c603	; 	20 bytes (10 words)
+	sprepeat		= $c617	; 	Stackpointer für REPEAT
+	execstack		= $c618	; 	20 bytes (10 words)
+	spexec		= $c62c	; 	Stackpointer für EXEC
+	stackloop		= $c62d	; 	20 bytes (10 words)
+	sploop		= $c641	; 	Stackpointer für LOOP
+	lastkey		= $c642	; 	zuletzt gedrückte Taste
+	execflag		= $c643	; 	Flag für EXEC ohne EXEC-Befehlswort (>0)
+	krx		= $c644	; $cb48	Kreis: Radius X
+	kry		= $c645	; $cb49	Kreis: Radius Y
+	keyflag		= $c646	; 	Flag: F-Tasten aktiv (Wert 10)
+				; ! unused (3 bytes)
+	wavetab		= $c64a	; 	Teil von WAVE
+	keytab		= $c64d	; 	F-Tasten-Belegung (bis $c74c)
+; 			  $c74d	; 	Text: "ata" (string to compare w/ keyword DATA)
+
+; -----------------------------------------
+;
+;	ab $cb00 neuer Code möglich bis $cbd5
+; 	die Page $cb wird nicht mehr gelöscht
+;
+; -----------------------------------------
+
+; -----------------------------------------
+; ----------------------------------------- TSB neo
+; -----------------------------------------
+
+startvec	!wo sstart
+snmivec	!wo sbnmi
+
+; ----------------------------------------- Cartridge Marker
+;
+modultext	!tx "cbm80"
+
+; ----------------------------------------- Initialization
+;
+sstart	jmp befcold
+
+; ----------------------------------------- NMI
+;
+ssnmi	lda pport
+	sta pspeinmi
+	jsr kerromein
+	jmp $fe43		; sys NMI
+
+; -----------------------------------------
+;
+snmi	pha
+	txa
+	pha
+	tya
+	pha
+
+sbnmi	jsr kerromein
+	lda #$7f
+	sta $dd0d
+	ldy $dd0d
+	bmi rs232nmi
+	jsr $f6bc		; sys STOP?
+	jsr $ffe1		; sysvec really STOP?
+	bne rs232nmi
+
+; -----------------------------------------
+;
+sbrk	lda #$04
+	sta video		; video at $0400
+	jsr $fda3		; set CIAs
+	jsr $e518		; sys init screen
+	jsr tsbcols	; set colors, returns .a=0
+	sta $d4
+	sta mobbew
+	sta gmemflag
+	lda #14		; CTRL n:
+	sta playflag	; clear play 2
+	jsr bsout		; cset 1
+	jmp ($a002)	; system nmi
+
+rs232nmi	jmp $fe72		; nmi when rs323
+
+; ----------------------------------------- command: COLD
+;
+befcold	jsr basromein
+	ldx #$00
+	stx ramstart
+	stx doindex
+	ldy #$80
+	jsr $fd8c		; sys set memory top
+	jsr $e453		; sys load basic vectors ($0300..$030b)
+	jsr $e3bf		; sys init ram
+	sei
+	jsr $fda3		; sys init cias
+	jsr colsout	; sys init VIC and keyboard, set TSB colors
+	lda #0
+	tax
+-	sta faststack,x
+	sta settings1,x
+	sta $d400,x	; init SID
+	inx
+	bne -
+;
+into	lda #8		; set drive 8 and LOAD/SAVE vectors
+	sta drive
+	ldy #3
+-	lda loadsave,y
+	sta $0330,y	; sys set vectors
+	dey
+	bpl -
+	ldx #11
+-	lda tsbvecs,x
+	sta basvecs,x
+	dex
+	bpl -
+	ldx #>ssnmi	; (hard) nmi vector hi ($800c)
+	stx $fffa+1	; (in case kernal is off at reset)
+	nop		; in case...
+	stx nmivec+1	; NMI = $8017
+	nop		; in case...
+	stx brkvec+1
+	lda #<sbrk	; SBRK = $8031
+	sta brkvec
+	lda #<ssnmi	; sys nmi vector lo ($800c)
+	sta $fffa		; (in case kernal is off at reset)
+	lda #<snmi
+	sta nmivec
+	cli
+	lda $2b		; get start of basic program
+	ldy $2c
+	jsr $a408		; sys free memory
+	jsr $e422		; sys out start message of sb
+	ldx #$fb
+	txs
+dscbmout	ldy #0		; show "tuned"
+-	lda tuned,y
+	beq endsmb
+	jsr bsout
+	iny
+	bne -
+
+; ----------------------------------------- End any Command
+;
+endsmb	jsr kerromein	; switch kernal on
+	cli
+	jsr basromein	; switch BASIC on
+	jmp $a7ae		; sys: V2 Interpreter
+
+; ----------------------------------------- TSB Interpreter
+; 			recoded
+sbasbef	tsx
+	stx stack		; save stack pointer
+	lda onkeyflag
+	beq sintprt0
+	jsr onkey1
+
+sintprt0	jsr chrget	; get next char
+	jsr stateofdo	; what about DO..DONE and ELSE?
+
+	lda traceflag	; trace active?
+	beq +
+
+	ldx $3a		; yes, get basic line hi
+	inx
+	beq +
+	jsr trace1
+
++	ldy #0
+	sty autoflag	; auto off
+
+	lda (progz),y	; current char:
+	beq ipr0		; line end?
+
+	cmp #$8b		; IF?
+	bne ipr1
+	jmp befif
+
+ipr1	cmp #$64		; sb token?
+	beq ipr5
+
+	cmp #$8a		; RUN?
+	beq ipr3
+	cmp #$9c		; CLR?
+	beq ipr3
+	cmp #$a2		; NEW?
+	beq ipr3
+
+	lda (progz),y	; reget char:
+	bmi ipr4		; standard v2 token?
+
+	cmp #$3a		; no, ":"? (end of command)
+	beq ipr0		; yes, continue with next
+
+	jsr $a906		; sys find next ":" (offset in .y)
+	sty $22
+	ldx #$b2		; sys find "=" (offset in .y)
+	jsr $a90b
+	cpy $22		; beyond ":"?
+	bcs ipr2		; yes, so this is EXEC w/o EXEC
+
+ipr4	jsr chrgot	; no, reget standard token
+	jmp $a7e7		; and process
+
+ipr0	jmp $a7ae		; sys interpreter
+
+ipr2	sty execflag	; flag for EXEC w/o EXEC
+	lda #51		; token of EXEC
+	bne +		; execute EXEC
+
+ipr3	sty doindex	; clear variables
+	sty elseindex
+	sty sprepeat
+	sty nestelse
+	sty dolevel
+	sty spexec
+	sty sploop
+	sty prstack
+	beq ipr4		; (uncond. branch)
+;
+ipr5	jsr incbasbz	; process tsb command:
+	lda (progz),y	; get token
+	bpl +		; v2 token?
+	eor #$8f		; yes, convert to TSB usable token
++	tax		; use as index into command address table
+	jsr basromaus
+	sta portspei
+	dex
+	txa
+	asl
+	tay
+	lda sprtab+1,y	; get command address
+	pha
+	lda sprtab,y
+	pha
+	rts		; execute command
+
+; ----------------------------------------- TSB Tokenizer
+;
+tokenize	ldy #4		; check $0200 (until $00)
+next	iny
+next1	lda $01fb,y
+	bne ma1
+ende	jmp $a57c		; then: sys: tokenize V2
+
+ma1	cmp #$22		; quote? (and also: colon)
+	bne dsign
+ma4	sta helpvc2
+ma2	iny
+	lda $01fb,y	; line end?
+	beq ende		; yes, finished
+	cmp helpvc2	; quote end?
+	bne ma2		; no, skip string
+	beq next		; yes, cont. scan
+
+dsign	cmp #$40		; "@" (of DESIGN)?
+	beq ma3
+
+data	cmp #$44		; "d" (of DATA)?
+	bne ziffer
+	pha		; save .a and .y
+	tya
+	pha
+	ldx #$ff
+mt10	inx
+	iny
+	lda $01fb,y
+	cmp ata,x		; compare against "ata"
+	bne mt11		; not found, cont. scan
+	cpx #2
+	bne mt10
+	pla		; found: skip line
+	tay
+	pla
+ma3	lda #$3a		; search for ":"
+	bne ma4
+
+mt11	pla		; restore .a and .y
+	tay
+	pla
+
+ziffer	cmp #$41		; is a char?
+	bcc next
+	cmp #$db
+	bcs next
+
+	sty zwisp2	; index into line
+	ldx #>tabbef
+	stx $21
+	ldx #<tabbef
+	stx $20
+
+	ldx #0		; init token counter
+	stx codezae
+
+cmpare	sec		; check chars in list against basic line
+	sbc ($20,x)
+	beq mt1		; if equal, next char
+	cmp #$80		; found keyword?
+	beq mt6		; yes, transform to token
+
+mt5	lda ($20,x)	; end of list?
+	beq next		; yes, get next char in basic line
+	bmi mt4		; shifted?
+	jsr inc20		; no, skip command word
+	bne mt5
+
+mt4	inc codezae	; yes, next command word
+	ldy zwisp2
+	!by $a9
+mt1	iny		; command word still equal, so
+	lda $01fb,y	; cont. compare
+	jsr inc20
+	bne cmpare
+
+mt6	cpy zwisp2	; index moved?
+	beq tonext	; no, advance
+
+token1	ldx zwisp2	; otherwise:
+	lda #$64		; write sb token,
+	sta $01fb,x
+	inx
+token2	lda codezae	; write counter as token number
+	sta $01fb,x
+	inc $01fb,x
+
+disapa	cmp #$40		; command SECURE?
+	bne vor
+	lda #$3a		; yes, enter ":"
+	ldy #0
+mt12	inx
+	iny
+	sta $01fb,x	; 4 times colon
+	cpy #4
+	bmi mt12
+	txa
+	tay
+	jmp next1
+
+vor	iny		; move up rest of line
+	inx
+	lda $01fb,y
+	sta $01fb,x
+	bne vor
+mt13	inx
+	lda #0		; delete beyond by $00
+	sta $01fb,x
+	lda $01fb+1,x
+	bne mt13
+
+	ldy zwisp2	; get next char from basic line
+	iny
+tonext	jmp next
+
+; ----------------------------------------- Detokenizer Entry Point
+;
+slist	php		; start of LIST
+
+	jsr slist3	; first: TSB-Optionen abarbeiten,
+	php		; (TSB? regelt zeroflag)
+	ldx helpvc2+1
+	plp		; dann: V2
+	beq ma
+
+	plp		; war TSB, nun:
+	jmp $a6f6		; sys: romlista (Quote, nächste zeile)
+
+ma	plp		; war nicht TSB, nun:
+	jmp $a71a		; sys: romlistb (V2-Befehle ausgeben)
+
+; ------------------------------------------------------------
+;  tsb detokenizer (from sys: $a717 via $0306/07)
+; ------------------------------------------------------------
+;
+slist3	sty helpvc2	; register retten
+	stx helpvc2+1
+	pha		; laufendes zeichen retten
+
+-	ldy $028d		; Sondertasten-Flag
+	cpy #1		; Shift (1) gedrückt?
+	beq -		; if Shift: hold LIST
+	tya
+	and #2
+	bne sl1		; if C=: skip delay & page (and LIST normally)
+	tya
+	and #4
+	beq page
+
+dlay	ldx #$ff		; if CTRL (4): delay LIST
+	bmi +
+ml0	iny		; verzögern
+	bne ml0
++	inx
+	cpx delay		; Faktor erreicht?
+	bne ml0		; ja, weiter
+
+page	ldy pageflag	; PAGE is ON?
+	beq sl1		; no, skip
+	ldy pagewert	; bis zu welcher zeile?
+	beq sl1		; bei 0: skip
+	cpy $d6		; zeile erreicht?
+	bcs sl1
+
+	ldy #0		; ja, hold LIST
+ml1	lda ($d1),y	; zeilennummer merken
+	sta $0244,y
+	iny
+	cmp #32
+	bne ml1
+
+wait	jsr $ffe1		; Hold, sys: stop? (Abbruch)
+	beq sl1		; ja, cont.
+	jsr $ffe4		; sys: getkey
+	cmp #$0d		; <cr>?
+	bne wait		; nein, warten
+
+	lda $d4		; $d4, cursorphase retten
+	pha
+	lda #0
+	sta $d4		; cursor aus
+	jsr clear		; clr/home ausgeben
+	ldy #0
+ml2	lda $0244,y	; zeilennummer wieder hinschreiben
+	jsr bsout
+	iny
+	cmp #32
+	bne ml2
+	pla
+	sta $d4		; cursor rekonstruieren
+
+sl1	pla		; aktuelles zeichen holen
+
+sl2	ldx #>tabbef	; zeiger setzen
+	stx $21
+	ldx #<tabbef
+	stx $20
+	cmp #$64		; ist TSB token im .a?
+	beq listb		; ja, list tsb
+
+back	ldy helpvc2	; nein, flags für weitermachen im ROM-List
+	ldx #0
+	rts
+
+; -----------------------------------------
+;
+listb	ldx $d4
+	bne back
+
+option	lda optflag	; OPTION aktiv?
+	beq ml3
+	lda #$12		; ja, rvs on
+	jsr bsout
+ml3	ldy helpvc2
+	iny
+	lda ($5f),y	; nächstes Zeichen (Token) holen
+	bpl +
+	eor #$8f		; umwandeln und auf 0..127 begrenzen
++	tax		; Token als zähler
+	ldy #0
+	cpx #1		; ist HIRES?
+	beq ml7		; ja, skip Suche
+
+list1	dex		; bis zum richtigen Befehlswort blättern...
+	beq list2
+ml5	jsr inc20
+	lda ($20),y	; ...überlesen:
+	bpl ml5		; normale Zeichen: skip
+	bmi list1		; bei geshiftetem Zeichen: nächstes Befehlswort
+
+list2	jsr inc20
+ml7	lda ($20),y	; dann richtiges befehlswort ausgeben
+	bmi ml8		; (bis zum geshifteten Zeichen)
+	jsr bsout
+	iny
+	bne ml7
+ml8	and #$7f		; geshiftetes zeichen ausgeben
+	jsr bsout
+	jsr rvsoff	; und rvs off (falls OPTION aktiv ist)
+
+	ldy helpvc2	; flags setzen, weiter im ROM
+	iny
+	ldx #1
+lr1	rts
+
+; ----------------------------------------- Eingabewarteschleife
+;
+sloop	sei
+	lda #>sirq	; change irq to tsb
+	sta irqvec+1
+	lda #<sirq
+	sta irqvec
+	ldx #0		; clear flags
+	stx $d01a
+	stx playflag
+	stx onerrorflag
+	stx onkeyflag
+	stx basbzk+1
+	stx doflag
+	cli
+	lda $d011
+	and #$20
+	beq +
+	jsr basromaus
+	jsr nrm01		; do NRM
++	jsr basromein
+	lda autoflag
+	cmp #10
+	beq auto
+	jmp $a483		; sys Eingabewarteschleife
+
+; -----------------------------------------
+;
+auto	clc
+	lda autozi
+	adc autoinc
+	sta $63
+	sta autozi
+	lda autozi+1
+	adc #0
+	sta $62
+	sta autozi+1
+	jsr sxyflp2
+	jsr $bddf		; sys fac2ascii
+	ldx #0
+-	lda linenum,x
+	beq +
+	sta keybuf,x
+	inx
+	bne -
++	lda #$20		; space
+	sta keybuf,x
+	inx
+	stx numkeys
+	lda #0
+	sta autoflag
+	jsr $a560		; sys Basiczeile einlesen
+	sty $aa
+
+	ldy #0
+-	iny
+	lda basinbuf,y
+	beq +
+	cmp #$3a		; ":"?
+	bcc -
+	cmp #$5b		; "["? (beyond "z"?)
+	bcs -
+	lda #10
++	sta autoflag
+
+	ldy $aa
+	jmp $a486		; sys Eingabewarteschleife (ohne inc)
+
+; ----------------------------------------- Warmstart
+;
+swarm	ldx #$20		; 32 = bad mode
+warmstart	stx errn		; here: errnum in .x
+
+	jsr endcheck	; break by END?
+	lda onerrorflag	; on error active?
+	cmp #10
+	beq +
+	jmp serrout	; no, error out
+
++	lda onerrzeig+1	; if on error:
+	sta progz+1	; go to on error line
+	lda onerrzeig
+	sta progz
+	lda $39		; set errln
+	sta errln
+	lda $3a
+	sta errln+1
+	lda $3d		; set cont pointer
+	ldy $3e
+	sta savecont
+	sty savecont+1
+	ldx stack		; restore stack pointer
+	txs
+swm0	jmp endsmb	; end on error
+
+endcheck	jsr basromein
+	txa		; any error?
+	bpl +
+eck0	lda #0		; no, clear on error flag
+	sta onerrorflag
++	rts
+
+; -----------------------------------------
+;
+serrout	txa		; any error?
+	bpl +
+	jmp $a474		; no, sys out: ready.
+
++	jsr kerromein
+	txa
+	and #$20
+	bne +
+	jmp $a43a		; yes, sys out: error
+
++	txa		; TSB error (above $1f)
+	and #$1f
+	asl
+	tax
+	lda fehlmtab,x
+	sta $22
+	lda fehlmtab+1,x
+	sta $23
+	jmp $a447		; sys out: (tsb) error
+
+; ----------------------------------------- Load Extensions
+;
+loadext	stx helpvec
+	jsr chkdrv	; drive ready?
+	ldx helpvec
+	ldy #>names
+	lda #7		; yes, set 7 chars
+	jsr $ffbd		; sys setnam
+	lda #1		; LOAD "name",dr,1
+	ldx drive		; get tsb drive
+	tay
+	jsr $ffba		; sys setlfs
+	lda #0
+	sta $9d		; force prog mode
+	jmp $f4a5		; sys LOAD
+
+; ----------------------------------------- Check Drive Presence
+; 			(P. Hagemann)
+chkdrv	lda #0
+	sta status
+	lda drive
+	jsr $ffb1		; sys: LISTEN
+	jsr $ffae		; sys: UNLISTEN
+	lda status	; what happened?
+	bmi err05
+-	rts
+
+; -----------------------------------------
+;
+safeopen	jsr sopen
+	bcc -
+
+err05	ldx #5		; drive not ready
+	jmp ($0300)
+
+; ----------------------------------------- Repair CHRGET after Extensions
+;
+repchrget	lda progz+2	; chrget changed (by INST)?
+	cmp #$4c
+	bne +		; no, leave
+
+	jsr kerromein
+	ldx #2
+-	lda $e3ab,x	; sys repair chrget
+	sta progz+2,x
+	dex
+	bpl -
++	rts
+
+; -----------------------------------------
+; ----------------------------------------- TSB IRQ (set in SLOOP)
+; -----------------------------------------
+;
+sirq	ldy #0
+	inc zaeirq	; count 60 jiffies
+	lda zaeirq
+	cmp #60
+	bne +
+	inc zaesec	; 60 jiffies = 1 sec
+	sty zaeirq
+
++	lda bflashjn
+	cmp #10		; bflash active?
+	bne sirq2		; no, skip
+
+	inc bflzae	; counter at max?
+	lda bflzae
+	cmp bflashsp
+	bne sirq2		; no, skip
+
+	sty bflzae	; reset counter
+	lda $d020		; toggle colors
+	and #$0f
+	cmp bflashf1
+	beq +
+	lda bflashf1
+	jmp sq1
+
++	lda bflashf2
+sq1	sta $d020
+
+; -----------------------------------------
+;
+sirq2	lda $ff		; save $fc to $ff
+	pha
+	lda $fe
+	pha
+	lda $fd
+	pha
+	lda $fc
+	pha
+;
+	lda flashfl	; is flash active?
+	cmp #10
+	bne sirq3 	; no, skip
+
+	inc flashzae	; is counter at speed?
+	lda flashzae
+	cmp flashsp
+	bne sirq3 	; no, skip
+;
+	lda flashing	; set sync byte
+	eor #$80
+	sta flashing
+	lda #$d8		; yes, set color ram at $fe/$ff
+	sta $ff
+	lda video		; set video ram at $fc/$fd
+	sta $fd
+	sty $fe		; .y=0
+	sty $fc
+	sty flashzae
+;
+-	lda ($fe),y	; get color
+	and #$0f
+	tax
+	lda flashfls,x	; is color tagged?
+	beq +
+	lda ($fc),y	; yes, invert char in video ram
+	eor #$80
+	sta ($fc),y
++	inc $fe
+	bne +
+	inc $ff
++	inc $fc
+	bne +
+	inc $fd
++	lda $ff		; up to $e8db in color ram
+	cmp #$db
+	bne -
+	lda $fe
+	cmp #$e8
+	bne -
+
+; -----------------------------------------
+;
+sirq3	lda $d4
+	bne sirq4
+
+	ldy $028d		; Shift/C=?
+	lda shwerttab,y
+	sta inkey
+	lda $cb
+	cmp #4		; F1?
+	beq wasf1
+	cmp #5		; F3?
+	beq wasf3
+	cmp #6		; F5?
+	beq wasf5
+	cmp #3		; F7?
+	beq wasf7
+;
+	lda #0		; none of these
+	sta inkey
+	beq sirq4
+;
+wasf7	inc inkey
+	inc inkey
+wasf5	inc inkey
+	inc inkey
+wasf3	inc inkey
+	inc inkey
+wasf1	inc inkey
+
+; -----------------------------------------
+;
+sirq4	lda $cc
+	bne sirq5
+
+	lda keyflag
+	cmp #10
+	beq sirq5
+	lda $d4
+	bne sirq5
+;
+	lda $cb
+	cmp lastkey
+	beq ams5
+	lda $d8
+	bne ams5
+	lda inkey
+	beq ams5
+;
+	lda inkey
+	sta $fe
+	cmp #17		; beyond 16?
+	bcs ams5
+	lda #0		; # mal 16
+	sta $ff
+	dec $fe
+	asl $fe
+	rol $ff
+	asl $fe
+	rol $ff
+	asl $fe
+	rol $ff
+	asl $fe
+	rol $ff
+	clc
+	lda $fe
+	adc #<keytab	; plus $c64d
+	sta $fe
+	lda $ff
+	adc #>keytab
+	sta $ff
+	ldy #0		; out inkey text
+-	lda ($fe),y	; (zero terminated, but max 16 chars)
+	beq ams4
+	cpy #16		; (max length: 16)
+	beq ams4
+	sta $0277,y	; write to keybuf
+	iny
+	bne -
+;
+ams4	sty $c6
+ams5	lda $cb
+	sta lastkey
+
+; -----------------------------------------
+;
+sirq5	lda playflag
+	cmp #10
+	bne +
+	jsr sirqplay
+;
++	pla		; restore $fc to $ff
+	sta $fc
+	pla
+	sta $fd
+	pla
+	sta $fe
+	pla
+	sta $ff
+	jmp $ea31		; sys IRQ
+
+; -----------------------------------------
+;
+; Section 2: Tables and Lists
+;
+; -----------------------------------------
+
+; ----------------------------------------- Calls to BASIC ROM
+;
+romtable:
+	!wo $ad8a		;  0 frmnum: get numerical expression
+	!wo $b7f7		;  1 getadr: FAC to word (.y=lo, .a=hi, :INT)
+	!wo $e26b		;  2 func SIN
+	!wo $e264		;  3 func COS
+	!wo $aefd		;  4 check for comma
+	!wo $ad9e		;  5 frmevl: retrieve expression
+	!wo $b6a3		;  6 frestr: retrieve string parameters
+	!wo $a8a3		;  7 bef GOTO (to line in INT)
+	!wo $aeff		;  8 check if char in .a is at pz
+	!wo $bc44		;! 9 intflt: integer to float (hi: $62, lo: $63, .x:#$90)
+	!wo $a613		; 10 compute address of line start (number in INT)
+	!wo $aef7		; 11 check for "Klammer zu"
+	!wo $bc49		;!12 intflt: convert to FAC (.x=exponent)
+	!wo $bc0c		; 13 FAC to ARG
+	!wo $ba30		; 14 FAC*ARG
+	!wo $bba2		; 15 const (.a=lo, .y=hi) to FAC
+	!wo $bb14		; 16 ARG/FAC
+	!wo $bddd		; 17 FAC to ASCII (in $0100)
+	!wo $b08b		; 18 getvar: get var from basic
+	!wo $b3a6		; 19 check for direct mode (error if yes)
+	!wo $abb5		; 20 clear open device channels
+	!wo $a8f8		; 21 find colon and add to progz
+	!wo $a906		; 22 find colon, offset in .y
+	!wo $ac0d		; 23 bef INPUT
+	!wo $aaca		; 24 print buffer $0200 and cr
+	!wo $a8fb		; 25 progz plus .y
+	!wo $b79e		; 26 getbyt from basic (to .x)
+	!wo $a533		; 27 bind basic lines
+	!wo $ab7b		; 28 GET
+	!wo $a96b		; 30 line# to int
+	!wo $ad8f		; 32 sys check for string
+	!wo newopen	; 34 bef OPEN (with TSB drive)
+	!wo $a3b8		; 36 sys block copy
+
+; ----------------------------------------- Table of Kernal Vectors
+;
+tsbvecs	!wo warmstart,sloop,tokenize,slist,sbasbef,sgetari
+
+; ----------------------------------------- Table for Vectors of LOAD and SAVE
+;
+loadsave	!wo sysload,syssave
+
+; -----------------------------------------
+;
+tsbpudef	!by $2b,$2a,$2c,$2e,$2d,$23	; +*,.-#
+
+; ----------------------------------------- tsb start message
+;
+tuned	!by $0e,$08
+	!tx " tuned"
+	!by $0d,0
+
+; ----------------------------------------- Table of Command Names
+;
+tabbef	!tx "hireS"	; 1
+	!tx "ploT"
+	!tx "linE"
+	!tx "blocK"
+	!tx "fchR"
+	!tx "fcoL"
+	!tx "filL"
+	!tx "reC"
+	!tx "roT"		; 9
+	!tx "draW"
+	!tx "chaR"
+	!tx "hi coL"
+	!tx "inV"
+	!tx "fraC"
+	!tx "movE"
+	!tx "placE"
+	!tx "upB"		; 17
+	!tx "upW"
+	!tx "leftW"
+	!tx "leftB"
+	!tx "downB"
+	!tx "downW"
+	!tx "rightB"
+	!tx "rightW"
+	!tx "multI"	; 25
+	!tx "colouR"
+	!tx "mmoB"
+	!tx "bflasH"
+	!tx "mob seT"
+	!tx "musiC"
+	!tx "flasH"
+	!tx "repeaT"
+	!tx "plaY"	; 33
+	!tx "dO"
+	!tx "centrE"
+	!tx "envelopE"
+	!tx "cgotO"
+	!tx "wavE"
+	!tx "fetcH"
+	!tx "at",$a8
+	!tx "untiL"	; 41
+	!by $be		; *
+	!by $be		; +
+	!tx "usE"
+	!by $be		; -
+	!tx "globaL"
+	!by $be		; /
+	!tx "reseT"
+	!tx "proC"	; 49
+	!tx "calL"
+	!tx "exeC"
+	!tx "end proC"
+	!tx "exiT"
+	!tx "end looP"
+	!tx "on keY"
+	!tx "disablE"
+	!tx "resumE"	; 57
+	!tx "looP"
+	!tx "delaY"
+	!tx "clS"		; <
+	!tx "x",$a1	; = (x!)
+	!tx "maP"		; >
+	!by $be		; ?
+	!tx "securE"
+	!tx "disapA"	; 65
+	!tx "circlE"
+	!tx "on erroR"
+	!tx "no erroR"
+	!tx "locaL"
+	!tx "rcomP"
+	!tx "elsE"
+	!tx "retracE"
+	!tx "tracE"	; 73
+	!tx "diR"
+	!tx "pagE"
+	!tx "dumP"
+	!tx "finD"
+	!tx "optioN"
+	!tx "autO"
+	!tx "olD"
+	!tx "joY"		; 81
+	!tx "moD"
+	!tx "diV"
+	!tx "d",$a1
+	!tx "duP"
+	!tx "inkeY"
+	!tx "insT"
+	!tx "tesT"
+	!tx "liN"		; 89
+	!tx "exoR"
+	!tx "inserT"
+	!tx "poT"
+	!tx "penX"
+	!by $be		; ^
+	!tx "penY"
+	!tx "sounD"
+	!tx "graphicS"	; 97
+	!tx "desigN"
+	!tx "rlocmoB"
+	!tx "cmoB"
+	!tx "bckgndS"
+	!tx "pausE"
+	!tx "nrM"
+	!tx "moB"
+	!tx "ofF"		; 105
+	!tx "angL"
+	!tx "arC"
+	!tx "colD"
+	!tx "scrsV"
+	!tx "scrlD"
+	!tx "texT"
+	!tx "cseT"
+	!tx "voL"		; 113
+	!tx "disK"
+	!tx "hrdcpY"
+	!tx "keY"
+	!tx "painT"
+	!tx "low coL"
+	!tx "copY"
+	!tx "mergE"
+	!tx "renumbeR"	; 121
+	!tx "meM"
+	!tx "detecT"
+	!tx "checK"
+	!tx "displaY"
+	!tx "erR"
+	!tx "ouT"
+	!by 0
+
+; ----------------------------------------- Table of Error Messages
+;
+tsbf0	!tx "bad modE"		; 32 / $20
+tsbf1	!tx "proc not founD"	; 33 / $21
+tsbf2	!tx "insert too largE"	; 34 / $22
+tsbf3	!tx "string too largE"	; 35 / $23
+tsbf4	!tx "not binary chaR"	; 36 / $24
+tsbf5	!tx "not hex chaR"		; 37 / $25
+tsbf6	!tx "end proc without exeC"	; 38 / $26
+tsbf7	!tx "end loop without "	; 39 / $27
+tsbf8	!tx "looP"		; 40 / $28
+tsbf9	!tx "until without repeaT"	; 41 / $29
+tsbfa	!tx "not yet activE"	; 42 / $2a
+tsbfb	!tx "too few lineS"		; 43 / $2b
+tsbfc	!tx "bad char for a moB"	; 44 / $2c
+tsbfd	!tx "array not founD"	; 45 / $2d
+
+; ----------------------------------------- Table of Command Addresses
+;
+sprtab	!wo befhires-1	;   1 hires
+	!wo befplot-1	;   2 plot
+	!wo befline-1	;   3 line
+	!wo befblock-1	;   4 block
+	!wo movebef-1	;   5 fchr
+	!wo movebef-1	;   6 fcol
+	!wo movebef-1	;   7 fill
+	!wo befrec-1	;   8 rec
+	!wo befrot-1	;   9 rot
+	!wo befdraw-1	;  10 draw
+	!wo befchar-1	;  11 char
+	!wo befhicol-1	;  12 hi col
+	!wo movebef-1	;  13 inv
+	!wo swarm-1	;     bad mode (fn frac)
+	!wo movebef-1	;  15 move
+vecplace	!wo befplace-1	;  16 place    (changed from 86e2)
+	!wo movebef-1	;  17 upb
+	!wo movebef-1	;  18 upw
+	!wo movebef-1	;  19 leftw
+	!wo movebef-1	;  20 leftb
+	!wo movebef-1	;  21 downb
+	!wo movebef-1	;  22 downw
+	!wo movebef-1	;  23 rightb
+	!wo movebef-1	;  24 rightw
+	!wo befmulti-1	;  25 multi
+	!wo befcolour-1	;  26 colour
+	!wo befmmob-1	;  27 mmob
+	!wo befbflash-1	;  28 bflash
+	!wo befmobset-1	;  29 mob set
+	!wo befmusic-1	;  30 music
+	!wo befflash-1	;  31 flash
+	!wo befrepeat-1	;  32 repeat
+	!wo befplay-1	;  33 play
+	!wo befdo-1	;  34 do, done, do null
+	!wo befcentre-1	;  35 centre
+	!wo befenvelope-1	;  36 envelope
+	!wo befcgoto-1	;  37 cgoto
+	!wo befwave-1	;  38 wave
+	!wo beffetch-1	;  39 fetch
+	!wo befat-1	;  40 at       (fn at)
+	!wo befuntil-1	;  41 until
+	!wo swarm-1	;     (*)
+	!wo swarm-1	;     (+)
+	!wo befuse-1	;  44 use
+	!wo swarm-1	;     (-)
+	!wo befglobal-1	;  46 global
+	!wo swarm-1	;     (/)
+	!wo befreset-1	;  48 reset
+	!wo befproc-1	;  49 proc
+	!wo befcall-1	;  50 call
+	!wo befexec-1	;  51 exec
+	!wo befendproc-1	;  52 end proc
+	!wo befexit-1	;  53 exit
+	!wo befendloop-1	;  54 end loop
+	!wo befonkey-1	;  55 on key
+	!wo befdisable-1	;  56 disable
+	!wo befresume-1	;  57 resume
+	!wo befloop-1	;  58 loop
+	!wo befdelay-1	;  59 delay
+	!wo befcls-1	;  60 cls (<)
+	!wo err2a-1	;  61 x!  (=)
+vecmap	!wo err2a-1	;  62 map (>)
+	!wo swarm-1	;     	(?)
+	!wo befsecure-1	;  64 secure
+	!wo bef0-1	;  65 disapa
+	!wo befcircle-1	;  66 circle
+	!wo befonerror-1	;  67 on error
+	!wo befnoerr-1	;  68 no error
+	!wo beflocal-1	;  69 local
+	!wo befrcomp-1	;  70 rcomp
+	!wo befelse-1	;  71 else
+	!wo befretrace-1	;  72 retrace
+	!wo beftrace-1	;  73 trace
+	!wo befdir-1	;  74 dir
+	!wo befpage-1	;  75 page
+	!wo befdump-1	;  76 dump
+	!wo beffind-1	;  77 find
+	!wo befoption-1	;  78 option
+	!wo befauto-1	;  79 auto
+	!wo befold-1	;  80 old
+	!wo swarm-1	;     bad mode (fn joy)
+	!wo befmod-1	;  82 mod      (fn mod)
+	!wo befcls-1	;     div	     (fn div)
+	!wo befdelete-1	;  84 d!
+	!wo befdup-1	;  85 dup      (fn dup)
+	!wo swarm-1	;     bad mode (fn inkey)
+	!wo befinst-1	;  87 inst     (fn inst)
+	!wo swarm-1	;     bad mode (fn test)
+	!wo beflin-1	;  89 lin      (fn lin)
+	!wo swarm-1	;     bad mode (fn exor)
+	!wo befinsert-1	;  91 insert   (fn insert)
+	!wo swarm-1	;     bad mode (fn pot)
+	!wo swarm-1	;     bad mode (fn penx)
+vecbmode	!wo swarm-1	;     (^)
+	!wo swarm-1	;     bad mode (fn peny)
+	!wo befsound-1	;  96 sound    (fn sound)
+	!wo befgraphics-1	;  97 graphics (fn graphics)
+	!wo befdesign-1	;  98 design
+	!wo befrlocm-1	;  99 rlocmob
+	!wo befcmob-1	; 100 cmob
+	!wo befbckgnds-1	; 101 bckgnds
+	!wo befpause-1	; 102 pause
+	!wo befnrm-1	; 103 nrm      (fn nrm, 90df)
+	!wo befmoboff-1	; 104 mob off
+	!wo befoff-1	; 105 off
+	!wo befangl-1	; 106 angl
+	!wo befarc-1	; 107 arc
+	!wo befcold-1	; 108 cold
+	!wo befscrsv-1	; 109 scrsv
+	!wo befscrld-1	; 110 scrld
+	!wo beftext-1	; 111 text
+	!wo befcset-1	; 112 cset
+	!wo befvol-1	; 113 vol
+	!wo befdisk-1	; 114 disk
+	!wo befhrdcpy-1	; 115 hrdcpy
+	!wo befkey-1	; 116 key
+	!wo befpaint-1	; 117 paint
+	!wo beflowcol-1	; 118 low col
+	!wo befcopy-1	; 119 copy
+	!wo befmerge-1	; 120 merge
+vecrenum	!wo befrenum-1	; 121 renumber
+	!wo befmem-1	; 122 mem
+	!wo befdetect-1	; 123 detect
+	!wo befcheck-1	; 124 check    (fn check)
+	!wo befdisplay-1	; 125 display
+	!wo beferror-1	; 126 error    (fn err)
+	!wo befout-1	; 127 out
+
+; ----------------------------------------- Table of Error Message Addresses
+;
+fehlmtab	!wo tsbf0,tsbf1,tsbf2,tsbf3,tsbf4,tsbf5,tsbf6,tsbf7
+	!wo tsbf8,tsbf9,tsbfa,tsbfb,tsbfc,tsbfd
+
+; ----------------------------------------- Table of Joystick Values
+;
+tabjoy	!by $6e,$66,$67,$65,$6d,$69,$6b,$6a
+
+; ----------------------------------------- Tables about Music and Sound
+;
+mregs	!by $00,$07,$0e,$15,$15
+;
+nottab	!by $43,$c3,$44,$c4,$45,$46,$c6,$47
+	!by $c7,$41,$c1,$42,$5a,$ac,$b1,$bb
+	!by $a5,$b0,$bf,$bc
+;
+frqtabl	!by $16,$27,$39,$4b,$5f,$74,$8a,$a1
+	!by $ba,$d4,$f0,$0e,$00,$27,$4b,$5f
+	!by $8a,$ba,$f0,$0e
+
+; ----------------------------------------- Tables of Bitmasks
+;
+gbittabs	!by $80,$40,$20,$10,$08,$04,$02,$01
+gbittabl	!by $7f,$bf,$df,$ef,$f7,$fb,$fd,$fe
+mbittabs	!by $01,$02,$04,$08,$10,$20,$40,$80
+mbittabl	!by $fe,$fd,$fb,$f7,$ef,$df,$bf,$7f
+
+; ----------------------------------------- Table of Multicolor Bitmasks
+; a725
+destab3	!by $c0,$30,$0c,$03		; %11: D $d800..
+destab2	!by $80,$20,$08,$02		; %10: C $d023
+destab1	!by $40,$10,$04,$01		; %01: B $d022
+				; %00: A $d021
+
+; ----------------------------------------- Table of Graphics Addresses
+;
+gadrtabl	!by $00,$40,$80,$c0
+;
+gadrtabh	!by $e0,$e1,$e2,$e3,$e5,$e6,$e7,$e8
+	!by $ea,$eb,$ec,$ed,$ef,$f0,$f1,$f2
+	!by $f4,$f5,$f6,$f7,$f9,$fa,$fb,$fc
+	!by $fe
+
+; ----------------------------------------- Table of ROT(ation) values
+;
+tabrot1	!by $96,$ff,$69,$ff,$96,$ff,$69,$ff
+tabrot2	!by $14,$35,$21,$a3,$82,$ca,$48,$5c
+
+; ----------------------------------------- Tables for FETCH
+;
+fcursor	!by $9d,$92,$20,$12	; rvs on, space, rvs off, crsr lft
+	!by $9d,$9d,$20	; space, crsr lft, crsr lft
+; -----------------------------------------
+;
+fetchtab	!by $05,$11,$12,$13,$1c,$1d,$1e,$1f	; all these 26 get skipped
+	!by $90,$91,$92,$93,$94,$9c,$9d,$9e	; (color codes, crsr, rvs, home)
+	!by $9f,$8d,$81,$95,$96,$97,$98,$99
+	!by $9a,$9b
+
+; ----------------------------------------- Table of Print Values (COPY/HRDCPY)
+;
+quotetab	!by $80,$80,$83,$80,$83,$80,$08
+nline	!by $31,$32,$10,$0f,$0d,$08
+grprntab	!by $08,$35,$31,$10,$0f,$0d
+; from r to l: CR, Char mode, Tab "15", Graphic mode
+
+; ----------------------------------------- Table for (shifted) F-KEYs
+
+shwerttab	!by $00,$01,$08,$09
+
+; ----------------------------------------- Table of Tokens for RENUMBER
+;
+tokens	!by $9b,$a7,$8d,$89,$8a,$30,$46
+	; tokens: LIST,THEN,GOSUB,GOTO,RUN,RESET,RCOMP
+
+; ----------------------------------------- DO NULL text
+;
+null	!tx "null"
+
+; ----------------------------------------- Table of Extension Names
+;
+names
+nammem	!tx "tsb.mem"
+nameext	!tx "tsb.ext"
+namehsg	!tx "tsb.hsg"
+
+; ----------------------------------------- Table of KEY texts
+;
+textkey	!tx "key",0
+textchr	!tx "chr$(13)",0
+
+; ----------------------------------------- Version Text
+;
+version	!tx "ad23"	; Signature
+	!by $0d
+	!tx "2.31113"	; Version Number
+
+; -----------------------------------------
+;
+; Section 3: Helper Routines
+;
+; -----------------------------------------
+
+; ----------------------------------------- Execute ROM Calls
+; (offset to ROM table by .x)
+; 1: calls that use .x
+sxflppl	stx $ff		; save .x to $ff
+	ldx #18
+	bne pspeibe
+sxflp	stx $ff
+	ldx #24
+	bne pspeibe
+sinput1	stx $ff
+	ldx #46
+	bne pspeibe
+spuf0cr	stx $ff
+	ldx #48
+	bne pspeibe
+
+; 2: parameterless calls
+sbind	ldx #54
+	!by $2c
+sopen	ldx #62
+	!by $2c
+sysget	ldx #56
+	!by $2c
+sclrch	ldx #40
+	!by $2c
+srem	ldx #42
+	!by $2c
+snexttr	ldx #44
+	!by $2c
+tsbblcopy	ldx #64
+	!by $2c
+stestdirm	ldx #38
+	!by $2c
+sgoto1	ldx #14
+	!by $2c
+schkzei	ldx #16
+	!by $2c
+sstrpz	ldx #20
+	!by $2c
+schkklz	ldx #22
+	!by $2c
+sfmult	ldx #28
+	!by $2c
+sfldfack	ldx #30
+	!by $2c
+sfdiv	ldx #32
+	!by $2c
+sfacasc	ldx #34
+	!by $2c
+sgetvar	ldx #36		; used as trick
+	!by $2c
+ssin	ldx #4
+	!by $2c
+scos	ldx #6
+	!by $2c
+sgetbyt1	ldx #52
+	!by $2c
+sadr2int	ldx #58
+	!by $2c
+schkstr	ldx #60
+	!by $2c
+sfacarg	ldx #26
+	!by $2c
+sbzply	ldx #50
+	!by $2c
+sfrestr	ldx #12
+	!by $2c
+sfrmevl	ldx #10
+	!by $2c
+sfrmnum	ldx #0
+	!by $2c
+sfacadr	ldx #2
+	!by $2c
+schkcom	ldx #8
+
+; -----------------------------------------
+;
+pspeibe	pha		; save .a
+	lda #$4c		; JMP to 'help' ($0054)
+	sta help
+	lda pport
+	sta portspei	; save $01
+	jsr basromein	; switch basic rom on
+	lda romtable,x
+	sta help+1
+	inx
+	lda romtable,x
+	sta help+2
+	pla		; restore .a
+	ldx $ff		; restore .x
+; ROM call:
+	jsr help		; excute rom call
+;
+prestor	pha		; save .a
+	lda portspei	; restore $01
+	sta pport
+	lda #0
+	sta $ff
+	pla		; restore .a (.x and .y remain unharmed)
+	rts
+
+; ----------------------------------------- Set TSB Colors
+;
+colsout	jsr $ff5b		; init VIC
+
+; -----------------------------------------
+;
+tsbcols	ldx #12		; backgr: mgr
+	stx $d021
+	dex		; border: dgr
+	stx $d020
+	lda #0		; cursor: blk (value 0 needed in SBRK!)
+	sta aktfarb
+	rts
+
+; ----------------------------------------- PRINT anything more?
+;
+chkscolon	jsr basromein	; uses ROM routines:
+	jsr $aa9d		; check if more (part of PRINT)
+	jmp basromaus
+
+; -----------------------------------------
+;
+getkey	jsr $ffe4		; get char (getkey affects "tsb.mem"!)
+	beq +
+;
+-	jsr $ffe4		; warten
+	beq -
++	rts
+
+; ----------------------------------------- STOP plus Entprellung
+;
+chk4key	jsr $ffe1		; STOP?
+	beq +		; yes, leave
+-	ldx $cb		; any key?
+	cpx #$40
+	bne -		; yes, loop
+	inx
++	rts
+
+; ----------------------------------------- Save INT while getting another INT
+;
+getint	ldx int
+	lda int+1
+	stx helpvc2
+	sta helpvc2+1
+	jmp $aefa		; sys: "("?, returns .y=0
+
+; ----------------------------------------- Restore INT after that
+;
+intback	jsr restint
+	jmp $aef7		; sys ")"?
+
+; -----------------------------------------
+;
+restint	ldx helpvc2	; restore INT
+	lda helpvc2+1
+	stx int
+	sta int+1
+	rts
+
+; ----------------------------------------- (Part of EXOR)
+;
+getexor	jsr getint	; check "(", get adress value
+	jmp sgetadr2
+
+; -----------------------------------------
+;
+sgetadrn	jsr incbasbz
+sgetadr	jsr sfrmnum
+	jmp sfacadr
+
+; -----------------------------------------
+;
+sgetadr2	lda portspei
+	pha
+	jsr sgetadr
+	sta zwspei1
+	pla
+	sta portspei
+	lda zwspei1
+	rts
+
+; ----------------------------------------- Komma plus GETADR
+;
+sgetadrc	jsr schkcom	; get address after comma
+	jmp sgetadr
+
+; ----------------------------------------- Klammer plus GETADR
+;
+klgetadr	jsr $aefa		; sys "("?
+	jmp sgetadr2
+
+; ----------------------------------------- GETBYT
+;
+sgetbytn	jsr incbasbz
+	bne +
+sgetbytc	jsr schkcom
++	jmp sgetbyt1
+
+; ----------------------------------------- GETSTR
+;
+sgetstrn	jsr incbasbz
+sgetstr	jsr sfrmevl	; get string from basic
+	jsr sfrestr
+	sta $69		; len
+	lda $23		; location
+	ldx $22
+	rts
+
+; ----------------------------------------- Get 2 Strings
+;
+getstrgs	jsr $aefa		; sys "("?
+get2strs	jsr sgetstr1	; get string
+	sta $a8		; adr: a7/a8
+	stx $a7
+	lda $69		; len: strlen1 ($cbb7)
+	sta strlen1
+	jsr $aefd		; sys chkcom
+get1str	jsr sgetstr1	; get oldstring
+	sta $aa		; adr: a9/aa
+	stx $a9
+	lda $69
+	sta strlen2
+	rts
+
+; ----------------------------------------- GETSTR from behind BASIC
+;
+sgetstr1	lda portspei
+	pha
+	jsr sgetstr
+	sta zwspei1
+	pla
+	sta portspei
+	lda zwspei1
+	rts
+
+; ----------------------------------------- Used in HIRES
+;
+g2nsafe	jsr repchrget	; repair chrget
+	bne get2nyb	; uncond. branch
+
+; ----------------------------------------- Combine two Parameters to one Byte
+;
+get2nybc	jsr schkcom	; comma?
+	jsr dec7a
+get2nyb	jsr sgetbytn	; get value
+get2nyb2	jsr xnyb		; is below 16?
+	txa
+	asl		; times 16
+	asl
+	asl
+	asl
+	sta $aa		; store
+	jsr sgetbytn	; get next value
+	jsr xnyb		; is below 16?
+	txa
+	ora $aa		; combine and
+	sta $aa		; store
+	rts
+
+; -----------------------------------------
+;
+chkvoice	cpx #4		; check if SOUND parameter is 4
+	beq +
+
+; ----------------------------------------- Check wether Parameters are 1..3
+;
+x123	cpx #4
+	bcs towarm
+	cpx #0
+	beq towarm
+	dex
++
+-	rts
+
+; ----------------------------------------- Check wether Parameters are <8 or <16
+;
+getx8n	jsr incbasbz
+getx8	jsr sgetbyt1
+isit8	cpx #8
+	!by $2c
+xnyb	cpx #16
+	bcc -
+
+towarm	pla
+	pla
+	jmp swarm		; error
+
+; ----------------------------------------- INT to Float
+;
+sxyflp3	ldx #0		; byte values in .y
+sxyflp	sty $63		; word values: lo
+	stx $62		; and hi
+sxyflp2	ldx #$90
+	sec
+	jmp $bc49		; sys convert to float
+
+; ----------------------------------------- Convert int to float
+;
+scflp	ldx #$90
+	sec
+	jmp sxflp
+
+; -----------------------------------------
+;
+flinend	jsr chrget	; find endofline marker ($00)
+	cmp #0
+	bne flinend
+	rts
+
+; -----------------------------------------
+;
+vglae	lda vgla
+	cmp vgle
+	beq +
+	lda vgla+1
+	sbc vgle+1
+	ora #1
+	rts
+
++	lda vgla+1
+	sbc vgle+1
+	rts
+
+; ----------------------------------------- aa/ab plus 320
+;
+plus320	inc $a4
+	lda $a4
+	and #7
+	bne +
+	clc		; plus 320
+	lda $aa
+	adc #$40
+	sta $aa
+	lda $ab
+	adc #1
+	sta $ab
++	lda $aa
+	sta $a8
+	lda $ab
+	sta $a9
+	lda $6f
+	sta $09
+	lda $70
+	sta $0a
+	lda $a4
+	rts
+
+; ----------------------------------------- devide a8/a9 by 90
+;
+a8a9div90	lda #$5a		; divide angle by 90: in which quadrant?
+	sta idivsor
+	lda #0
+	sta idivsor+1
+	lda $a8
+	sta idivdend
+	lda $a9
+	sta idivdend+1
+	jsr idiv
+	lda idivrest
+	sta $a8
+	lda idivrest+1
+	sta $a9
+	lda idivdend	; result in $20: 0..3 (0 = N->E)
+	sta $20
+	cmp #1
+	beq +
+	cmp #3
+	beq +
+	rts
+;
++	sec
+	lda #$5a		; Winkel = 90 minus Winkel
+	sbc $a8
+	sta $a8
+	lda $20
+	rts
+
+; -----------------------------------------
+;
+a8a9bogm	lda $a8		; convert degree to radian
+	sta $63		; get angle
+	lda $a9
+	sta $62
+	jsr scflp
+	jsr sfacarg
+	lda #$a8		; sys get PI
+	ldy #$ae
+	jsr sfldfack
+	jsr sfmult	; rad = angle times PI...
+	jsr sfacarg	; (returns .x=0)
+	stx $62
+	lda #$b4		; 180 to 62/63
+	sta $63
+	jsr scflp
+	lda $61		; ...div 180
+	ldy $70
+	jmp sfdiv
+
+; ----------------------------------------- 20/21 minus 40
+;
+l20mn40	sec
+	lda $20		; dest: 1 row before
+	sbc #40
+	sta $20
+	bcs +
+	dec $21
++	rts
+
+; ----------------------------------------- 23/24 minus 40
+;
+l23mn40	sec
+	lda $23		; source: 1 row before
+	sbc #40
+	sta $23
+	bcs +
+	dec $24
++	rts
+
+; ----------------------------------------- 20/21 plus b1 to 23/24
+;
+mplus	clc
+	lda $20		; 1 (char/row) next
+	adc helpvec+1
+	sta $23
+	lda $21
+	adc #0
+	sta $24
+	rts
+
+; ----------------------------------------- 20/21 minus b1 to 23/24
+;
+mminus	sec
+	lda $20		; 1 (char/row) before
+	sbc helpvec+1
+	sta $23
+	lda $21
+	sbc #0
+	sta $24
+	rts
+
+; ----------------------------------------- a4/a5 mal 40
+; 			optimized
+a4mal40	lda #0
+	asl $a4		; $a4 mal 8...
+	rol
+	asl $a4
+	rol
+	asl $a4
+	rol
+
+	sta $a5		; ...merken...
+	pha
+	lda $a4
+	pha
+
+	asl $a4		; ...mal 32...
+	rol $a5
+	asl $a4
+	rol $a5
+
+	clc		; ...plus 8
+	pla
+	adc $a4
+	sta $a4		; Ergebnis in $a4/5
+	pla
+	adc $a5
+	sta $a5
+	rts
+
+; ----------------------------------------- 20/21 plus 40
+;
+l20pl40	clc
+	lda $20
+	adc #40
+	sta $20
+	bcc +
+	inc $21
++	rts
+
+; ----------------------------------------- 23/24 plus 40
+; 			optimized
+l23pl40	clc
+	lda $23
+	adc #40
+	sta $23
+	bcc +
+	inc $24
++	rts
+
+; ----------------------------------------- INC a6/a7
+;
+inca6a7	inc $a6
+	bne +
+	inc $a7
++	rts
+
+; ----------------------------------------- INC a8/a9
+;
+inca8a9	inc $a8
+	bne +
+	inc $a9
++	rts
+
+; ----------------------------------------- a8/a9 plus 8
+;
+a8plus8	clc
+	lda $a8
+	adc #8
+	sta $a8
+	bcc +
+	inc $a9
++	rts
+
+; ----------------------------------------- INC ex/ex+1
+;
+incex	inc ex
+	bne +
+	inc ex+1
++	rts
+
+; ----------------------------------------- INC 20/21
+;
+inc20	inc $20
+	bne +
+	inc $21
++	rts
+
+; ----------------------------------------- 20/21 to a8/a9
+;
+toa8	lda $20
+	sta $a8
+	lda $21
+	sta $a9
+	rts
+
+; -----------------------------------------  a8/a9 to 20/21
+;
+to20	lda $a8
+	sta $20
+	lda $a9
+	sta $21
+	rts
+
+; ----------------------------------------- INC PRG Zeiger
+;
+incbasbz	inc progz
+	bne +
+	inc progz+1
++	rts
+
+; ----------------------------------------- DEC PRG Zeiger
+;
+dec7a	lda progz
+	bne +
+	dec progz+1
++	dec progz
+	rts
+
+; ----------------------------------------- BASIC ein
+;
+basromein	lda pport
+	ora #$01
+	bne +
+
+; -----------------------------------------
+;
+kerromein	lda pport
+	ora #2
+	bne +
+
+; -----------------------------------------
+;
+charen1	lda pport
+	ora #4
+	bne +
+
+; -----------------------------------------
+;
+kerromaus	sei
+	lda pport
+	and #$fd
++	sta pport
+	rts
+
+; -----------------------------------------
+;
+charen0	sei
+	lda pport
+	and #$fb
+	sta pport
+	rts
+
+; ----------------------------------------- Get String and change behind BASIC ROM
+;
+frominsrt	jsr sgetstrn
+
+; ----------------------------------------- BASIC aus
+;
+basromaus	lda pport
+	and #$fe
+	sta pport
+	rts
+
+; ----------------------------------------- CLOSE 1
+;
+sclose	jsr $ffcc		; sys clrch
+	lda #1
+	jmp $ffc3		; sys close 1
+
+; ----------------------------------------- from SOPEN
+;
+newopen	jsr $e219		; sys get parameters
+	lda drive		; set drive
+	sta $ba
+	jmp $e1c1		; continue original routine
+
+; ----------------------------------------- OPEN Printer
+;
+open14	lda #1		; open 1,4
+	ldx #4
+	ldy #$ff
+	jsr $ffba
+	jsr $ffc0
+	ldx #1		; cmd 1
+	jmp $ffc9
+
+; ----------------------------------------- New LOAD/SAVE
+; 8be7			new
+sysload	ldy drive
+	sty $ba
+	jsr chrgot	; more?
+	beq +
+	jsr bloadadr	; yes, get bload adr
++	lda $0a		; ### 2.20627 (VERIFY-Patch)
+	jmp $f4a5		; sys LOAD
+; 8bf8
+syssave	ldy drive
+	sty $ba
+	jmp $f5ed		; sys SAVE
+
+; ----------------------------------------- Part of LOAD
+; 9ad9
+bloadadr	jsr $aefd		; sys chkcom
+	jsr sgetadr	; word holen
+	sta $c4		; als startadresse
+	sty $c3
+	ora $c3
+	rts
+
+; ----------------------------------------- Set automatic 100/10 Parameters
+;
+get10010	jsr incbasbz	; skip token
+	jsr chrgot	; anything following?
+	bne +
+	lda #100		; no, set start value
+	sta autozi
+	sta $a4
+	ldx #10		; set step
+	stx ay		; (also for RENUMBER)
+	lda #0
+	sta autozi+1
+	sta $a5
++	rts		; 24
+
+; ----------------------------------------- Check if ON or OFF follow as Parameters
+;
+chkonoff 	ldx #10		; if yes: .x=10
+-	jsr chrget	; read next byte
+	cmp #$91		; ON?
+	beq setonoff
+	cmp #$64		; TSB token?
+	beq -
+	cmp #$69		; OFF?
+	beq setoff
+	jmp sgetbyt1	; no, get parameter (to .x)
+setoff	ldx #0
+setonoff	jmp incbasbz
+
+; ----------------------------------------- Get Parameters X and Y and more
+;
+getxy	jsr sgetadrn	; get X
+getxy2	sty $09
+	sta $0a
+	sty ax
+	sta ax+1
+	sty ex
+	sta ex+1
+	jsr sgetbytc	; get Y
+	stx $a4
+	stx ay
+	stx ey
+	rts
+
+; -----------------------------------------
+;
+getxyxyf	jsr getxy		; get start X/Y
+getxyf	jsr schkcom	; comma?
+gxyf0	jsr sgetadr	; get end X
+	sta ex+1
+	sty ex
+gyf0	jsr sgetbytc	; get end Y
+	stx ey
+getpktf	jsr gnextpar	; get draw mode (or MOB size)
+	stx $f7
+-	rts
+
+; ----------------------------------------- (Part of MMOB)
+;
+gmspeed	ldx mobsptab,y	; get current speed
+
+; ----------------------------------------- Parameter following?
+
+gnextpar	jsr chrgot	; anything following?
+	beq -		; no, leave with speed in .x
+	jmp sgetbytc	; yes, get new mob speed to .x
+
+; ----------------------------------------- Char out
+; 			new
+klaa	lda #$28		; "("
+	!by $2c
+klaz	lda #$29		; ")"
+	!by $2c
+doll	lda #$24		; "$"
+	!by $2c
+proz	lda #$25		; "%"
+	!by $2c
+colo	lda #$3a		; ":"
+	!by $2c
+rvsoff	lda #$92		; RVS off
+	!by $2c
+outeql	lda #$3d		; =
+	!by $2c
+komma	lda #$2c		; ,
+	!by $2c
+leerzch	lda #$20		; space
+	!by $2c
+quote	lda #$22		; "
+	!by $2c
+return	lda #$0d		; Return
+	jmp bsout
+
+; -----------------------------------------
+;
+; Section 4: Chain of Functions
+;
+; -----------------------------------------
+
+; -----------------------------------------
+; ----------------------------------------- Get Arithmetical Expression
+; -----------------------------------------
+; 			enhanced
+sgetari	lda #0
+	sta $0d
+	jsr chrget
+	bcs +
+	jmp $bcf3		; sys: digits from basic to float
+
++	cmp #$24		; "$"?
+	beq gethex
+	cmp #$25		; "%"?
+	beq getbin
+	cmp #$64		; sb token?
+	beq +
+	jmp $ae92		; no : sys: get arithmetical expression from basic
+
++	jmp csgetari1	; yes: tsb
+
+; ----------------------------------------- func % (Prefix)
+;
+getbin	jsr getdouble
+	jsr bincon
+	ldy $a8
+	jmp sxyflp3
+
+; ----------------------------------------- func $ (Prefix)
+;
+gethex	ldx #0
+	stx $a5
+	jsr getdouble	; check wether $$, returns .y=1
+;
+hcon0	jsr dec7a
+
+hexcon	jsr onebyte	; first two digits of hex value
+	tay		; in .y (.x=0)
+	lda $a5		; max position?
+	jsr byte2		; has two digits?
+	bcs hcon1		; yes, out
+	tya		; has 4 digits, so first two are hibyte
+	tax		; 1st is now hibyte
+	jmp hcon0		; loop for 2nd two digits
+
+hcon1	jmp sxyflp
+
+; ----------------------------------------- Check for HEX Chars
+;
+chhexchr	jsr chrget	; get next char, is digit?
+	bcc ++		; yes, ok
+; 8ca2
+ishex	cmp #"g"		; no, beyond "f"?
+	bcs ++		; yes, not hex
+	cmp #"a"		; below "a"?
+	bcs +		; no, ok (is a-f)
+
+	sec		; fail (is no hexdigit)
+	rts
++	clc		; ok (is hexdigit)
+++	rts
+; 8cae
+err25	pla
+	pla
+	ldx #$25		; error "not hex char"
+	jmp ($0300)
+
+; -----------------------------------------
+;
+byte2	cmp #2
+	bcc byte1		; max position? if not: continue
+	jmp incbasbz	; yes, out
+
+;
+fromnrm	ldx #1		; c8fd: jsr fromnrm
+	ldy $69		; len of digit string?
+	cpy #4		; less than 4?
+	bcc +
+	dex
++	stx $a5		; set byte counter accordingly
+	jsr dec7a
+;
+byte1	jsr chrget	; next char: decimal digit?
+	bcc ++		; yes, leave byte1 (so CLC)
+	pha		; no, is token? (so SEC)
+	pla
+	bmi +
+	jmp ishex		; no, is hex?
++	sec
+++	rts
+
+; -----------------------------------------
+;
+onebyte	jsr chhexchr	; hi nibble digit valid?
+	bcs err25		; no, error
+	tay
+	jsr chhexchr	; lo nibble digit valid?
+	bcs err25
+
+; -----------------------------------------
+;
+hex2w	inc $a5		; inc byte counter
+	jsr hexw		; convert .a und .y to byte...
+	sta zwisp2
+	tya
+	jsr hexw
+	asl
+	asl
+	asl
+	asl
+	ora zwisp2	; ...return in .a
+	rts
+
+hexw	sec		; make value from digit
+	sbc #$30
+	cmp #10
+	bcc +
+	sbc #7
++	rts
+
+; ----------------------------------------- Check for BINary Chars
+;
+bincon	ldy #0		; pointer into panel
+	sty $a8		; init result byte
+-	lda (progz),y
+	cmp #$30		; "0"?
+	beq ++
+	cmp #$31		; "1"?
+	beq +
+err24	ldx #$24		; no, error "not binary char"
+	jmp ($0300)
+
++	lda $a8
+	ora gbittabs,y	; enter value to result
+	sta $a8
+++	iny
+	cpy #8
+	bne -
+	jmp sbzply
+
+; ----------------------------------------- Check for double Char (% or $ Prefixes)
+;
+getdouble	ldy #1
+	cmp (progz),y
+	beq +
+	jmp chrget
+
++	pha		; save current char
+	jsr chrget
+	jsr chrget
+
+; ----------------------------------------- part of $$/%%
+;
+enhexbin	jsr sgetadr
+	pla
+	tay
+	pla
+	pla
+	cpy #$24		; "$"?
+	bne mkbin		; no, make binary
+
+	ldx #0
+	lda int+1		; hibyte=0?
+	beq +
+	jsr mkhex		; no, make hex
++	lda int		; lobyte
+	jsr mkhex		; make hex
+	lda #0		; transfer and convert to string
+	tay
+	sta linenum,x
+mkstrng	iny
+	jsr $b487		; sys make string
+	jsr $b6a3		; sys frestr
+	jsr $b47d		; sys set string
+	jsr $b68c		; sys generate string
+	jmp $b4ca		; sys string on stack
+
+; -----------------------------------------
+;
+mkhex	pha		; get upper nibble
+	lsr
+	lsr
+	lsr
+	lsr
+	ora #$30		; make hex digit
+	cmp #$3a
+	bcc +
+	clc
+	adc #7
++	sta linenum,x	; and store
+	inx
+	pla		; get lower nibble
+	and #$0f		; do the same
+	ora #$30
+	cmp #$3a
+	bcc +
+	clc
+	adc #7
++	sta linenum,x
+	inx
+	rts
+
+; -----------------------------------------
+;
+mkbin	ldx #16		; len of result
+	stx helpvec
+	lda #$30		; "0"
+-	sta+2 linenum-1,x	; fill
+	dex
+	bne -
+	lda int+1		; hibyte=0?
+	bne bin0
+	lsr helpvec	; yes, halve result
+	bne ++
+bin0	asl
+	bcc +
+	inc linenum,x	; upper byte
++	inx
+	cpx #8
+	bne bin0
+++	tax
+	lda int
+-	asl		; isolate bits
+	bcc +
+	inc linenum+8,x	; lower byte
++	inx
+	cpx #8
+	bne -
+	sta linenum+8,x	; 0 to end of result
+	tay		; .y=0
+	lda helpvec
+	cmp #8
+	beq mkstrng
+	tya
+	beq mkstrng	; uncond. branch
+
+; -----------------------------------------
+; ----------------------------------------- Start of Func Chain
+; -----------------------------------------
+;
+csgetari1	jsr chrget	; get token number
+	tay
+	jsr chrget
+
+; -----------------------------------------
+
+	cpy #$55		; DUP?
+	bne fnc1
+
+; ----------------------------------------- func DUP
+;
+fndup	jsr $aefa		; sys "("?
+	jsr sgetstr1	; get string to copy
+	ldy $69		; len
+	sty pos
+	sta str1+1
+	stx str1
+
+	jsr sgetbytc	; get copy factor
+	jsr $aef7		; sys ")"?
+	ldx $65		; factor
+	beq err0e
+	stx dwert
+
+	ldy #0
+	sty pos1
+--	ldy #0		; multiply len
+-	inc pos1
+	beq jerr17	; if more than 255: error
+	iny
+	cpy pos
+	bne -
+	dex
+	bne --
+
+	lda pos1		; get new len
+	jsr neustr	; create string (adr in $62)
+	lda str1+1	; get address of string to copy
+	sta $21
+	lda str1
+	sta $20
+
+	ldx dwert		; get factor
+	ldy #0
+	sty helpvec	; count full len
+-	lda ($20),y	; copy from original...
+	sty helpvec+1
+	ldy helpvec
+	sta ($62),y	; ...to copy
+	iny
+	sty helpvec
+	ldy helpvec+1	; count separate len
+	iny
+	cpy pos		; is reached?
+	bne -
+	ldy #0		; so back to 0
+	dex		; count # of copies
+	bne -
+
+	lda #$ff		; publish new string
+	sta $0d
+	jmp pushstr
+
+; -----------------------------------------
+;
+err0e	ldx #$0e		; error "illegal quantity"
+	jmp ($0300)	; (affects "tsb.mem"!)
+jerr17	jmp err17		; error "string too long"
+
+; -----------------------------------------
+
+fnc1	cpy #$5a		; EXOR?
+	bne fnc2
+
+; ----------------------------------------- func EXOR
+;
+fnexor	jsr getexor	; check "(", get first value
+	sty $aa
+	sta $ab
+	jsr $aefd		; sys chkcom
+	jsr sgetadr2
+	jsr intback	; restore INT value, sys ")"
+	lda $65
+	eor $aa
+	tay
+	lda $64
+	eor $ab
+	tax
+	jmp sxyflp
+
+; -----------------------------------------
+
+fnc2	cpy #$51		; JOY?
+	bne fnc3
+
+; ----------------------------------------- func JOY
+;
+fnjoy	ldy #$00		; set $dc00
+	sty helpvec
+	lda #$dc
+	sta helpvec+1
+	jsr chrgot	; anything more?
+	beq +		; .y=0
+
+	jsr $aefa		; yes, "("?
+	jsr sgetbyt1	; value to .x
+	jsr schkklz	; ")"?
+	txa
+	and #1		; delimit to 0/1
+	tay
+
++	lda (helpvec),y	; get joy
+	sta $20
+	and #$6f		; skip fire
+	sta joywert
+
+	ldx #0
+-	lda tabjoy,x	; convert to joy value
+	inx
+	cmp joywert
+	beq +
+	cpx #8
+	bne -
+
+	lda #0		; not in tab, so $00
+	sta joywert
+	beq ++
+
++	stx joywert	; we have a joy value
+
+++	lda $20		; now isolate fire
+	and #$10
+	bne +
+	lda joywert	; and indicate in value
+	ora #$80
+	sta joywert
+
++	ldy joywert	; convert to float
+	jmp sxyflp3	; $8CCB
+
+
+; -----------------------------------------
+
+fnc3	cpy #$0e		; FRAC?
+	bne csgetari2
+
+; ----------------------------------------- func FRAC
+; 8de7			enhanced
+fnfrac	ldy #0
+	jsr sxyflp3
+	jsr $bc0c		; sys fac->arg
+	jsr $aefa		; sys "("?
+	jsr $ad9e		; sys frmevl
+	lda $66		; save sign
+	sta $aa
+	bpl +
+	jsr $bfb4		; sys toggle sign
++	jsr $aef7		; sys ")"?
+	jsr $bc1b		; sys runden fac
+	jsr $bc0c		; sys fac->arg
+	jsr $bccc		; sys INT()
+	jsr $b853		; sys arg-fac
+	lda #0
+	sta $0d
+	lda $aa
+	bpl +
+	jsr $bfb4		; sys toggle sign
++	jmp $bc1b		; sys runden fac
+
+; -----------------------------------------
+;
+csgetari2	cpy #$10		; PLACE?
+	bne csgetari3
+
+; ----------------------------------------- func PLACE
+;
+fnplace	jsr getstrgs	; check "(", get 2 strings
+	jsr $aef7		; sys ")"?
+
+	lda $9d		; direct mode?
+	bne err15		; yes, error
+
+	tay		; search str1 in str2
+	sty plpos		; position to 0
+-	lda ($a7),y	; found 1st char?
+	cmp ($a9),y
+	bne +
+	iny		; yes, check next
+	cpy strlen1	; as long as str1?
+	bne -
+	inc plpos		; yes, position found, create value
+	lda plpos
+--	tay
+	lda #0
+	sta $0d
+	jmp sxyflp3
+
++	ldy #0		; char not found yet, advance in oldstr
+	inc $a9
+	bne +
+	inc $aa
++	inc plpos		; advance position likewise
+	lda plpos
+	cmp strlen2	; oldstr checked?
+	bne -
+	lda #0		; yes, result: 0
+	beq --
+
+
+; -----------------------------------------
+;
+csgetari3	cpy #$5b		; INSERT?
+	bne csgetari4
+
+; ----------------------------------------- func INSERT
+;
+fninsert	jsr getstrgs	; check "(", get 2 strings
+	jsr getbytc	; get position ($c51f)
+	stx pos
+	jsr $aef7		; sys ")"?
+
+	lda $9d		; direct mode?
+	bne err15		; yes, error
+
+	clc
+	lda strlen2	; len of result string > 255?
+	adc strlen1
+	bcc +
+;
+err22	ldx #$22		; yes, error "insert too large"
+	!by $2c
+err15	ldx #$15		; error "illegal direct"
+	!by $2c
+err17	ldx #$17		; error "string too long"
+	jmp ($0300)
+
++	jsr neustr	; neuen String einrichten (62/3, len: 61)
+			; hier:
+
+	ldy #0		; Zähler auf Null
+	sty $bf		; auch für den zweiten Durchgang
+	beq +
+-	cpy pos		; Position erreicht?
+	bcs ++
+	lda ($a9),y	; nein, übertragen
+	sta ($62),y
+	iny
++	cpy strlen2	; Länge erreicht?
+	bne -		; nein, loop (ja: weiter)
+
+++	sty helpvec	; Position merken
+	sty dwert		; auch für dritten Durchgang
+-	ldy $bf 		; startet mit Null
+	cpy strlen1	; Einfügelänge erreicht?
+	beq +
+	lda ($a7),y	; nein, holen
+	inc $bf
+	ldy helpvec	; einfügen
+	sta ($62),y
+	inc helpvec
+	bne -		; loop
+
++	ldy dwert		; kein Rest?
+	bne +		; nein, neuen String erzeugen
+
+-	lda ($a9),y	; sonst: Rest übertragen
+	inc dwert
+	ldy helpvec
+	sta ($62),y
+	inc helpvec
+	ldy dwert
++	cpy strlen2
+	bcc -
+
+jpushstr	lda #$ff		; create result string
+	sta $0d
+	jmp pushstr
+
+; -----------------------------------------
+;
+csgetari4	cpy #$53		; DIV?
+	bne csgetari5
+
+; ----------------------------------------- func DIV
+; 			original
+fndiv	jsr divinit
+	ldy idivdend
+	ldx idivdend+1
+	jmp sxyflp
+
+; -----------------------------------------
+;
+divinit	jsr getint	; sys "("?
+	jsr sgetadr2
+	sta idivdend+1
+	sty idivdend
+	jsr $aefd		; sys chkcom
+	jsr sgetadr2
+	sta idivsor+1
+	sty idivsor
+	jsr intback	; ")"
+
+idiv	lda #0
+	sta idivrest
+	sta idivrest+1
+	lda idivsor
+	ora idivsor+1
+	bne +
+	pla
+	pla
+err14	ldx #$14		; error "division by zero"
+	jmp ($0300)
+
++	ldx #$10
+-	rol idivdend
+	rol idivdend+1
+	rol idivrest
+	rol idivrest+1
+	sec
+	lda idivrest
+	sbc idivsor
+	tay
+	lda idivrest+1
+	sbc idivsor+1
+	bcc +
+	sty idivrest
+	sta idivrest+1
++	dex
+	bne -
+	rol idivdend
+	rol idivdend+1
+	rts
+
+; -----------------------------------------
+;
+csgetari5	cpy #$52		; MOD?
+	bne csgetari6
+
+; ----------------------------------------- func MOD
+; 			original
+fnmod	jsr divinit
+	ldy idivrest
+	ldx idivrest+1
+	jmp sxyflp
+
+; -----------------------------------------
+;
+csgetari6	cpy #$59		; LIN?
+	bne csgetari7
+
+; ----------------------------------------- func LIN
+; 			modified
+fnlin	sec
+	jsr $fff0		; sys plot
+	txa
+	tay
+	jmp sxyflp3
+
+; -----------------------------------------
+;
+csgetari7	cpy #$58		; TEST?
+	bne csgetari8
+
+; ----------------------------------------- func TEST
+; 			modified
+fntest	jsr klgetadr	; check "(", get adress value
+	jsr getxy2	; get X/Y
+	jsr $aef7		; sys ")"?
+	lda #$0b
+	sta $f7
+	jsr basromaus
+	jsr punkt
+	ldy status
+	jsr basromein
+	jsr kerromein
+	cli
+	jmp sxyflp3
+
+; -----------------------------------------
+;
+csgetari8	cpy #$57		; INST?
+	bne csgetari9
+
+; ----------------------------------------- func INST
+;
+fninst	jsr getstrgs	; check "(", get 2 strings
+	jsr getbytc	; get position ($c51f)
+	stx pos
+	jsr $aef7		; sys ")"?
+
+	lda $9d		; direct mode?
+	beq +
+	jmp err15		; yes, error
+
++	clc
+	lda strlen1	; newlen + pos > oldlen?
+	beq +
+	adc pos
+	cmp strlen2
+	bcc +
+	beq ++
+	jmp err17		; yes, "string too long"
+
++	lda strlen2	; otherwise: build newstring (62/63)
+++	jsr neustr	; sys: set stringdescriptor
+
+;
+	ldy #0
+	sty $bf
+	sty helpvec
+
+-	lda ($a9),y	; get char from oldstring
+	cpy pos		; at inst position?
+	bcc ++		; no
+
+	ldy $bf		; yes, inststring finished?
+	cpy strlen1
+	bcs +
+	inc $bf		; no,
+	lda ($a7),y	; get char from inststring
++	ldy helpvec
+
+++	sta ($62),y	; write to newstring
+	inc helpvec
+	ldy helpvec	; all chars?
+	cpy strlen2
+	bcc -
+
+	jmp jpushstr	; yes, create new string on stringheapn (40)
+
+; -----------------------------------------
+;
+csgetari9	cpy #$56		; INKEY?
+	bne csgetaria
+
+; ----------------------------------------- func INKEY
+;
+fninkey	ldy inkey
+	jmp sxyflp3
+
+; -----------------------------------------
+;
+csgetaria	cpy #$5c		; POT?
+	bne csgetarib
+
+; ----------------------------------------- func POT
+;
+fnpot	jsr $aefa		; sys "("?
+	jsr sgetadr2	; (- jsr klgetadr!)
+	jsr $aef7		; sys ")"?
+	lda $65
+	bne +
+	ldy $d419		; get paddle 0 value
+	jmp ++
++	ldy $d41a		; get paddle 1 value
+++	sty $63
+	jmp sxyflp3	; convert to float
+
+; -----------------------------------------
+;
+csgetarib	cpy #$5d		; PENX?
+	bne csgetaric
+
+; ----------------------------------------- func PENX
+;
+fnpenx	jsr penabfr
+	ldy lpx		; lightpen x
+	jmp sxyflp3
+
+; -----------------------------------------
+;
+csgetaric	cpy #$5f		; PENY?
+	bne csgetarid
+
+; ----------------------------------------- func PENY
+;
+fnpeny	ldy lpy		; lightpen y (do first: PENX!)
+	jmp sxyflp3
+;
+penabfr	lda $d019
+	and #8		; wait for strobe
+	beq penabfr
+	lda $d013		; get lp x
+	sta lpx
+	lda $d014		; get lp y
+	sta lpy
+	lda $d019		; clear strobe
+	and #$f7
+	sta $d019
+	rts
+
+; -----------------------------------------
+;
+csgetarid	cpy #$61		; GRAPHICS?
+	bne csgetarie
+
+; ----------------------------------------- func GRAPHICS
+;
+fngraphics
+	ldx #$d0		; =$d000
+cga0	ldy #$00
+	jmp sxyflp
+
+; -----------------------------------------
+;
+csgetarie	cpy #$60		; SOUND?
+	bne csgetarif
+
+; ----------------------------------------- func SOUND
+;
+fnsound	ldx #$d4		; =$d400
+	bne cga0
+
+; -----------------------------------------
+;
+csgetarif	cpy #$67		; NRM?
+	bne csgetarig
+
+; ----------------------------------------- func NRM
+;
+fnnrm	jsr getint	; sys check "("
+	jsr sgetstr1
+	lda #0
+	sta $0d
+	ldx progz
+	ldy progz+1
+	stx $71
+	sty $72
+	ldx $22
+	ldy $23
+	stx progz
+	sty progz+1
+	jsr fromnrm	; patch 11.01.20
+;
+	ldx #0
+	ldy $69		; .y= len
+	cpy #8		; 8/9 (or 16/17) must be binary
+	bcc ++
+
+	cmp #$25		; >8: leading "%"?
+	bne +		; no
+	jsr chrget	; yes, skip
++	jsr bincon
+	ldy $69
+	cpy #16		; 16/17?
+	bcc +
+	ldx $a8		; yes
+	jsr bincon
++	jmp nrm0
+
+; -----------------------------------------
+;
+++	cmp #$24		; leading "$" in string?
+	bne +		; no
+	jsr chrget	; yes, skip "$"
++	jsr hcon0		; and convert
+;
+nrm0	lda $69
+	cmp #8
+	bcc +
+	ldy $a8
+	jsr sxyflp
++	jsr $b7e2		; sys get back progz
+	jmp intback	; ")"?
+
+; -----------------------------------------
+;
+csgetarig	cpy #$28		; AT?
+	bne csgetarih
+
+; ----------------------------------------- func AT
+;
+fnat	jsr sgetbyt1
+	cpx #40		; check limits (40/25)
+	bcs +
+	txa
+	pha
+	jsr sgetbytc
+	clc
+	pla
+	cpx #25
+	bcs +
+	tay
+	jsr $fff0		; sys plot
+	jsr schkklz	; ")"?
+
+	jsr dec7a
+	jmp sgetari	; cont (8c8d)
+
++	jmp swarm
+
+; -----------------------------------------
+;
+csgetarih	cpy #$7c		; CHECK?
+	bne csgetarii	; no
+
+; ----------------------------------------- func CHECK
+;
+fncheck	jsr $aefa		; sys "("?
+	sty helpvc2	; .y=0
+	jsr getx8		; get 1st sprite #
+	stx helpvec	; store
+	lda detectart	; type?
+	bne ++
+
+	jsr $aefd		; Spr-Spr: sys chkcom
+	jsr getx8		; get 2nd sprite #
+	stx helpvec+1	; store
+	jsr $aef7		; sys ")"?
+
+; ----------------------------------------- now check
+
+	jsr wdetect	; check: an Kollision beteiligt?
+	jmp +
+
+++	jsr $aef7		; Spr-Bgr: sys ")"?
++	ldx helpvec	; and 1st sprite
+	jsr wdetect	; check: an Kollision beteiligt?
+
+	ldy #1		; vorbesetzen: nein (1)
+	lda helpvc2	; Abfrage-Ergebnis
+	beq ++
+	ldx detectart
+	bne +
+	and #2		; Spr-Spr: beide?
+	beq ++		; nein
+
++	dey		; wenn ja  : return 0
+++	jmp sxyflp3	; wenn nein: return 1
+
+wdetect	lda detecterg
+	and mbittabs,x	; beteiligt?
+	beq +		; nein
+	inc helpvc2
++	rts		; 70
+
+; -----------------------------------------
+;
+csgetarii	cpy #$7d		; DISPLAY?
+	bne csgetarij
+
+; ----------------------------------------- func DISPLAY
+;
+fndisplay	ldx video		; returns video address
+	jmp cga0
+
+; ----------------------------------------- func D!PEEK
+;
+csgetarij	cpy #$54		; Token von D!?
+	bne csgetarik
+
+; ----------------------------------------- func D!PEEK
+;
+fndpeek	jsr getpeek
+	lda (int),y	; get lo
+	pha
+	iny
+	lda (int),y	; get hi
+	tax
+	pla
+	tay
+	jmp sxyflp	; .y/.x to float
+;
+getpeek	ldy #0
+	lda #$c2		; PEEK following?
+	cmp (progz),y
+	beq +
+	jmp swarm		; no, bad mode error
+
++	jsr incbasbz	; yes, advance:
+	jsr getint	; sys: "("?, returns .y=0
+	jsr sgetadr2	; get address
+	jmp $aef7		; check ")"
+
+; -----------------------------------------
+;
+csgetarik	cpy #$7a		; Token von MEM?
+	bne csgetaril	; MEMPEEK?
+
+; ----------------------------------------- func MEMPEEK
+;
+fnmempeek	jsr getpeek	; yes, PEEK in overall RAM
+	sei
+	lda pport
+	pha
+	lda #$30		; patch 924a: $31 for charset area
+	sta pport
+	lda (int),y
+	tay
+	pla
+	sta pport
+	cli
+	jsr restint
+	jmp sxyflp3
+
+; -----------------------------------------
+;
+csgetaril	cpy #$2c		; USE?
+	bne csgetariend
+
+; ----------------------------------------- func USE
+;
+	jsr dec7a
+	ldy $be		; get drive number
+	jmp cen0		; convert
+
+; -----------------------------------------
+;
+csgetariend		; end of func chain
+
+; ----------------------------------------- ERR entry
+;
+fnerr	jsr dec7a
+	ldy #0
+	jsr errnln	; "n" (errn)?
+	beq cerrn
+
+; ----------------------------------------- func ERRLN
+;
+cerrln	cmp #$4c		; no, "l" (errln)?
+	beq +
+
+-	jmp endsmb
+
+; ----------------------------------------- func ERRN
+;
+cerrn	ldy errn
+cen0	ldx #0
+	beq ++
+
++	jsr errnln	; "n" (errln)?
+	bne -
+
+	ldy errln
+	ldx errln+1
+++	jsr incbasbz
+	jmp sxyflp
+
+; -----------------------------------------
+;
+errnln	jsr chrget
+	cmp #$4e
+	rts
+
+; -----------------------------------------
+;
+; Section 5: Required Commands
+;
+; -----------------------------------------
+
+; ----------------------------------------- End TSB command
+;
+bef0	jsr chrget	; (affects "tsb.mem"!)
+	jmp endsmb
+
+; ----------------------------------------- bef NRM
+;
+befnrm	jsr nrm00
+nrm2	jsr allnrm	; here: returned from TSB.MEM
+	jmp bef0		; (affects "tsb.mem"!)
+
+
+;
+nrm00	lda #4		; video at $0400
+	sta video
+	lda #$c7		; VIC bank 0 ($0000)
+nrm02	sta $dd00
+	lda #$1b		; HIRES off
+	sta $d011
+	lda #$c8		; MULTI off
+	sta $d016
+	lda #$63
+	sta gmemflag
+	lda #$17		; lower case chars
+nrm	sta $d018		; entry for CSET
+	rts
+
+; ----------------------------------------- Check for Extensions
+;
+allnrm	lda vecrenum	; vector of bef RENUMBER
+	cmp #<befrenum-1	; unchanged? (after MEM)
+	beq +		; yes, leave via RTS
+;
+	lda progz+2	; chrget changed? (by DOS Wedge 5.1)
+	cmp #$4c
+	beq nrm3		; yes, go to "tsb.ext" (!changes!)
+;
+!if uniprom {		; if for Uniprom CRT:
+	ldx #4
+	ldy #$cc
+	jsr $7f80		; load "tsb.mem" from there
+} else {
+	ldx #<nammem	; else load "tsb.mem" from disk
+	jsr loadext
+	bcs iffail	; leave if fail
+}
+
+	lda #<befrenum-1	; repair RENUM vector
+	sta vecrenum	; 87b4
+	lda #>befrenum
+	sta vecrenum+1
+	lda #<befplace-1	; repair PLACE vector
+	sta vecplace	; 86e2
+	lda #>befplace
+	sta vecplace+1
++	rts
+
+; -----------------------------------------
+;
+iffail	pla
+	pla
+iffail1	ldx #24		; row 24
+	lda #0		; column 0 (screen bottom line)
+	jsr $e570		; sys set cursor
+	jsr basromaus
+	jmp flpmsg2
+
+; -----------------------------------------
+;
+nrm3	jsr kerromein
+	cli
+	jmp $ce6c		; repair CHRGET (inside DOS Wedge!)
+
+; ----------------------------------------- Fallback from HIRES
+;
+nrm01	lda video		; MEM active?
+	cmp #$cc
+	bne +
+	lda #$c4		; yes
+	!by $2c
++	lda #$c7		; no
+	jsr nrm02
+
+; ----------------------------------------- Part of CSET
+;
+csm0	ldx video
+	cpx #$cc		; is MEM active?
+	bne +
+	eor #$2c		; yes, change values accordingly
++	jmp nrm
+;
+csetmem	pha
+	jsr nrm01
+	pla
+	bne csm0		; uncond. branch
+
+; -----------------------------------------
+;
+scd5	pla		; otherwise: just finish command
+	pla		; (also: SECURE)
+	jmp endsmb
+
+
+; ----------------------------------------- bef INST
+;
+befinst	ldx #<nameext	; load "tsb.ext"
+	jsr loadext
+	bcc +
+	jmp iffail1	; leave if fail
+
++	jsr basromaus
+	ldy #0
+	jsr extension	; cc00: init DOS Wedge
+
+; ----------------------------------------- part of INST and MEM
+;
+setbmode	iny		; change bef vectors
+-	lda vecbmode,y	; to bad mode
+	sta vecplace,y
+	sta vecrenum,y
+	dey
+	bpl -
+	jmp bef0
+
+; ----------------------------------------- bef OUT
+;
+befout	jsr basromein
+	ldx errn
+	lda #0
+-	sta helpvec
+	jsr chrget	; anything following?
+	beq +		; no
+	cmp #$3b		; semicolon?
+	beq -
+
+	jsr sgetbyt1	; then, number of error
+	cpx #$2e		; wrong number?
+	bcc +
+	ldx #$80		; yes, indicate as wrong
++	txa
+	asl
+	tax
+	beq outx0		; skip when no error
+
+	cpx #$40		; no, 32 or more?
+	bcs +		; if no, sys errors
+	lda $a326,x	; sys: addresses of sys errors
+	sta $22
+	lda $a327,x
+	sta $23
+	bne ++		; uncond. branch
+
++	and #$1f
+	tax
+	lda fehlmtab,x	; addresses of tsb errors
+	sta $22
+	lda fehlmtab+1,x
+	sta $23
+
+++	jsr tsberrs
+	lda #$6a
+	ldy #$a3
+	jsr $ab1e		; sys out string " error"
+	lda helpvec
+	beq outx0
+	jsr dec7a
+outx0	jsr chkscolon
+	jmp endsmb
+
+; -----------------------------------------
+;
+tsberrs	ldy #0		; set standard input device
+	sty $13
+-	lda ($22),y	; out error text
+	php
+	and #$7f
+	jsr bsout
+	iny
+	plp
+	bpl -
+	rts
+
+; ----------------------------------------- TRACE while RUNning
+;
+trace1	lda $d3		; save cursor
+	pha
+	lda $d5
+	pha
+	lda $d6
+	pha
+	lda $d4
+	pha
+
+	lda $028d		; C= key?
+	and #$02
+	beq +
+
+---	ldx #8		; yes, slowdown
+	stx helpvec
+--	ldx #$2d
+	ldy #0
+-	dey
+	bne -
+	dex
+	bne -
+	dec helpvec
+	bne --
+
++	lda $028d		; Shift?
+	and #$01
+	bne ---		; yes, slowdown
+
+	jsr $e566		; sys home
+	jsr trace2
+	jsr $aad7		; sys out cr/lf
+	ldx helpvec
+	jsr $e88c		; sys set cursor
+	ldy helpvec+1
+	sty $d3
+	lda ($d1),y	; revert char
+	eor #$80
+	sta ($d1),y
+
+	pla		; restore cursor
+	sta $d4
+	pla
+	tax
+	jsr $e88c		; sys set cursor
+	pla		; restore cursor
+	sta $d5
+	pla
+	sta $d3
+-	rts
+
+; -----------------------------------------
+;
+tr20	ldy $49
+	bne tr21
+
+; -----------------------------------------
+;
+trace3	lda #$20
+	ldy $d3
+--	sta ($d1),y
+	cpy $d5
+	bcs -
+	iny
+	bne --
+;
+trace2	jsr $bdc9		; sys out: line # (.x/.a)
+	lda $39
+	ldx $3a
+	sta int
+	stx int+1
+	jsr $a613		; sys compute start of line
+	lda $d6
+	ldx $d3
+	sta helpvec
+	stx helpvec+1
+	ldy #3
+	sty $0b
+	sty $49
+	lda #$20
+
+tr2	ldy $49
+	and #$7f
+;
+tr1	jsr $ab47		; sys out char in .a
+tr21	cmp #$22		; string?
+	bne tr0
+	lda $0b		; contains: 3
+	eor #$ff
+	sta $0b
+tr0	iny
+	ldx $60
+	tya
+	clc
+	adc $5f
+	bcc +
+	inx
++	cmp progz
+	bne +
+	cpx progz+1
+	bne +
+	lda $d6
+	ldx $d3
+	sta helpvec
+	stx helpvec+1
++	lda ($5f),y
+	beq trace3
+	bmi ++
+	cmp #$64		; sb token?
+	bne +
+	jsr tr3		; yes
+	ldy $49
+	bne tr0
+
++	jmp tr1
+++	cmp #$ff
+	beq tr1
+	bit $0b
+	bmi tr1
+	jsr trace4
+	bmi tr20
+;
+trace4	ldx #$a0		; sys: address of basic commands
+	stx $21
+	ldx #$9e
+	stx $20
+;
+trace7	sty $49		; points via $5f to token number
+	tax		; .a: token number as count down
+	ldy #0
+	asl		; times 2
+	beq ++		; was 0? (HIRES)
+--	dex		; no, count finished?
+	bpl +
+-	jsr inc20		; yes, not found: skip keyword
+	lda ($20),y
+	bmi --		; char shifted? (delimiter): count
+	bne -		; no, proceed skipping
+-
++	iny		; found: out keyword
+++	lda ($20),y
+	php
+	and #$7f
+	jsr $ab47		; no, sys: out char in  .a
+	plp
+	bmi +
+	bne -		; uncond. branch
+
+tr3	iny
+	lda ($5f),y	; get token number ($64 number)
+	tax
+	dex		; token number: index in
+	txa		; Liste der Schlüsselwörter
+	ora #$80
+	ldx #>tabbef
+	stx $21
+	ldx #<tabbef
+	stx $20
+	jmp trace7
+
++	rts
+
+; -----------------------------------------
+; ----------------------------------------- bef IF
+; -----------------------------------------
+;
+befif	jsr incbasbz	; inc progz
+	jsr sfrmevl	; evaluate condition clause ($61=true or false)
+	jsr chrgot	; last byte was:
+	cmp #$89		; GOTO?
+	beq +
+
+	lda #$a7		; no, check for THEN (syntax error if not)
+	jsr schkzei	; via $aeff, .y=0
+;
+inif	jsr schdo		; search DO in same line
+	tax
+	bne fnddo		; found, store DO boole in stack
+
++	jsr schelse	; not found, search for ELSE in same line
+	sta justif	; set flag for "ELSE in IF-line" (.a=$47 if ELSE found)
+	pha
+	ldx $61		; get boole
+	stx ifflag	; save boole for RCOMP (does not apply for DO)
+	pla
+	beq +
+
+	txa		; boole
+	ldx elseindex	; if ELSE found:.a = boole of latest IF
+	inx
+	sta stackelse,x	; save boole
+	stx elseindex
+	tax
+
++	txa
+	bne iftrue	; if boole is TRUE: process THEN
+
+	lda justif	; if boole is FALSE:
+	bne fndelse	; if ELSE found: continue there
+
+	jsr sbzply	; ELSE not found: add .y to progz (skip THEN)
+	jmp endsmb	; continue PRG
+
+; -----------------------------------------
+;
+iftrue	lda #0		; doflag off
+	sta doflag
+	jsr chrgot	; get latest byte from PRG
+	bcs +		; no digits: cont PRG
+	jmp cgoto1	; when digits after THEN: GOTO
+
+; -----------------------------------------
+;
+fnddo	lda $61		; DO found: store boole value on DO stack
+	ldx doindex
+	sta dobooles,x
+	inc doindex	; inc stackpointer
+	sty indoloop	; set flag for active DO
+; 9ba5
+fndelse	dey
+	jsr sbzply
++	jsr dec7a
+; 9bac
+execbef	jsr basromein	; basic on, execute command
+	jmp ($0308)	; sys exec
+
+; -----------------------------------------
+; ----------------------------------------- bef ELSE
+; -----------------------------------------
+;
+befelse	ldy #0
+	ldx doindex	; is DO active? (stack index has incremented?)
+	beq +		; no, skip ELSE, cont. PRG
+	lda justif	; is just an IF..THEN..ELSE?
+	bne +		; yes, get latest IF boole
+
+	dex		; and get DO-boole from stack
+	lda dobooles,x
+	beq execbef	; if FALSE: cont. PRG after ELSE
+	lda #$47		; if TRUE: skip from ELSE to DONE
+	sta doflag
+	bne execbef
+
+; -----------------------------------------
+
++	sty justif	; clear justif, cont. PRG
+	sty doflag
+	ldx elseindex	; fetch boole, is IF true?
+	lda stackelse,x
+	dex
+	stx elseindex
+	tax
+	beq execbef	; no, FALSE, continue PRG
+	jmp befproc	; yes, TRUE, skip rest of line
+
+; -----------------------------------------
+; ----------------------------------------- bef DO
+; -----------------------------------------
+;
+befdo	ldy #0		; check for end of line
+	sty justif	; clear justif
+	lda doflag	; are we in DO..DONE already?
+	eor #$d0
+	bne +
+	sta doflag	; yes, clear flag
++	jsr chrget	; at end of line?
+	beq docont	; yes
+
+; -----------------------------------------
+; ----------------------------------------- bef DO NULL
+; -----------------------------------------
+;
+isnull	sty indoloop	; no, .y=0, clear DO flag
+	sty justif	; clear flag for additional IFs
+	dey
+-	iny
+	lda (progz),y	; check for "NULL"
+	cmp null,y
+	beq -
+	cpy #4		; NULL when .y=4
+; a753
+	bcs waitkey	; "null"? (yes, if .c)
+
+; -----------------------------------------
+; ----------------------------------------- bef DONE
+; -----------------------------------------
+;
+	ldy #$ff		; no, check for DONE
+-	iny
+	lda (progz),y
+	cmp tuned+5,y	; "ne"?
+	beq -
+	cpy #2
+	bcc +		; no, skip rest of line
+	jmp donecont	; yes, now tidy IF..THEN DO
+
+; ----------------------------------------- part of DO NULL
+;
+waitkey	jsr getkey+5
++	jmp befproc
+
+; ----------------------------------------- part of DO/DONE
+;
+donecont	dec doindex	; from DONE: dec stack pointer
+;
+docont	lda doindex	; stack pointer DO
+	cmp #11		; 10 Verschachtelungen möglich
+	bcs faildo
+	jsr dec7a
+	jmp stofdo2	; set DO (in DODO) active (if indoloop=1)
+;
+faildo	jmp err0f		; "overflow error"
+
+; -----------------------------------------
+; ----------------------------------------- bef RCOMP
+; -----------------------------------------
+;
+befrcomp	jsr incbasbz
+	jsr basromein
+	jsr chrgot
+	lda ifflag
+	sta $61
+	jmp inif
+
+; -----------------------------------------
+; ----------------------------------------- execute DO
+; -----------------------------------------
+;
+stateofdo	ldy doflag	; DO active?
+	beq do4		; no, leave
+;
+stofdo2	ldy doflag	; DO active?
+	beq do5		; no
+	cpy #$d0		; just after DO (up to ELSE, then $47)
+	beq do3
+	cpy #$47		; ELSE?
+	beq do2
+do4	rts
+
+do5	tya
+	ora indoloop
+	beq do6
+
+	lda $61		; get IF boole
+	beq dodo		; wenn FALSE: search for DONE and possible ELSE
+
+do3	tya		; is TRUE: .y to .x
+	tax		; in .x is $d0 *after* execution of DO
+	ldy #0
+	lda (progz),y	; check token: DO?
+	cmp #$22
+	bne do4		; no, return
+	cpx #$d0		; yes, skip
+	beq clrdoflg
+;
+setdoflg	ldy #$d0		; set INDOLOOP to $d0 *before* execution of DO
+clrdoflg	sty indoloop
+	sty doflag
+do6	jsr flinend	; find line end
+	jmp endsmb	; finished
+
+; ----------------------------------------- part of DO
+;
+do2	jsr basromaus
+dodo	lda #1
+	sta nesteddo	; init counter for nested DOs
+	jsr sfordone	; first: search for DONE
+
+	lda doflag	; found, are we behind ELSE?
+	cmp #$47
+	bne +
+	pla		; yes, don't search for ELSE, cont at DONE
+	pla
+	bne do9
+
++	lda progz		; points to 1 byte before token of DONE
+	ldx progz+1	; (to PRG end if no DONE)
+	sta $a8
+	stx $a9
+	lda $3d		; sys get CONT address (after ELSE)
+	ldx $3e
+	sta progz
+	stx progz+1
+
+-	jsr sforelse	; if single ELSE: don't return
+
+	tya		; ELSE not found, continue search (until DONE)
+	clc
+	adc #5
+	tay
+	jsr sbzply	; progz plus .y
+	sec
+	lda progz		; at DONE?
+	sbc $a8
+	lda progz+1
+	sbc $a9
+	bcc -		; no, continue search
+
+	lda $a8		; ELSE not found, continue PRG (at DONE)
+	ldx $a9
+	sta progz
+	stx progz+1
+
+do9	ldy #0
+	sty doflag
+	sty dolevel
+	jmp ($0308)	; execbef
+
+; -----------------------------------------
+;
+nxline	jsr sbzply	; progz plus .y
+	ldy #2		; found prog end?
+	lda (progz),y
+	beq do4		; yes, to RTS
+	ldy #5
+--	jsr sbzply
+;
+sfordone	jsr schdo		; search for DONE
+	cmp #0		; found line end?
+	beq nxline	; continue search
+	inc nesteddo	; count DOs (and DONEs) while searching
+	ldx #$ff
+-	inx
+	iny
+	lda (progz),y
+	cmp tuned+5,x	; compare against "ne" (is "done"?)
+	beq -
+	cmp #32		; space? (the one in "DO NULL")
+	bne +
+	dec nesteddo	; yes, denest DO, is just DO NULL
++	cpx #2
+	bcc --
+
+	ldx nesteddo	; if nested DOs: denest until 0
+	dex
+	dex
+	stx nesteddo
+	bne nxline
+
+	tya		; and then: set PZ to 1 byte before token of DONE
+	sbc #5		; .y minus 5
+	tay
+	bcs +
+	dec progz+1
++	jmp sbzply	; add .y to PZ
+
+; -----------------------------------------
+;
+sforelse	jsr schelse	; search for single ELSE (after IF..THEN DO wasn't successful):
+	tax		; found line end?
+	beq sfo0		; yes, leave by RTS
+	iny
+	lda (progz),y	; line end behind ELSE?
+	bne sfo0
+
+	inc nestelse	; count single ELSE
+	ldx dolevel	; check DO level
+	dex		; more than 1?
+	bne sfo0		; yes, don't operate ELSE
+
+	pla		; no, clear stack
+	pla
+	stx dolevel	; operate ELSE (don't return to dodo)
+	jmp fndelse+4
+
+; -----------------------------------------
+;
+schdo	lda #$22
+	sta $22
+	ldy #$ff
+-	iny		; get next byte
+	lda (progz),y
+	beq sfo0		; found end of line?
+	cmp #$64		; no, sb token?
+	bne -		; no
+
+	iny		; yes
+	lda (progz),y	; is token of DO?
+	cmp $22
+	bne -
+
+sfo0	rts		; yes, DO found
+
+; -----------------------------------------
+;
+schelse	lda #$47
+	sta $22
+	ldy #$ff
+-	iny		; get next byte
+--	lda (progz),y
+	beq sfo0		; found end of line?
+	cmp #$64		; no, sb token?
+	bne -		; no, next
+
+	iny		; yes
+	lda (progz),y	; is token of DO?
+	cmp #$22
+	beq +
+	cmp #$47		; is token of ELSE?
+	bne -
+	rts		; yes, ELSE found, end the search (DONE only if no ELSE)
+
++	ldx #$ff		; when token of DO:
+-	inx
+	iny
+	lda (progz),y	; is DONE?
+	cmp tuned+5,x
+	beq -
+	cpx #2		; DONE if .x=2
+	bcc +
+	dec dolevel	; DONE: dec DO level counter
+	dec dolevel
++	inc dolevel	;   DO: inc DO level counter
+	jmp --		; continue
+
+; -----------------------------------------
+;
+; Section 6: UI Commands
+;
+; -----------------------------------------
+
+; ----------------------------------------- bef CLS (Clear Video, also by DIV)
+;
+befcls	jsr clear		; clear screen
+	jmp bef0
+
+; ----------------------------------------- bef MEM
+;
+befmem	ldy #1		; commands following?
+	lda (progz),y
+	bpl memnrml
+	jmp memplus	; yes, process REU commands
+
+; -----------------------------------------
+;
+memnrml	lda #$cc		; video now at $cc00
+	sta video
+	jsr clear		; clr/home
+
+	jsr charen0
+	lda #$d0		; open char generator
+	sta $21
+	lda #$e0		; move chars to $e000
+	sta $a9
+	lda #$00
+	sta $20
+	sta $a8
+	tax
+	tay
+-	lda ($20),y
+	sta ($a8),y
+	inc $20
+	bne +
+	inc $21
+	inx
++	jsr inca8a9
+	cpx #16		; 16 pages?
+	bne -
+	jsr charen1
+
+	lda #$94		; VIC bank 3
+	sta $dd00
+	lda #$3b		; video at $cc00 (lower)
+	sta $d018
+	jsr repchrget	; save bef vectors and leave
+	jmp setbmode	; at a035: set bad mode to PLACE & RENUMBER
+
+; ----------------------------------------- MEM Distributor
+;
+memplus	dey		; .y=0
+	jsr chrget
+	lda (progz),y
+	ldx #2
+	cmp #$94		; SAVE?
+	beq +		; yes, .x=0
+	cmp #$93		; LOAD?
+	beq ++		; yes, .x=1
+	cmp #$87		; READ?
+	beq +++		; yes, .x=2
+	cmp #$9c		; CLR?
+	beq memclr	; yes, go there
+
+	dex		; otherwise: .x=$ff
++	dex
+++	dex
+
++++	cpx #$ff		; Parameter?
+	beq params	; ja, Parameter einlesen
+
+	txa		; sonst: Direktbefehl auslösen
+	ora #$80
+	sta helpvec
+	lda $df01
+	and #$6c		; Bit 0,1,4,7 aus
+	ora helpvec
+	sta $df01
+	lda pport
+	pha
+	ldx helpvc2
+
+; ----------------------------------------- Part of MEMLOAD/SAVE
+;  by P. Hagemann
+execdma	bmi +		; carries FF00 flag
+	lda #$30		; no color ram access wanted
+	bne ++
++	lda #$35		; color ram access wanted
+++	sei
+	sta pport
+	lda $ff00		; save byte
+	sta $ff00		; activate DMA
+	pla		; restore IO config
+	sta pport
+	cli
+	jmp bef0		; finished
+
+; ----------------------------------------- bef MEMCLR
+;
+memclr	jsr sgetadrn	; get adress (to INT)
+	sty helpvec	; transfer adr to helpvec
+	sta helpvec+1
+	jsr sgetadrc	; comma, get amount to INT
+	ldx #0		; preset .x to 0
+	jsr gnextpar	; anything more?
+	txa		; prepare value
+	ldy int+1
+	beq +
+
+	ldy #0		; amount lo
+-	jsr mstore
+	inc helpvec+1	; 1 page
+	dec int+1		; next page
+	bmi +
+	bne -
++	ldy int		; rest
+	beq +
+	jsr mstore
++	jmp endsmb
+;
+; -----------------------------------------
+; ----------------------------------------- MEM w/ Parameters
+; -----------------------------------------
+;
+params	sty helpvc2	; .y=0
+	tax
+	jsr chrget	; advance to parameters:
+	cpx #$8c		; RESTORE? (set Reload addresses)
+	beq param5
+	cpx #$9a		; CONT?	(set Increment type)
+	beq param6
+	cpx #$96		; DEF?	(set all)
+	beq param1
+	cpx #$c3		; LEN?	(set amount of data)
+	beq param1
+	cpx #$b0		; OR?	(set address in C64)
+	beq param2
+	cpx #$b9		; POS?	(set address & bank in REU)
+	beq param3u4
+	jmp swarm		; otherwise: error "Bad Mode",
+
+; -----------------------------------------
+;
+param1	jsr sgetadr	; LEN: get amount
+	sty $df07
+	sta $df08
+
+	jsr chrgot	; more parameters?
+	beq ready		; no
+	jsr schkcom
+
+param2	jsr sgetadr	; OR: get c64 start
+	sty $df02
+	sta $df03
+
+	jsr chrgot	; more parameters?
+	beq ready		; no
+	jsr schkcom
+
+param3u4	jsr sgetadr	; POS: get reu start (and bank)
+	sty $df04		; get offset
+	sta $df05
+	jsr sgetbytc	; get bank
+	stx $df06
+
+	jsr chrgot	; more parameters?
+	beq ready		; no
+	jsr schkcom
+
+param5	jsr sgetbyt1	; RESTORE: get autoinc flag
+	ldy $df01		; get autoinc register
+	stx helpvc2	; store dma flag (pos/neg)
+	txa
+	and #1		;  0 or 1?
+	beq +		; if autoinc=0: off
+	tya
+	ora #$20		; else set ON
+	bne ++
++	tya		; set OFF
+	and #$df
+++	sta $df01
+
+	jsr chrgot	; more parameters?
+	beq ready		; no
+	jsr schkcom
+
+param6	jsr sgetbyt1	; CONT: get fix reu flag
+	txa
+	and #3
+	clc
+	ror		; rotate value to the decent position
+	ror
+	ror
+	sta $df0a
+ready	jmp endsmb
+
+; ----------------------------------------- bef CSET
+;
+befcset	jsr sgetbytn
+	txa		; cset 0?
+	beq +
+	dex		; cset 1?
+	bne ++
+
+	lda #$17		; CSET 1: lower case chars
+	!by $2c
++	lda #$15		; CSET 0: upper case chars
+	jsr csetmem	; check for MEM, set charset
+	bne +++		; uncond. branch
+
+++	jsr nrm03		; cset 2
++++	jmp endsmb
+
+nrm03	lda #$3b		; CSET 2: bits for hires mode
+	sta $d011
+	lda #$0b		; graphics at $e000, cols at $c000
+	sta $d018
+	lda #$94		; vic bank 3 ($c000)
+	sta $dd00
+	lda #10		; flag for MOB SET
+	sta gmemflag
+	rts
+
+; ----------------------------------------- bef COLOUR
+;
+befcolour	ldx #0		; 0: black
+	jsr chrget	; anything following?
+	beq colc0		; no, set paper and border to blk
+
+	cmp #$2c		; comma?
+	beq colc1		; yes, only ink
+
+	jsr sgetbyt1	; get param1 (in .x)
+	stx helpvec
+	jsr chrgot	; no more?
+	beq +		; yes, only paper
+
+	jsr sgetbytc	; get param2 (in .x)
+	lda helpvec
+	!by $24
+colc0	txa
+	sta $d020		; border
++	stx $d021		; paper
+	jsr chrgot	; no more?
+	beq +		; yes, only border and paper
+
+colc1	jsr sgetbytc	; get param3
+	stx $0286		; ink
++	jmp endsmb
+
+; -----------------------------------------
+;
+delend	jsr basromein
+endmrge	jsr $a660		; sys clear
+	jmp $a474		; sys out: ready.
+
+; ----------------------------------------- bef DELAY
+;
+befdelay 	jsr chkonoff
+	stx delay
+bms0	jmp endsmb
+
+; ----------------------------------------- part of WAVE
+;
+getpanel	jsr schkcom	; comma? digit following?
+	bcc +
+-	jsr sgetbyt1	; no, get expression
+	stx $a8
+	pla
+	pla
+	jmp cpanel
+
++	cmp #$32		; yes, 1st digit 0 or 1?
+	bcs -		; no, is expression
+	jsr snexttr	; yes, check if 8 digits
+	cpy #8
+	bcc -		; no, less: expression
+	rts
+
+; ----------------------------------------- Part of FLASH
+;
+flashactv	lda #10
+	sta flashsp	; Default-Speed: 10
+	sta flashfls,x	; Farbe aktivieren
+	rts
+
+; ----------------------------------------- bef FLASH
+;
+befflash	lda #0
+	sta flashzae
+	jsr chkonoff	; Parameter holen
+	jsr chrgot	; end of statement?
+	bne +		; no, cont
+	txa
+	bne +		; OFF?
+	jmp endflash	; yes, clear
+
++	tay
+	cpx #16		; Farbe über 15?
+	bcs +		; ja, übergehen
+	jsr flashactv	; Farbe u. Default-Speed setzen
+
++	cpy #$2c		; folgt Speed?
+	bne +
+	jsr sgetbytn	; ja, holen
+	stx flashsp
+
++	lda #10		; FLASH aktivieren
+	sta flashfl
+	bne bms0
+
+; ----------------------------------------- bef OLD
+;
+befold	jsr basromein	; basic ein
+	lda #1
+	tay
+	sta ($2b),y
+	jsr $a533		; rechain lines
+	txa
+	adc #02
+	sta $2d		; set start of basic variables
+	lda $23
+	jsr $a655		; sys: CLR
+	jmp $a474   	; sys: Ready.
+
+; ----------------------------------------- Execute PLAY (2)
+;
+sirqplay	lda musicz4	; from sirq5
+	beq sip0
+	dec musicz2
+	lda musicz2
+	beq sip1
+	rts
+
+sip1	dec musicz4
+	lda musicz4
+	beq sip0
+	lda musicz3
+	sta musicz2
+	rts
+
+sip0	lda musicadr	; get adr of music string
+	sta $fc
+	lda musicadr+1
+	sta $fd
+	ldy musicz1	; get pointer into string
+	cpy musiclen	; at end of string?
+	bcs playend	; yes, end PLAY
+
+	lda ($fc),y
+	cmp #$8d		; beyond f8? (code for longest note)
+	bcs sip9		; yes
+	cmp #$85		; below f1? (code for shortest note)
+	bcc sip9		; yes
+	sbc #$84		; code valid, set individ. note duration
+	sta musicz2
+	sta musicz3
+	lda musicdau	; general tempo (the shorter the faster)
+	sta musicz4
+	bne sip4		; uncond. branch
+;
+sip2	sty musicz5	; store pointer into string
+	jsr notesuch	; search note, result in .a and .x
+	ldy #1
+	sta ($fe),y
+	txa
+	dey
+	sta ($fe),y
+	jsr stimmein	; play on
+	ldy musicz5	; re-get pointer
+
+sip4	cpy musiclen	; at end of music string?
+	bcs playend	; yes
+	iny		; no, advance
+	bne +
+;
+playend	ldy #0		; clear play flag
+	sty playflag
++	sty musicz1
+	rts
+
+sip9	cmp #$93		; clr (code for select voice)?
+	bne sip2		; no, note?
+	iny		; yes, get voice number
+	lda ($fc),y
+	ldx #$00
+	stx musicz4
+	cmp #$34		; beyond voice 3?
+	bcs sip5
+	cmp #$31		; below voice 1?
+	bcc sip5
+	sbc #$30		; make value from voice #
+	tax
+	dex
+	lda mregs,x	; pointer to voice 1..3
+	sta mregadr
+	stx stimmenr
+	lda #$d4		; set $d4xx (from voice)
+	sta mregadr+1
+-	bne sip4		; advance in music string
+;
+sip5	cmp #$47		; code "g": voice off?
+	bne sip3
+	tya
+	pha
+	jsr svmregadr
+	ldy stimmenr
+	lda wavetab,y
+	and #$fe
+	ldy #4
+sip11	sta ($fe),y
+	pla
+	tay
+	bne -		; advance
+;
+sip3	cmp #$54		; code "t": sync bit?
+	bne sip6
+	tya
+	pha
+	jsr svmregadr
+	ldy stimmenr
+	lda wavetab,y
+	eor #$02
+--	ldy #4
+	bne sip11		; advance
+;
+sip6	cmp #$43		; code "c": clear waveform
+	bne sip7
+	tya
+	pha
+	jsr svmregadr
+	lda #0
+	beq --
+
+sip7	cmp #$52		; code "r": repeat music
+	bne -
+	ldy #0
+	sty musicz1
+	sty musicz4
+	rts
+
+; -----------------------------------------
+;
+notesuch	ldy #$13		; search in 20 notes
+-	cmp nottab,y
+	beq sip8
+	dey
+	bpl -
+	lda #0		; not found
+	tax
+	beq svmregadr
+;
+sip8	lda frqtabl,y	; found, set frequency
+	sta mfreq
+	tya		; hi byte:
+	ldy #0
+	cmp #12		; 12=0
+	beq +++
+	cmp #19		; 19=2
+	beq +
+	cmp #11		; 11=2
+	bne ++
++	iny
+++	iny		; all others=1
++++	sty mfreq+1
+	inc musicz5
+	ldy musicz5	; set octave
+	lda ($fc),y
+	and #15		; (0..max 9)
+	tax
+	beq sip10
+-	asl mfreq
+	rol mfreq+1
+	dex
+	bne -
+;
+sip10	lda mfreq+1
+	ldx mfreq
+svmregadr	ldy mregadr
+	sty $fe
+	ldy mregadr+1
+	sty $ff
+	rts
+
+; -----------------------------------------
+;
+stimmein	ldy #6		; index to SID register 6
+	ldx stimmenr
+	lda srtab,x	; get sustain/release values from buffer
+	sta ($fe),y	; write to register
+	dey		; register 5
+	lda adtab,x	; get attack/decay values from buffer
+	sta ($fe),y
+	dey		; register 4
+	lda wavetab,x	; set waveform data
+	and #$fe		; clear key bit
+	sta ($fe),y
+	ora #1		; and set it (activate voice)
+	sta ($fe),y
+	rts
+
+; -----------------------------------------
+;
+useready	pla
+	pla
+	lda #$00
+	jsr genout
+	jsr basromein
+	lda #<outstring	; address of outstring ($02a7)
+	ldy #>outstring
+nocrlfstr	jsr $ab1e		; sys string out
+nocrlf	jsr basromaus
+	jsr chrgot	; semicolon?
+	bne +
+	jmp return	; no, sys cr/lf out
+
+; -----------------------------------------
+;
++	lda #$3b		; ";"?
+use6	ldy #0		; compare to running code char
+	cmp (progz),y	; if not equal: error bad mode
+	bne +
+	jmp chrget	; otherwise: get next char
+
++	jmp swarm		; bad mode
+
+; ----------------------------------------- bef DISPLAY
+;
+befdisplay
+	jsr incbasbz
+dpl2	ldx #0
+	stx $a7
+	inx		; first number: 1
+	stx $a6
+	lda #>keytab	; base address of texts
+	sta $21
+	lda #<keytab
+	sta $20
+;
+dpl1	ldy #0
+-	lda textkey,y	; out "KEY"
+	beq +
+	jsr bsout
+	iny
+	bne -
++	sta $62 		; .a=0 (hi)
+	lda $a6		; out number of f-key
+	sta $63		; (lo)
+	ldx #$90		; look at scflp!
+	sec		; (4 bytes gain)
+	jsr sxflp		;
+	jsr sfacasc	; returns .y=1
+	jsr outasc
+	jsr komma		; out ","
+	jsr quote		; out quote
+	dey
+
+-	lda ($20),y	; get text of f-key
+	beq nxkey		; is $00? (end of text)
+	cmp #$0d		; is cr? (also end of text)
+	beq crtxout	; yes, add "+chr$(13)"
+
+	jsr bsout		; otherwise out text
+	iny
+	cpy #16
+	bcc -
+	beq nxkey
+
+crtxout	jsr quote		; is cr: out quote
+	lda #$2b		; out "+"
+	jsr bsout
+	ldx #0
+-	lda textchr,x
+	beq +
+	jsr bsout		; out "chr$(13)"
+	inx
+	bne -		; uncond. branch
+
+nxkey	jsr quote		; end of text: out quote
++	inc $a6		; count texts
+	clc
+	lda $20		; add 16 to address
+	adc #16
+	sta $20
+	bcc +
+	inc $21
++	jsr return	; out LF
+	lda $a6		; loop until 16 texts
+	cmp #17
+	bne dpl1
+
+	beq mmb4		; finished
+
+; ----------------------------------------- bef DIR
+;
+befdir	jsr sclose	; first: close file
+	jsr chrget	; get next byte
+	jsr fromdir	; check if anything follows (a2d5)
+	stx $ae
+	sta $af
+	ldy #0
+	lda ($ae),y
+dollars	cmp #$24		; "$"?
+	beq dir0
+	jmp swarm		; no, error "Bad Mode"
+
+dir0	ldy $af
+	lda drive
+	sta $ba
+	jsr basromaus
+	lda $69
+	jsr fileopen	; aa61 open file
+	jsr basromein
+
+	ldx #5
+dir1	jsr $ffcf		; skip 5 chars
+	dex
+	bne dir1
+
+	sta $63		; len lo
+	jsr $ffcf
+	sta $62		; and hi
+	jsr $bdd1		; sys out integer
+	lda #2
+	sta helpvec
+dir2	jsr chk4key	; STOP? Any other key?
+	beq dir5		; if STOP: leave
+dir3	jsr $ffcf		; get char
+	ldx status	; fail?
+	bne dir5
+dir4	jsr bsout		; write char
+	tay
+	cmp #$22		; quotes?
+	beq dir6
+	tya		; no, cont
+	bne dir2		; end of line?
+	lda helpvec
+	bne dir5
+	jsr $aad7		; yes, sys out cr/lf
+	ldx #3		; then skip 3 chars
+	bne dir1
+
+dir6	dec helpvec
+	bne dir2
+	lda #$3a		; out ":" after 2nd quote
+	bne dir4
+;
+dir5	lda #0
+	sta numkeys
+	jsr sclose
+mmb4	jmp endsmb
+
+; ----------------------------------------- Part of DIR
+;
+fromdir	bne +		; anything following?
+	ldx #1		; no, set length of filename ("$"): 1
+	stx $69
+	ldx #<(dollars+1)	; address of name
+	lda #>(dollars+1)
+	rts		; return to DIR
+
++	jmp sgetstr	; return to regular DIR
+
+; ----------------------------------------- part of DIR
+;
+fileopen	jsr $ffbd		; sys setnam
+	ldx $ba
+	lda #1
+	ldy #0
+	jsr $ffba		; sys setlfs
+	jsr $ffc0		; sys OPEN
+	bcc +
+	tax		; .x=Error# (f.i.: 5)
+	jmp ($0300)
++	ldx #1
+	jmp $ffc6		; sys chkin 1
+
+; ----------------------------------------- all MOVE befs
+;
+; here: .y contains (token-1)*2
+; entry for: MOVE (.y=28), UP (32/34), LEFT (36/38),
+; DOWN (40/42), RIGHT (44/46), INV (24).
+; Each of these commands gets performed twice, 1st: set chars, 2nd: set colors
+; -----------------------------------------
+
+movebef	lda progz		; save address of token in basic code
+	sta $c1		; for 2nd pass
+	lda progz+1
+	sta $c2
+	lda #0		; init:
+	sta helpvec	; - w-marker
+	sta helpvec+1	; - displacement offset
+	sta $a6		; - pass counter
+	beq mve6		; uncond. branch
+
+; ---------------------------
+
+mve0	ldy $a7		; 2nd pass: reset basic pointer
+	lda $c1		; and token number ($a7)
+	sta progz
+	lda $c2
+	sta progz+1
+
+mve6	tya		; mind: .y: (token#-1)*2
+	sta $a7
+	pha
+	jsr getrcwd	; get parameters: row, column, width, height
+			; and compute start address (in $20/1 and $a4/5)
+	jsr toa8		; save start address to $a8/9 for wrap
+	pla
+	cmp #32		; command: upb (32)?
+	bcc mve5		; no, move (28), INV (24), FCHR (8), FCOL (6), or FILL (12)
+
+;
+	jsr mdistrb	; distribution vector for all commands
+
+mve4	inc $a6		; advance to 2nd pass
+	lda $a6
+	cmp #2
+	bcc mve0
+mve4b	jmp endsmb	; after 2nd pass: finished
+
+; ----------------------------------------- befs FCHR, FCOL, FILL, INV
+;
+mve5	cmp #16		; is INV?
+	bcs mve1		; yes, branch
+
+	and #7		; FCHR?
+	lsr
+	beq mve2
+	lsr		; no, FCOL?
+	beq mve3
+
+; ----------------------------------------- bef FILL
+	jsr mve9		; FILL: get char
+	jsr to20		; reset start address, now:
+
+; ----------------------------------------- bef FCOL
+mve3	jsr mvea		; address color ram, get color
+	beq mve4		; finished
+
+; ----------------------------------------- bef FCHR
+mve2	jsr mve9		; get character
+	beq mve4		; finished
+
+; ---------------------------
+mvea	inc $a6		; address color ram
+	jsr movez
+; ---------------------------
+mve9	inc $a6		; advance pass counter
+	jsr sgetbytc	; get next parameter (character or color)
+	txa		; value in .x
+	ldy spaltenanz
+	jsr fillmt	; fill buffer with value in .a
+	ldx zeilenanz
+-	jsr mkline	; write buffer to address in $20/1
+	jsr l20pl40	; next row
+fillbox	dex		; all rows
+	bne -
+	rts
+
+; -----------------------------------------
+;
+mve1	and #4		; command: INV?
+	beq mve7
+	jsr mveb		; no, MOVE
+	beq mve4		; finished
+
+; ----------------------------------------- bef INV
+;
+mve7	jsr befinv
+	beq mve4b		; finish after 1st pass
+
+;
+befinv	ldx #0
+--	ldy #0
+-	cpy spaltenanz
+	beq mve8
+	lda ($20),y	; get char
+	eor #$80		; set bit 7 (revert)
+	sta ($20),y	; store back
+	iny
+	bne -
+mve8	inx
+	cpx zeilenanz
+	beq +
+	jsr l20pl40
+	bne --
++	rts
+
+; ----------------------------------------- bef MOVE
+;
+mveb	jsr sgetbytc	; get target row
+	stx zeileanf
+	jsr sgetbytc	; get target column
+	stx spalteanf
+	jsr movez		; compute address
+	lda $a8		; set source
+	sta $23
+	lda $a9
+	sta $24
+	jmp moveit	; and move
+
+; ----------------------------------------- Command Distributor
+;
+mdistrb	and #$0f		; reduce token nums
+	lsr
+	tay		; upb?
+	beq befupb
+	cmp #1		; upw?
+	beq befupw
+	cmp #2		; leftw?
+	beq befleftw
+	cmp #3		; leftb?
+	beq befleftb
+	cmp #4		; downb?
+	beq befdownb
+	cmp #5		; downw?
+	beq befdownw
+	cmp #6		; rightb?
+	beq befleftb
+
+; ----------------------------------------- bef RIGHTW (7) / LEFTW (2)
+; 			enhanced
+befleftw	lda #1
+	sta helpvec	; set w-marker
+	bne mdb0
+; ----------------------------------------- bef UPW (1)
+; 			enhanced
+befupw	lda #1
+	sta helpvec	; set w-marker
+	bne befupb
+; ----------------------------------------- bef RIGHTB (6) / LEFTB (3)
+; 			enhanced
+befleftb	lda #1		; set displacement to 1
+	bne mdb0
+; ----------------------------------------- bef DOWNB (4)
+; 			enhanced
+befdownb	lda #2		; set down flag
+	bne mdb1
+; ----------------------------------------- bef DOWNW (5)
+; 			enhanced
+befdownw	lda #3		; set down flag and w-marker
+mdb1	sta helpvec
+
+; ----------------------------------------- bef UPB (0)
+; 			enhanced
+befupb	lda #40		; set displacement to 40
+
+; -----------------------------------------
+;
+mdb0	sta helpvec+1	; displacement
+
+	cpy #2		; up (0/1)?
+	bcs +
+	jmp mcontup	; yes
+
++	cpy #4		; left (2/3)?
+	bcc mcontleft	; yes
+
+	cpy #6		; down (4/5)?
+	bcc mcontdown	; yes
+
+; ----------------------------------------- RIGHT(B/W)
+
+mcontright
+	dec spaltenanz
+	lda helpvec	; w-marker (if=1)
+	and #1
+	beq +
+	ldy spaltenanz
+	jsr mfrow		; RIGHTW: store rightmost line to buffer
+	bne ++
++	ldy zeilenanz
+	jsr mspc0		; RIGHTB: store spaces to buffer
+++	jsr mminus	; set src to 1 column before (to $23/4)
+
+	ldx #0
+--	ldy spaltenanz	; start rightmost
+-	lda ($23),y	; get src
+	sta ($20),y	; write to dest
+	dey		; proceed to the left
+	bne -		; until 1 before leftmost
+	inx		; next row
+	cpx zeilenanz	; until bottom
+	beq +
+	jsr l20pl40	; next dest row
+	jsr l23pl40	; next src row
+	jmp --
+	iny		; INY unused
++	jmp mfbox		; restore leftmost w/ previous rightmost
+
+; ----------------------------------------- DOWN(B/W)
+;
+mcontdown	dec zeilenanz
+	ldx zeilenanz
+	beq mcup0
+	jsr maddhg	; proceed to bottom row
+	jsr mminus	; set source (1 row above)
+	lda helpvec	; w-marker (if=1)
+	and #1
+	beq +
+	jsr mfline	; DOWNW: store bottom row to buffer
+	beq ++
++	ldy spaltenanz	; DOWNB: store spaces to buffer
+	jsr mspc0
+++	jsr moveit	; move rows
+	dex
+	jsr mvit0		; move last row (probably useless)
+	jmp mkln0		; restore bottom row at top row
+
+; ----------------------------------------- LEFT(B/W)
+;
+mcontleft	jsr mplus		; set source (1 column in advance)
+	lda helpvec	; w-marker (if=1)
+	and #1
+	beq +
+	ldy #0
+	jsr mfrow		; LEFTW: store leftmost to buffer
+	bne ++
++	ldy zeilenanz	; LEFTB: store spaces to buffer
+	jsr mfspace
+++	dec spaltenanz
+	jsr moveit	; move from left to right
+	ldy spaltenanz
+	jmp mfbox		; restore rightmost line from buffer
+
+mcup0	inc zeilenanz	; repair DOWN (?)
+
+; ----------------------------------------- UP(B/W)
+;
+mcontup	jsr mplus		; set source (1 row in advance)
+	lda helpvec
+	and #1
+	beq +
+	jsr mfline	; UPW: store topmost to buffer
+	beq ++
++	ldy spaltenanz	; UPB: store spaces to buffer
+	jsr mfspace
+++	jsr moveit	; move topdown
+	jmp mkline	; restore bottommost from topmost
+
+; ----------------------------------------- Move bytes
+;
+moveit	ldx #0
+mvit0	ldy #0
+-	cpy spaltenanz
+	beq +
+	lda ($23),y	; from source
+	sta ($20),y	; to dest
+	iny
+	bne -
++	inx
+	cpx zeilenanz
+	beq ++		; finished
+	lda helpvec	; down flag?
+	and #2
+	bne +
+	jsr l20pl40	; no: top down
+	jsr l23pl40
+	bne mvit0
++	jsr l20mn40	; yes: bottom up
+	jsr l23mn40
+	jmp mvit0		; loop
+
+; ----------------------------------------- Restore vertically
+;
+mfbox	jsr to20
+	ldx #0
+-	lda movetab,x
+	sta ($20),y
+	jsr l20pl40
+	inx
+	cpx zeilenanz
+	bne -
+++	rts
+
+; ----------------------------------------- Restore horizontally
+;
+mkln0	jsr to20
+mkline	ldy #0
+-	lda movetab,y
+	sta ($20),y
+	iny
+	cpy spaltenanz
+	bne -
+	rts
+
+; ----------------------------------------- Save to Buffer
+;
+mfrow	ldx #0
+-	lda ($20),y	; vertically
+	sta movetab,x
+	jsr l20pl40
+	inx
+	cpx zeilenanz
+	bne -
+	jmp to20
+
+;
+mfline	ldy #0
+-	lda ($20),y	; horizontally
+	sta movetab,y
+	iny
+	cpy spaltenanz
+	bne -
+	rts
+
+; ----------------------------------------- Spaces to Buffer
+;
+mfspace	dey		; fill movetab w/
+mspc0	lda #$20		; space
+fillmt	sta movetab,y
+	dey
+	bpl fillmt
+	rts
+
+; ----------------------------------------- Retrieve Parameters
+;
+getrcwd	jsr sgetbytn	; get row
+	cpx #25		; >24?
+	bcs err32		; yes, bad mode
+	stx zeileanf
+
+	jsr sgetbytc	; get column
+	cpx #40		; >39?
+	bcs err32		; yes, bad mode
+	stx spalteanf
+
+	jsr sgetbytc	; get width (num of columns)
+	txa
+	beq err32		; 0 is error
+	stx spaltenanz
+
+	jsr sgetbytc	; get height (num of rows)
+	txa
+	beq err32		; 0 is error
+	stx zeilenanz
+
+; ----------------------------------------- Compute Addresses
+;
+movez	ldy #0
+	sty $20		; init dest
+	sty $a5
+	lda $a6		; which pass?
+	bne +
+	lda video		; video (1st pass)
+	!by $2c
++	lda #$d8		; or colors (2nd pass)
+	sta $21
+	lda zeileanf	; compute start address
+	sta $a4
+	jsr a4mal40
+	clc
+	lda $a4
+	adc $20
+	sta $a4
+	lda $a5
+	adc $21
+	sta $a5
+	clc
+	lda $a4
+	adc spalteanf
+	sta $20
+	lda $a5
+	adc #0
+	sta $21
+	clc
+	lda zeileanf
+	adc zeilenanz	; beyond limits?
+	cmp #26
+	bcs err32
+	clc
+	lda spaltenanz
+	adc spalteanf
+	cmp #41
+	bcs err32
+	rts		; no, proceed
+
+; -----------------------------------------
+;
+err32	jmp swarm		; error "bad mode"
+
+; ----------------------------------------- bef INSERT
+;
+befinsert	jsr get1ststr	; get string and len
+	cmp #9
+	bne jerr0e	; yes, error
+
+	pha		; save len
+	ldx #0
+	stx $a6
+	lda #$2c		; comma follows?
+	cmp (progz,x)
+	bne err32		; no, bad mode
+
+	pla
+	tay
+	dey		; .y= len
+	sty helpvec
+	lda $c7		; save RVS flag
+	sta helpvec+1
+-	lda ($20),y	; read box string
+	cmp #$e0		; RVS intended?
+	bcc +		; no
+	inc $c7		; yes, set flag for RVS
++	cmp #$60		; convert chars to bcode
+	bcc +
+	and #$7f
+	ora #$40
+	bne ++
++	and #$3f
+++	dec $c7		; rvs?
+	bmi +
+	ora #$80		; yes
++	sta $02c0,x	; store converted box chars
+	lda helpvec+1	; restore RVS flag
+	sta $c7
+	inx
+	dey
+	bpl -
+	jsr getrcwd	; get position params
+	jsr mkbox
+	jmp mve3		; out box
+
+; -----------------------------------------
+;
+get1ststr	jsr frominsrt	; get box definition
+	sty $21
+	stx $20
+	lda $69		; len<>9 or even empty?
+	beq jerr0e
+	rts
+
+; -----------------------------------------
+;
+jerr0e	jmp err0e		; yes, error "illegal quantity"
+
+; -----------------------------------------
+;
+mkbox	jsr mkrow
+	jsr mkline	; top row
+	jsr l20pl40
+	jsr mkrow
+	ldx zeilenanz
+	dex
+	bne +
+	inc zeilenanz
+	bne ++
++	jsr fillbox	; middle rows
+++	jsr mkrow
+	jmp mkline	; bottom row
+;
+mkrow	ldy helpvec	; one row
+	lda $02c0,y
+	tax
+	dey
+	lda $02c0,y
+	pha
+	dey
+	lda $02c0,y
+	dey
+	sty helpvec
+	ldy spaltenanz
+	dey
+	bne +
+	iny
+	inc spaltenanz
++	sta movetab,y
+	dey
+	pla
+	jsr fillmt
+	stx movetab
+	rts
+
+; -----------------------------------------
+; ----------------------------------------- bef FETCH
+; -----------------------------------------
+;
+beffetch	jsr get1ststr	; get ctrl string and its len
+	sta fetchlen	; store len of ctrl string
+	jsr chkfchlen	; get (and check) len
+	stx fetchanz	; get len (max 88)
+	jsr schkcom
+	jsr stestdirm	; check for direct mode
+	jsr crsrout	; show cursor
+	lda #$2c		; prepare INPUT
+	sta $01ff
+
+; -----------------------------------------
+;
+fetchit	jsr fgetkey	; gather input chars
+	lda $13		; current io device
+	beq +		; is 0? (keyboard)
+
+	jsr $ffb7		; no, sys read floppy status
+	and #2		; timeout?
+	beq +		; no, proceed
+;
+	jsr sclrch	; yes, clear io
+-	jsr srem		; advance to next basic command
+--	jmp endsmb	; end of fetch
+
+; -----------------------------------------
+;
++	lda basinbuf	; anything typed?
+	bne +
+	lda $13		; no, io device is
+	bne fetchit	;   not keyboard
+	beq -		;   keyboard
+
++	jsr sinput1	; yes, perform kernal input
+;
+	ldx helpvec+1	; was comma in string?
+	beq --
+	ldy #1		; yes, reconstruct comma
+	lda ($49),y
+	sta helpvec
+	iny
+	lda ($49),y
+	sta helpvec+1
+	txa
+	tay
+	lda #$2c
+	sta (helpvec),y
+
+	bne --		; finish fetch
+
+; -----------------------------------------
+;
+jfoa	jmp foutall	; yes, perform input
+
+; -----------------------------------------
+;
+fgetkey	ldx #0		; .x=0: start length of input
+	stx helpvec	; store
+	stx helpvec+1	; store comma flag
+;
+floop	jsr $ffe4		; sys get key
+	sta joywert	; merken
+	lda joywert
+	beq floop		; nothing typed?
+
+	cmp #$0d		; cr?
+	beq jfoa
+	cmp #$14		; del?
+	bne fquote
+
+; ----------------------------------------- key: delete
+;
+fdelete	ldx helpvec	; no input yet?
+	beq floop		; yes, loop
+
+	ldx #6
+	jsr crsrdel
+	dec helpvec
+	bpl floop
+
+; -----------------------------------------
+;
+fquote	lda $d4		; no, quote mode?
+	bne fcheck
+
+	ldx #0		; no, check special chars
+-	lda fetchtab,x
+	cmp joywert
+	beq floop		; found one, so skip it
+	inx
+	cpx #27
+	bne -
+
+; ----------------------------------------- check input char
+;
+fcheck	ldy #0
+	lda joywert	; get current char
+chkloop	ldx helpvec	; get current len
+	cmp ($20),y	; is char in ctrl string?
+	beq fchrisin	; yes, store
+
+; -----------------------------------------
+;
+fspecials	tax
+	lda ($20),y	; no, check ctrl string:
+	cmp #$13		; home? (a..z)
+	beq fchkaz
+	cmp #$11		; crsr dwn? (a..z,A..Z)
+	beq fchkdig
+	cmp #$1d		; crsr rgt? (space..0..9..?)
+	beq fchkazup
+
+; -----------------------------------------
+;
+ftcont	lda joywert	; no, reget char
+	iny		; advance to next in list
+	cpy fetchlen	; until end of ctrl string
+	bne chkloop
+	beq ftc0		; at end of input: wait for finish
+
+; -----------------------------------------
+;
+fchrisin	jsr bsout		; sys out
+	cmp #$3a		; colon?
+	beq +
+	cmp #$2c		; comma?
+	bne ++
+	stx helpvec+1	; yes, store position
++	lda #$2e		; hide comma as period
+++	sta basinbuf,x	; store in buffer
+	inx		; count chars
+	stx helpvec
+	cpx fetchanz	; input len?
+	beq flastchar	; yes, wait for cr
+	jsr crsrout	; otherwise: show cursor
+ftc0	jmp floop		; and wait for more input
+
+; -----------------------------------------
+;
+flastchar	jsr $ffe4		; sys get key
+	sta joywert	; store
+	cmp #$0d		; cr?
+	beq foutcr	; yes, cr, end now
+
+fend	cmp #$14		; del?
+	beq fdelete
+	bne flastchar	; no, wait on
+
+; -----------------------------------------
+;
+foutall	jsr leerzch	; sys out space (switch crsr off)
+
+foutcr	ldx helpvec
+	jmp spuf0cr	; out all
+
+; ----------------------------------------- Checks
+;
+fchkdig	cpx #$20		; below space?
+	bcc notinit
+	cpx #$41		; beyond a?
+	bcs notinit
+	bcc legal		; no, legal
+;
+fchkazup	cpx #$c1		; below A?
+	bcc fchkaz
+	cpx #$db		; beyond Z?
+	bcs notinit
+	bcc legal		; no, legal
+
+fchkaz	cpx #$41		; below a?
+	bcc notinit
+	cpx #$5b		; beyond z?
+	bcs notinit
+;
+legal	txa
+	ldx helpvec
+	jmp fchrisin	; yes, legal
+notinit	jmp ftcont	; no, check against next one
+
+; -----------------------------------------
+;
+crsrout	ldx #3		; crsr out
+crsrdel	lda $d4
+	pha
+	lda $c7		; store rvs flag (to helper)
+	sta int
+	lda #0		; crsr off
+	sta $d4
+	jsr showcrsr
+	pla
+	sta $d4
+back2call	rts
+
+; -----------------------------------------
+;
+showcrsr	lda fcursor,x
+	tay
+	and #$7f		; reduce
+	cmp int		; is $12?
+	bne +
+	tya
+	eor #$80		; 12 <-> 92
+	!by $24		; neutralizes TYA
++	tya
+	jsr bsout
+	dex
+	bpl showcrsr
+	rts
+
+; ----------------------------------------- bef DISK
+;
+befdisk	jsr chkdrv	; is drive there?
+	jsr sgetstrn	; yes, get string
+	lda $69
+	sta $b7
+	stx $bb
+	sty $bc
+	lda $be		; set TSB drive
+	sta $ba
+	jsr $ffb1		; sys send listen
+	lda #$6f
+	sta $b9
+	jsr $ff93		; sys send sa after listen
+	ldy #0
+-	lda ($bb),y	; send disk command
+	jsr $ffa8		; sys cout
+	iny
+	cpy $b7
+	bcc -
+	jsr $ffae		; sys unlisten
+	lda $9d		; direct mode?
+	beq +
+	jsr dec7a
+	jmp flpmsg2	; bfc5 yes, to bef ERROR
+
+; ----------------------------------------- bef ERROR
+; (code by D. Temme, 64'er 11/1984)
+beferror	jsr chrget
+	cmp #$b0		; next char is token of OR?
+	beq flpmsg
+	jmp swarm		; no, error bad mode
+
+flpmsg	jsr chkdrv	; is drive there? (error 5 if not)
+flpmsg2	lda drive		; and set
+	jsr $ffb4		; sys: talk
+	lda #$6f
+	sta $b9
+	jsr $ff96		; sys: send sa after talk
+-	jsr $ffa5		; sys: read from IEC
+	jsr bsout		; and out
+	cmp #$0d		; until cr
+	bne -
+	jsr $ffab		; sys: send untalk
+	jmp bef0
+
+; ----------------------------------------- bef USE drive
+;
+usedrv	jsr sgetbyt1	; get drive# (constant [plus expression])
+	stx drive		; and set
++	jmp endsmb
+
+; ----------------------------------------- bef USE
+;
+befuse	jsr chrget	; next char: digit?
+	bcc usedrv	; yes, branch
+
+	cmp #$23		; "#"?
+	bne use2		; yes, open file (81ec)
+
+	jsr sgetbytn	; USE #n,string,vars
+	stx $13		; .x= device #
+	jsr $e4ad		; sys: basic ckout
+	bcs use2		; error: continue anyway
+	jsr schkcom	; comma?
+
+use2	jsr use3a		; get ctrl string
+	jsr use3		; analyse USE parameters
+	jsr sclrch
+	jmp endsmb
+
+; ----------------------------------------- main part of USE
+;
+use7	ldx #0		; clear current
+	ldy $44
+-	cpy $43		; compare to len
+	bcs usel1
+	lda ($49),y	; get char in ctrl string
+	cmp #$2a		; "*" (leading char)?
+	bne +
+	sta $63
+	beq ++
++	cmp #$23		; "#" (place holder)?
+	bne usel1
+++	inx		; yes, skip
+	iny
+	bne -
+
+usel1	stx $66		; save index
+	ldy #0
+	ldx $61		; get index in out string
+-	lda linenum+1,x	; get next char
+	cmp #$2f		; digits and math signs?
+	bcc +
+	cmp #$45		; or "e"?
+	beq usel2
+	inx
+	iny
+	bne -
++	tya
+	sta $65
+	rts
+
+; -----------------------------------------
+;
+usel2	pla
+	pla
+usel3	ldy $bd
+--	cpy $43		; len of ctrl string
+toul3	beq use5		; reached, cont in use3
+	lda ($49),y	; get char from ctrl string
+	ldx #6
+-	cmp tsbpudef-1,x	; is a ctrl char?
+	beq +		; yes, found
+	dex
+	bne -
+	beq use5		; no
+
++	sta outstring,y	; and store
+	iny
+	bne --
+
+; -----------------------------------------
+;
+err0b	ldx #$0b		; error "syntax"
+	jmp ($0300)
+
+-	jmp err17		; error "string too long"
+
+; -----------------------------------------
+;
+use3	lda $69		; len=0?
+	beq err0b		; yes, syntax error
+	sta $43		; len of ctrl string
+	stx $49		; and address
+	sty $4a
+	cmp #$59		; >88 chars?
+	bcs -		; yes, error
+
+	ldy #0
+use5	sty $44		; current char in ctrl string
+useloop	jsr mkoutstr
+	jsr use7
+	bne +
+
+	ldx $66
+	beq usel4
+
+	jsr use8		; generate outstring
+	jsr use9		; generated string to out
+	ldy $44
+	lda #$30		; "0"
+	sta outstring-1,y
+	bne ++
+
++	lda $66
+	sec
+	sbc $65
+	beq +
+	bcc usel3
+	jsr use8-1	; init outstring
++	jsr use9		; generate string
+
+usel4	ldy $44
+++	cpy $43
+	beq useloop
+	ldx $61
+	lda linenum+1,x
+	beq +
+	inc $61
++	lda ($49),y
+	cmp #$2c		; comma?
+	beq +
+	cmp #$2e		; period?
+	bne usel5
+
++	jsr gno0
+	jsr use7
+	ldx $66
+	beq usel5
+	cmp $66
+	bcs +
+	jsr use9		; generate string
+	lda $66
+	sec
+	sbc $65		; result: Anzahl Nachkommastellen
+	jsr use9a
+	beq usel5
++	txa
+	jsr usel9
+	cmp #$39		; "9"?
+	beq usel5
+	lda linenum+2,x
+	cmp #$35		; "5"?
+	bcc usel5
+	ldx $44
+	inc outstring-1,x
+
+usel5	jsr longround
+	jmp useloop
+
+; ----------------------------------------- Part of USE
+;
+roundup	inc helpvec	; now: 1
+-	ldx outstring-1,y	; no, get digits from last to first
+	cpx #$30		; is comma or period?
+	bcc ++		; yes, skip rounding
+	cpx #$39		; digit: is 9?
+	bne +
+	inc helpvec
+	ldx #$2f		; yes, produce 0
++	inx		; increment digit
+	txa
+	dec helpvec
+	bmi +++
+	sta outstring-1,y	; and write back
+	beq +++
+++	cpx #$20		; is char prefix of value?
+	beq userr		; yes, leave to set leading 1
+	dey		; no, check next char
+	bpl -
+
+userr	bmi +		; ### 2.20915
+	pla
+	pla
+	lda #$31		; write leading 1
+	sta outstring-1,y
++++	rts		; finish
+
++	pla
+	pla
+	lda #$f7		; value does not fit format
+	sta toul3+1
+noround	jsr usel3		; restore format string
+	lda #$25
+	sta toul3+1
+	rts		; and out, finish
+
+; -----------------------------------------
+;
+longround	ldy $44
+	lda linenum+2,x	; get digit right after last format char (#)
+	cmp #$35		; lower than 5?
+	bcc lr0		; yes, don't round
+	lda $65
+	beq lr0
+	jsr roundup	; equal/higher, so round up
+lr0	jmp usel6
+
+; ----------------------------------------- bef KEYGET
+; by P. Hagemann, v2.20521
+keyget	jsr chrget	; nächstes Zeichen holen
+	cmp #$a1		; GET-Token?
+	beq get
+
+	ldx #10		; no, continue KEY
+	jsr chkonoff+5
+	jmp chrgot	; get last byte
+;9401
+get	ldx #0		; ### v2.20528
+	jsr chkdirmd
+-	ldx numkeys	; yes, Taste gedrückt?
+	beq -
+	jsr chrget
+	jsr sysget   	; dann sys GET
+	jmp scd5		; Stack bereinigen, Ende
+
+; -----------------------------------------
+;
+chkdirmd	stx numkeys
+	jmp stestdirm
+; -----------------------------------------
+;
+	tax
+use8	lda $63
+	cmp #$2a		; "*"?
+	beq +
+	lda #$20		; " "
+	bne +
+use9a	tax
+	lda #$30		; "0"
+-
++	jsr genout	; generate outstring
+	dex
+	bne -
+	rts
+
+; -----------------------------------------
+;
+use9	lda #0
+usel9	sta helpvec
+-	ldx $61
+	lda linenum+1,x
+	cmp #$2f		; "/"?
+	bcc +
+	jsr genout
+	inc $61
+	dec helpvec
+	bne -
++	rts
+
+; -----------------------------------------
+;
+userdy	jmp useready
+
+; -----------------------------------------
+;
+mkoutstr	ldy $44		; index to current char
+	cpy $43		; = len?
+	beq userdy	; yes, ready
+
+	lda ($49),y	; compare to control chars
+	ldx #6
+-	cmp tsbpudef-1,x
+	beq usea		; found!
+	dex
+	bne -
+	sta outstring,y	; store unchanged
+	inc $44		; inc current
+	bne mkoutstr	; and loop
+
+usea	sty $bd		; store index of found
+	lda #$2c		; running char: comma?
+	jsr use6		; bad mode if not
+	jsr sfrmnum	; get var, convert to digits in linenum
+	jsr sfacasc
+
+	ldx #0		; index in linenum
+	stx $61
+	stx $63
+usel6	ldx linenum	; get first char
+	ldy $44		; get current position in ctrl string
+	lda ($49),y	; get char
+	cmp #$2b		; "+"?
+	bne +		; no
+	cpx #32		; first char: 32 (=space)?
+	bne usel0		; no, take this char
+	ldx #$2b		; yes, set 43 (="+")
+usel0	txa
+	inc $44
+	sta outstring,y	; and store
+	rts
+
++	cmp #$2d		; "-"?
+	beq usel0		; yes, store
+	rts		; no, leave it
+
+; -----------------------------------------
+;
+genout	ldy $44
+gno0	sta outstring,y
+	inc $44
+-	rts
+
+; -----------------------------------------
+;
+chkstate	jsr $ffcf
+	ldx status
+	beq -
+	pla
+	pla
+	jmp ss5
+
+; ----------------------------------------- bef SCRLD
+; (patch by Hans Haberl), recoded by Peter Hagemann (sa=5)
+befscrld	jsr intro
+	stx $b5		; store hibyte
+	ldx $b8		; file#
+	jsr $ffc6		; chkin
+	jsr chkstate	; file exists?
+	jsr $ffcf		; yes, skip load address
+	lda #$cf		; set (ff)cf= basin to distributor
+	bne ss1
+
+; ----------------------------------------- bef SCRSV
+;
+befscrsv	jsr intro
+	stx $b5		; Startadr. High merken
+	ldx $b8		; file#
+	jsr $ffc9		; CHKOUT
+	tya		; $00 = Low-Byte Startadresse
+skipslo	jsr bsout
+	lda $b5		; und High-Byte Startadresse schreiben
+skipshi	jsr bsout
+	lda #$d2		; set (ff)d2= bsout to distributor
+;
+ss1	sta $f8
+ss0	bit $fa		; check sa, V an bei sa= 3 oder 5
+	bvc color
+;
+nbmpbl	ldx #32		; 3/5: 32 pages (bitmap)
+	lda $b5		; Hi-Byte Bitmap ($e0 oder gePOKEt)
+	jsr bloop		; Bitmap Subr. an $9efe
+	bne ss5		; Status: Fehler?
+	bit $fa
+	bmi ss5		; nur Bitmap? (wenn sa=3)
+;
+color	lda $f7		; nein, $04 (bei Text), $c0 (bei Grafik) oder gePOKEt
+	sta $fc
+nvrbl	ldx #4		; Anzahl Pages
+;
+col	lda ($fd),y	; Farb-RAM
+skipcr	jsr distr		; process
+	sta ($fd),y	; and restore
+	lda ($fb),y	; Video-RAM
+skipvr	jsr distr		; process
+	sta ($fb),y	; and restore
+	iny
+	bne col
+	inc $fc
+	inc $fe
+	dex	    	; count pages
+	beq ss5
+	lda status	; nach 256 Bytes
+	beq col
+
+; -----------------------------------------
+;
+ss5	jsr $ffcc		; clrch
+	lda $b8		; file#
+	jsr $ffc3		; close
+	jmp endsmb
+
+; -----------------------------------------
+;
+distr	jmp ($00f8)
+
+; -----------------------------------------
+;
+-	tax		; hibyte (to $b5)
+	bit $fa
+	bvs +   		; V-Flag = 1: Grafik
+	bvc ++		;          0: Text
+
+; -----------------------------------------
+;
+intro	jsr scrsvplus	; new: check for enhanced params
+	jsr safeopen
+	ldy #$00
+	sty $fb		; fb/fc: 0400/c000/e000
+	sty $fd 		; fd/fe: d800
+	lda $b9		; sa: 2 (lores) or 3 or 5 (hires bitmap, hires+color):
+	ror
+	ror
+	ror	    	; Flags N/V: 10 (2) - 11 (3) - 01 (5)
+	sta $fa 		; set saflag
+;   			(change $b218 for 2K charsets, 2nd half)
+cramhi	lda #$d8		; $d800
+	sta $fe
+;  			(change $b21c to $cc for videoram after MEM!)
+vramhi	lda #$04		; videoram text merken für Startadresse
+	bne - 		; uncond. branch
+;  			(change $b220 for any 8K RAM area)
+bmphi
++	ldx #$e0		; default start address Hires
+	lda #$c0		; Videoram bei Hires
+++	sta $f7 		; merken
+	lda #$ff		; Verteiler Hibyte
+	sta $f9		; (an $00f8): $ff(cf/d2)
+	rts
+
+; -----------------------------------------
+;
+chkfchlen	jsr sgetbytc	; get len
+	cpx #89		; too long?
+	bcc bend
+	jmp err0e		; yes: illegal quantity
+
+; ----------------------------------------- Part of SCRSV/SCRLD
+; by Peter Hagemann
+bloop	sta $fc
+bl	sei
+	lda #$34		; RAM unter Kernal ein
+	sta pport
+	lda ($fb),y
+	pha
+	lda #$36		; Kernal ROM ein
+	sta pport
+	cli
+	pla
+;
+ss2	jsr distr
+	sta ($fb),y
+	iny
+	bne bl
+;
+ss3	inc $fc
+	dex 		; count pages
+	beq bend
+	lda status
+	beq bl
+;
+bend	rts
+
+; ----------------------------------------- RESTORE for SCRLD/SCRSV
+; by P. Hagemann
+scrsvrst	ldx #4
+	stx vramhi+1	; vram back to $0400
+	stx nvrbl+1	; 4 pages
+	ldx #$e0		; bitmap start at $e000
+	stx bmphi+1
+	ldx #$20		; 32 pages
+	stx nbmpbl+1
+	stx skipcr	; $20 = JSR
+	stx skipvr
+	stx skipslo
+	stx skipshi
+	jmp leave1	; finish
+
+scrsvplus	jsr chrget	; DEF follows?
+	cmp #$8c		; Token for RESTORE?
+	beq scrsvrst
+	cmp #$96		; Token for DEF?
+	bne bend
+
+; ----------------------------------------- DEF after SCRLD/SV
+; by P. Hagemann
+defscrsv	jsr sgetbytn
+	stx helpvec	; Hibyte Ziel nach helpvec
+	jsr sgetbytc	; Anzahl Pages in helpvec+1
+	stx helpvec+1
+
+	jsr gyf0		; get mode and sa
+	ldx helpvec	; 1st par 0? (yes, don't set anything)
+	beq leave2
+	ldy helpvec+1
+	lda $f7		; sa: in $f7
+	ror		; 2 or 3/5 ?
+	bcs +		; odd?
+
+	stx vramhi+1	; even: Hibyte bei sa 2
+	sty nvrbl+1	; Pages
+	jmp ++		; unbed. Sprung
+
++	stx bmphi+1	; odd: Hibyte bei 3/5
+	sty nbmpbl+1	; Pages
+
+++	ldx ey		; Modus: 0,1,2
+	beq leave2	; Modus 0: nix ändern
+	lda #$2c		; sonst BIT schreiben
+	sta skipcr	; BIT: Colorram übergehen => nur Videoram
+	dex		; Modus 1: mit Startadresse
+	beq leave2	; Sonst (Modus >= 2)
+	sta skipslo	; BIT: ohne Startadresse
+	sta skipshi
+
+leave2	jsr dec7a
+leave1	pla
+	pla
+	pla
+	pla
+	jmp bef0
+
+; -----------------------------------------
+;
+; Section 7: Sprite Handling
+;
+; -----------------------------------------
+
+; ----------------------------------------- bef MMOB
+;
+befmmob	jsr getx8n	; get sprite number (0..7)
+	stx mobnr2
+	stx mobnr
+	asl mobnr2	; and as index into registers
+	jsr schkcom
+	jsr dec7a
+	jsr setmobpos	; get start/target position and size
+	beq mmba
+;
+mobcont	ldy mobnr		; with mob number:
+	jsr chkexp	; get (/set) sprite size (keeps .y)
+	jsr setspeed	; get (/set) mob speed and:
+
+mmba	lda #$f0		; (set mob flag)
+	sta mobbew
+	jsr mobbeweg	; -> move mob
+	sta mobbew	; (clear mob flag)
+	jmp endsmb
+
+; -----------------------------------------
+;
+chkexp	lda mobsztab,y	; mob size in .a
+	bne mmb1
+
+mmb0	jsr mobexl	; 0: not expanded
+-	jmp mobeyl
+
+mmb1	cmp #1		; 1: x-expanded
+	bne mmb2
+	jsr mobexs
+	bne -
+
+mmb2	cmp #2		; 2: y-expanded
+	bne mmb3
+	jsr mobeys
+	jmp mobexl
+
+mmb3	jsr mobexs	; 3: x-y-expanded
+	jmp mobeys
+
+; -----------------------------------------
+;
+mobexs	lda $d01d
+	ora mbittabs,y
+	bne +
+
+mobeys	lda $d017
+	ora mbittabs,y
+	bne ++
+
+mobexl	lda $d01d
+	and mbittabl,y
++	sta $d01d
+	rts
+
+mobeyl	lda $d017
+	and mbittabl,y
+++	sta $d017
+	rts
+
+; -----------------------------------------
+;
+setmobpos	jsr getxy		; get start position
+	jsr chrgot
+	beq +
+smp2	lda #$60		; patch!
+	sta getpktf
+	jsr getxyf	; get target position
+	lda #$20		; unpatch!
+	sta getpktf
+	ldy mobnr
+	sty $aa
+
+; ----------------------------------------- get/set mobsize
+;
+gpf2	ldx mobsztab,y	; get current mobsize
+	jsr gnextpar	; get new one to .x (or keep .x and skip)
+	php		; save result (of gnextpar)
+	txa		; .x=mobsize
+	ldy $aa
+	sta mobsztab,y	; store individual mobsize
+	plp
++	rts
+
+; -----------------------------------------
+;
+setspeed	jsr gmspeed	; mobnr in .y (from MOB SET, MMOB and RLOCMOB)
+	ldy $aa
+	txa
+	sta mobsptab,y
+	rts
+
+; -----------------------------------------
+;
+mobposs	ldy $aa
+	lda mobsptab,y
+	sta helpvec
+	ldx #0
+mmb6	cpx helpvec	; first slowdown
+	beq mmb5
+	inx
+	ldy #0
+mmb7	cpy #10
+	beq mmb6
+	iny
+	bne mmb7
+
+mmb5	ldy mobnr2
+	lda $09		; x position lo
+	sta $d000,y
+
+	lda $d010
+	ldx mobnr
+	ldy $0a		; x position hi > 256?
+	beq mmb8
+	ora mbittabs,x	; yes, set accordingly
+	bne +
+mmb8	and mbittabl,x
++	sta $d010
+	lda $a4		; and now y position
+	ldy mobnr2
+	sta $d001,y
+	rts
+
+; ----------------------------------------- Part of LINE (uses mobbew!)
+;
+linzei	clc
+	lda ax
+	sbc xmaxlow
+	lda ax+1
+	sbc xmaxhigh
+	bcc +
+	lda xmaxlow
+	sta ax
+	lda xmaxhigh
+	sta ax+1
++	clc
+	lda ex
+	sbc xmaxlow
+	lda ex+1
+	sbc xmaxhigh
+	bcc +
+	lda xmaxlow
+	sta ex
+	lda xmaxhigh
+	sta ex+1
++	lda ay
+	cmp #$c7		; 199?
+	bcc +
+	lda #$c7		; no, now 199
+	sta ay
++	lda ey
+	cmp #$c7
+	bcc mobbeweg
+	lda #$c7
+	sta ey
+
+; ----------------------------------------- Move a MOB (or draw a LINE)
+;
+mobbeweg	lda #0
+	sta ydiff
+	sta ay+1
+	sta ey+1
+	sta ydiff+1
+	sta helpvc2
+	sta helpvc2+1
+;
+vloop	lda ax
+	sta $09
+	lda ax+1
+	sta $0a
+	lda ay
+	sta $a4
+	lda ay+1
+	sta $a5
+	lda mobbew	; mmob or line?
+	cmp #$f0
+	bne +
+	jsr mobposs	; mmob
+	jmp vergl
+
++	jsr punkt		; line
+;
+vergl	lda helpvc2
+	ora helpvc2+1
+	beq +
+;
+vergl1	jsr ynext
+	jmp vloop
+
++	jsr cmpax
+	bne diff
+	jsr cmpay
+	beq +
+	jsr ynext
+	jmp vloop
++	rts
+
+; -----------------------------------------
+;
+diff	sec
+	lda ey
+	sbc ay
+	tay
+	lda ey+1
+	sbc ay+1
+	pha
+	tya
+	pha
+	bcs +
+	pla
+	pla
+	sec
+	lda ay
+	sbc ey
+	tay
+	lda ay+1
+	sbc ey+1
+	pha
+	tya
+	pha
++	clc
+	pla
+	adc ydiff
+	sta ydiff
+	pla
+	adc ydiff+1
+	sta ydiff+1
+	sec
+	lda ex
+	sbc ax
+	tay
+	lda ex+1
+	sbc ax+1
+	pha
+	tya
+	pha
+	bcs +
+	pla
+	pla
+	sec
+	lda ax
+	sbc ex
+	tay
+	lda ax+1
+	sbc ex+1
+	pha
+	tya
+	pha
++	pla
+	sta xdiff
+	pla
+	sta xdiff+1
+	lda #0
+	sta helpvc2+1
+;
+-	sta helpvc2
+	sec
+	lda ydiff
+	sbc xdiff
+	tay
+	lda ydiff+1
+	sbc xdiff+1
+	pha
+	tya
+	pha
+	bcc ++
+	pla
+	sta ydiff
+	pla
+	sta ydiff+1
+	inc helpvc2
+	bne +
+	inc helpvc2+1
++	lda helpvc2
+	jmp -
+;
+++	pla
+	pla
+	jsr cmpax
+	beq +++
+	bcc ++
+	jsr decax
+	jmp +
+
+++	jsr incax
++	lda helpvc2
+	ora helpvc2+1
+	bne +
++++	jmp vloop
+
++	jmp vergl1
+
+; -----------------------------------------
+;
+ynext	lda helpvc2
+	ora helpvc2+1
+	beq cpay
+	lda helpvc2
+	bne +
+	dec helpvc2+1
++	dec helpvc2
+cpay	jsr cmpay
+	beq +
+	bcs decay
+
+; -----------------------------------------
+;
+incay	inc ay		; inc y
+	bne +
+	inc ay+1
++	rts
+
+decay	lda ay		; dec y
+	bne +
+	dec ay+1
++	dec ay
+	rts
+
+incax	inc ax		; inc x
+	bne +
+	inc ax+1
++	rts
+
+decax	lda ax		; dec x
+	bne +
+	dec ax+1
++	dec ax
+	rts
+
+; -----------------------------------------
+;
+cmpax	lda ax+1
+	sta vgla+1
+	lda ax
+	sta vgla
+	lda ex+1
+	sta vgle+1
+	lda ex
+	sta vgle
+	jmp vglae
+;
+cmpay	lda ay+1
+	sta vgla+1
+	lda ay
+	sta vgla
+	lda ey+1
+	sta vgle+1
+	lda ey
+	sta vgle
+	jmp vglae
+
+; ----------------------------------------- bef MOB SET
+;
+befmobset	jsr getx8n	; get sprite number
+	stx $aa
+	lda #$f8
+	sta $a8
+	lda video
+	cmp #$cc		; MEM-Modus?
+	beq ifmem
+	lda gmemflag	; Grafik-Modus?
+	cmp #10
+	bne ifnrm
+ifhires	lda #$c3		; Grafik
+	!by $2c
+ifmem	lda #$cf		; MEM
+	!by $2c
+ifnrm	lda #$07		; NRM
+	sta $a9
+;
+	jsr sgetbytc	; get block number (to .x)
+	txa
+	ldy $aa
+	sta ($a8),y
+;
+msk0	jsr sgetbytc	; get mob color
+	ldy $aa
+	txa
+	sta $d027,y
+;
+	jsr sgetbytc	; get priority
+	stx helpvec	; set activation flag
+	txa
+	ldx $d01b
+	ldy $aa
+	and #1
+	beq +
+
+	txa		; prio 1
+	ora mbittabs,y
+	bne ++
+
++	txa		; prio 0
+	and mbittabl,y
+++	sta $d01b
+;
+	jsr sgetbytc	; get mob type (multi/hires)
+	lda $d01c
+	ldy $aa
+	cpx #1
+	bne +
+
+	ora mbittabs,y	; type 1 (multi)
+	bne ++
++	and mbittabl,y	; type 0 (hires)
+++	sta $d01c
+;
+	jsr gpf2		; get/set mob size (mobnr in .y)
+	ldy $aa		; of MOB nr .y
+	jsr chkexp	; set sprite size (keeps .y)
+	jsr setspeed	; get/set mobspeed
+
+	lda helpvec	; activate MOB? (number in .x)
+	bmi ++		; no if negative
+	ldx $aa
+	inc helpvec	; yes, activate
+	jmp mbo0
+
+; ----------------------------------------- bef CMOB
+;
+befcmob	jsr sgetbytn
+	stx $d025
+	jsr sgetbytc
+	stx $d026
+++	jmp endsmb
+
+; ----------------------------------------- bef RLOCMOB
+;
+befrlocm	jsr getx8n	; get sprite number (0..7)
+	stx mobnr2
+	stx mobnr
+	stx $aa
+	asl mobnr2	; and as index into registers
+	lda $d010		; get xpos hibyte
+	ora mbittabs,x
+	cmp $d010
+	bne +
+	lda #1
+	!by $2c
++	lda #0
+	sta ax+1
+	sta ay+1
+	ldy mobnr2
+	lda $d000,y	; set current xpos as start address
+	sta ax
+	lda $d001,y	; likewise ypos
+	sta ay
+	jsr smp2		; get/set target address (and size)
+	jmp mobcont	; set size and speed
+
+; ----------------------------------------- bef MOB OFF
+;
+befmoboff	jsr chkonoff	; check for ON/ OFF
+	sty helpvec	; .x=0: OFF/.x=10: ON
+	tya		; MOB ohne ON/OFF?
+	beq mbo0		; ja, skip (.x is mob#)
+	stx helpvec
+	jsr getx8		; get mob# to .x
+mbo0	lda $d015
+	ldy helpvec	; ON or OFF?
+	beq moboff
+	ora mbittabs,x	; ON
+	bne +
+moboff	and mbittabl,x	; OFF
++	sta $d015
+	jmp endsmb
+
+; ----------------------------------------- bef DETECT
+;
+befdetect	jsr sgetbytn
+	stx detectart
+	lda $d01e,x	; no check for 0 or 1 in .x!
+	sta detecterg
+dtno	jmp endsmb
+
+; ----------------------------------------- bef DESIGN
+;
+befdesign	jsr sgetbytn
+	stx $aa		; cset type (0..3)
+	cpx #8
+	bcc +
+	jmp swarm		; error bad mode if not
+
++	lda #0		; init:
+	sta ax		; hight of object (up to 8 or 21)
+	sta ay		; width of object (1 or 3)
+	sta $a6		; index into target
+
+	jsr setdesflg	; set mode and flag
+	jsr sgetadr	; get target address
+	sty $ae
+	sta $af
+
+; ----------------------------------------- main DESIGN loop
+;
+design	ldy #0		; init gather byte
+	sty $a8
+	ldx #0		; init byte line counter (0..7)
+	stx $a9		; index into multi bits (0..3)
+
+	jsr skipline	; find end of basic line
+
+	jsr incbasbz	; proceed:
+	lda (progz),y
+	sta ax+1
+	jsr incbasbz
+	lda (progz),y	; found end of program?
+	ora ax+1
+	beq err2b		; yes, error
+
+	jsr incbasbz	; skip next basic line header
+	jsr incbasbz
+
+; ----------------------------------------- per line loop
+;
+desloop	jsr incbasbz
+	lda (progz),y	; skip "@", .y=0
+	cmp #$40
+	beq desloop
+
+; -----------------------------------------
+; here in .a: first definition sign
+
+	stx $ab		; save .x
+	ldy $aa		; get type
+	beq deshires
+	cpy #2		; type 0 or 2? (hires objects)
+	beq deshires
+;
+desmulti	ldy $a8		; no, multi: get gatherbyte
+	ldx $a9		; get index into multi bits
+	inc $a9		; and increment it for next pass
+	inc $ab		; also normal index (to gain 8 there)
+
+	cmp #$44		; "D"?
+	bne +
+	tya
+	ora destab3,x
+	bne des2
++	cmp #$43		; "C"?
+	bne +
+	tya
+	ora destab2,x
+	bne des2
++	cmp #$42		; "B"?
+	bne +
+	tya
+	ora destab1,x
+	bne des2
+;
+deshires	cmp #$42		; "B"? (color1 pixel)
+	beq des1
+
++	cmp #$2e		; "."? (transparent)
+	beq descont
+	cmp #$20		; " "? (dito)
+	beq descont
+	cmp #$41		; "A"? (dito)
+	beq descont
+;
+err2c	ldx #$2c		; no, error "bad char f. a mob"
+	!by $2c
+err2b	ldx #$2b		; error "too few lines"
+	jmp ($0300)
+;
+des1	lda $a8		; set B-pixels (color1 for MOB SET)
+	ora gbittabs,x
+des2	sta $a8
+;
+descont	ldy #0
+	ldx $ab		; re-get .x
+	jsr usedesflg	; proceed to next line in byte
+	bne desloop
+
+; ----------------------------------------- after line
+;
+	ldy $a6		; get target index
+	lda $a8		; get gathered byte
+	sta ($ae),y	; store to target
+	inc $a6		; increment target index
+	inc ay		; increment width of object
+
+	ldy #0		; reset .y
+	ldx #0		; re-init gather byte
+	stx $a8
+	stx $a9
+
+	lda $aa		; check type
+	cmp #2		; is 2 or 3 (chars)
+	bcs +
+	lda ay		; no, 0 or 1 (mobs)
+	cmp #3		; so: is width=3?
+	beq +
+	jmp desloop	; no, loop
+
+; ----------------------------------------- line finished
+;
++	sty ay		; line finished, init width counter
+	inc ax		; increment object height
+	ldx ax		; get height
+	lda $aa
+	cmp #2		; of char?
+	bcc +
+	cpx #8		; yes, complete?
+	beq ++		; yes
++	cpx #21		; of mob: is height=21?
+	beq ++		; yes, complete
+
+	jmp design	; no, proceed
+
+; ----------------------------------------- object finished
+;
+++	jsr skipline	; finished, find end of basic line
+	jmp endsmb	; and return to interpreter
+
+; -----------------------------------------
+;
+skipline	lda (progz),y	; now find basic line end
+	beq +
+	jsr incbasbz
+	bne skipline
++	rts
+
+; ----------------------------------------- Part of DESIGN
+;
+setdesflg	txa
+	and #4
+	sta helpvec
+	txa
+	and #3
+	sta $aa
+	jmp schkcom
+
+; ----------------------------------------- Part of DESIGN
+;
+usedesflg	inx
+	lda helpvec
+	beq +
+	jsr incbasbz
++	cpx #8
+	rts
+
+; -----------------------------------------
+;
+; Section 8: TSB Graphics commands
+;
+; -----------------------------------------
+
+; ----------------------------------------- bef GRAPHICS
+;
+befgraphics
+	ldx #<namehsg	; load High Speed Graphics
+	ldy #>namehsg
+	jsr loadext
+	bcs +
+	jmp graph0
+
++	jmp iffail1
+
+; -----------------------------------------
+; gap
+	!by 0,0,0,0,0,0,0,0
+	!by 0
+
+; ----------------------------------------- bef HIRES
+;
+befhires	jsr sethiresm	; x-limit: 319 (returns .y=0)
+	sty $a6		; $a6/7: $e000 (bitmap)
+	sty lowcolflag
+	lda #$e0
+	sta $a7
+	jsr g2nsafe	; ca79, get2nyb (farben), even after MEM
+	sta $ac
+
+	lda #0		; clear bitmap
+-	sta ($a6),y
+	jsr inca6a7
+	ldx $a6
+	cpx #$40		; up to $ff3f
+	bne -
+	ldx $a7
+	cpx #$ff
+	bne -
+
+	tay		; .y=0
+	sty multijn
+	jsr nrm01
+	jsr nrm03
+
+;
+	sty lowcolflag	; .y= still 0
+	lda $ac		; clear colors
+setmod	jsr clrhicols
+	jmp endsmb
+
+; ----------------------------------------- bef MOD
+;
+befmod	jsr get2nyb	; get  ink and paper
+	jmp setmod	; and colorize
+
+; ----------------------------------------- Set Hires Mode
+;
+sethiresm	ldy #$01		; x-limit: 319 (hires)
+	sty xmaxhigh
+	lda #$3f
+	sta xmaxlow
+	dey		; .y=0
+	sty multijn	; set hires mode (0)
+	rts
+
+; ----------------------------------------- Clear Hires Colors
+;
+clrhicols	sta $c000,y	; clear video ram (1000 bytes)
+	sta $c0f9,y
+	sta $c1f3,y
+	sta $c2ed,y
+	iny
+	cpy #$fb
+	bne clrhicols
+	rts
+
+; ----------------------------------------- bef MULTI
+;
+befmulti	lda #$2c		; set multi limits
+	sta multijn
+	lda #$9f
+	sta xmaxlow
+	lda #$00
+	sta xmaxhigh
+
+	jsr chkonoff	; check for ON/OFF
+	jsr chrgot	; anything following?
+	beq justmulti
+
+	jsr get2nyb2	; yes, get 2 parameters, returns .y=0
+	jsr clrhicols	; set video ram
+;
+	jsr sgetbytc	; get 3rd parameter
+	txa
+	ldy #$fc
+-	sta $d7ff,y	; set color ram
+	sta $d8f8,y
+	sta $d9f2,y
+	sta $daec,y
+	dey
+	bne -
+	inx		; (never set 3rd param to 255! Turns multi off!)
+;
+justmulti	txa
+	beq +
+	lda #$18		; multi on
+	!by $2c
+
++	lda #$08		; multi off
+	sta $d016
+	jmp endsmb
+
+; ----------------------------------------- bef LOW COL
+;
+beflowcol	jsr get2nyb
+	sta lcfarb12
+	lda #10
+	sta lowcolflag
+	jsr sgetbytc
+	stx lcfarb3
+	jmp endsmb
+
+; ----------------------------------------- bef HICOL
+;
+befhicol	lda #0
+	sta lowcolflag
+	jmp bef0
+
+; ----------------------------------------- bef PLOT
+;
+befplot	jsr getxy
+	jsr getpktf	; col
+	jsr punkt		; set dot
+	jmp endsmb
+
+; ----------------------------------------- bef LINE
+;
+befline	jsr getxyxyf
+line0	jsr linzei
+	jmp endsmb
+
+; ----------------------------------------- bef BLOCK
+;
+befblock	jsr getxyxyf	; get top left and bottom right edges
+	jsr blockzei
+	jmp endsmb
+
+; ----------------------------------------- bef REC
+;
+befrec	jsr getxyxyf	; get x (AX), y (AY), Breite (EX), Höhe (EY) und Farbe ($f7)
+
+	lda ey		; ey retten
+	sta $61
+	lda ay		; ey=ay (und ay retten)
+	sta $62
+	sta ey
+	clc		; ax plus Breite (gleich Endpunkt X) -> 5f/60
+	lda ax
+	pha
+	adc ex
+	sta $5f		; merken Lo
+	sta ex
+	lda ax+1
+	pha
+	adc ex+1
+	sta $60		; merken Hi
+	sta ex+1
+	jsr linzei	; obere Linie (von ax nach ex auf ay) = AB
+;
+	pla
+	tax
+	sta ax+1
+	pla
+	pha
+	sta ax
+	txa
+	pha
+	clc		; ay plus Höhe (gleich Endpunkt Y) -> 61/62
+	lda ay
+	adc $61
+	sta ay
+	sta ey
+	jsr incax
+	jsr linzei	; untere Linie (von ax nach ex auf ay+ey) = DC
+;
+	pla
+	sta ax+1
+	sta ex+1
+	pla		; ex=ax
+	sta ax
+	sta ex
+	jsr chkcrnr	; linke Linie (von ay nach ey auf ax) = AD
+;
+	lda $5f		; ax=ex
+	sta ax
+	sta ex
+	lda $60
+	sta ax+1
+	sta ex+1
+	lda $61		; height=0?
+	beq +
+	dec ey		; no, height minus 1 (to save bottom right corner)
++	jsr chkcrnr	; rechte Linie (von ay nach ey-1 auf ax+ex) = BC
+
+-	jmp endsmb
+
+; -----------------------------------------
+;
+chkcrnr	lda $62		; check if height=0 (returns .e)
+	sta ay
+	jsr cpay
+	jmp linzei	; draw line if not
+
+; ----------------------------------------- bef DRAW TO
+;
+drawto	jsr get10010	; get byte after DRAW token
+	cmp #$a4		; token of TO?
+	bne +		; no, RTS
+
+	pla		; yes, clear stack
+	pla
+	jsr incbasbz	; skip TO
+	jsr gxyf0		; then get ex/ey-end and mode
+	jmp line0		; and draw line
++	rts
+
+; ----------------------------------------- bef DRAW
+;
+befdraw	jsr drawto	; check if DRAW TO (doesn't return if yes)
+	jsr sgetstr	; no, just DRAW, get string
+	stx $ac		; address
+	sta $ad
+	lda $69		; len
+	pha
+	jsr sgetadrc	; comma, x
+	sty drx
+	sta drx+1
+	jsr sgetbytc	; comma?
+	stx dry		; y
+	jsr getpktf	; draw mode
+	pla		; len back
+	sta $5f
+	lda #0
+	sta drstrz
+	lda rotgr
+	sta drgrz
+
+--	sty drstatus
+	stx dryanf
+	ldy drstrz
+	lda ($ac),y
+	cpy $5f
+	beq -
+	iny
+	clc
+	sbc #$2f
+	pha
+	dec drgrz
+	lda drgrz
+	bne +
+	lda rotgr
+	sta drgrz
+	sty drstrz
++	ldx dryanf
+	pla
+	ldy drstatus
+	cmp #9
+	bcs -
+	sta drricht
+	cmp #5
+	bcc +
+	clc
+	sbc #4
++	tax
+	lda drawtabx,x
+	sta drincx
+	lda drawtaby,x
+	sta drincy
+	lda drincx
+	beq +++
+	cmp #$ff
+	bne ++
+	lda drx
+	bne +
+	dec drx+1
++	dec drx
+	jmp +++
+
+++	inc drx
+	bne +++
+	inc drx+1
++++	lda drincy
+	beq ++
+	cmp #$ff
+	bne +
+	dec dry
+	jmp ++
+
++	inc dry
+++	lda drx
+	sta $09
+	lda drx+1
+	sta $0a
+	lda dry
+	sta $a4
+	lda drricht
+	cmp #5
+	bcc +
+	jsr punkt
+	jsr kerromein
++	jmp --
+
+; ----------------------------------------- bef ROT
+;
+befrot	jsr sgetbytn	; get direction: 0=N, 1=NO, ..., 7=NW
+	cpx #8
+	bcc +
+	jmp swarm
++	ldy #0		; get dir indicators:
+	lda tabrot1,x	; positive (if bit set)
+	sta helpvec
+	lda tabrot2,x	; negative (if bit set)
+	sta helpvec+1
+-	lda #0		; init .a to 0
+	rol helpvec+1
+	bcc +		; first: negative?
+	lda #$ff		; yes, set
++	rol helpvec
+	bcc +		; second: positive?
+	ora #1		; yes, set
++	sta drawtabx,y	; store result
+	iny		; until 8 dir values
+	cpy #8
+	bcc -
+	jsr sgetbytc	; get step width
+	stx rotgr
+	jmp endsmb	; finished
+
+; ----------------------------------------- bef CIRCLE
+;
+befcircle	jsr incbasbz
+	lda #0
+	sta drehsinn
+	sta ueberdreh
+	sta $a8		; startwinkel 0°
+	sta $a9
+	sta winksw+1	; schrittweite (hi) 0
+	jsr sgetadr
+	sty kmx		; mittelpunkt
+	sta kmx+1
+	jsr sgetbytc
+	stx kmy
+	lda #$68		; endwinkel 360°
+	sta $ac
+	lda #$01
+	sta $ad
+	lda #12		; schrittweite (lo) 12
+	sta winksw
+	jsr getrxryf
+	jmp endsmb
+
+; ----------------------------------------- bef CHAR
+;
+befchar	jsr getxy		; get X/Y position
+	jsr sgetadrc	; get screen code to $ac/d
+	sty $ac
+	sta $ad
+	ldx #1		; preset: 1
+	jsr getpktf	; get mode to $f7
+	ldx #1		; preset: 1
+	jsr gnextpar	; get zoom (never use 0!)
+	stx chgr
+	jsr charzei	; write char
+	jmp endsmb
+
+; ----------------------------------------- bef TEXT
+;
+beftext	jsr getxy		; get X/Y
+	jsr schkcom	; get string (address in $20/$21, len in $69 and helpvec)
+	jsr sgetstr
+	sta $21
+	stx $20
+	lda $69
+	sta helpvec
+
+	ldx #1		; preset to 1
+	jsr getpktf	; anything following? yes, get MODE (0=clear, 1=set...) to $f7
+	ldx #1		; preset to 1
+	jsr gnextpar	; anything following? yes, get ZOOM factor (.x to $cb6e)
+	txa
+	bne +
+	inx
++	stx chgr
+	ldx #8		; preset to 8
+	jsr gnextpar	; anything following? yes, get KERNING (.x to $c644)
+	stx krx		; .y=0
+
+	jsr textit	; write text
+
+	jmp endsmb	; until finished
+
+; -----------------------------------------
+
+textit	ldy #0
+	sty schrart	; preset textmode
+	sty $6a		; init rvs flag
+	beq txtst		; uncond. branch, any text ?
+
+txloop	lda $a4		; (loop:) yes, save Y...
+	pha
+	lda $09		; X...
+	pha
+	lda $0a
+	pha
+	lda chgr		; and ZOOM
+	pha
+
+	lda ($20),y	; get char from string (.y: index into string)
+
+	cmp #$12		; rvs on?
+	beq +
+	cmp #$92		; rvs off?
+	bne ++
+	lda #0		; no
+	!by $2c
++	lda #$80		; yes
+	sta $6a		; so set rvs flag
+	jmp txcont1	; and get next char
+
+++	tax		; ctrl a (upper-graph)?
+	dex
+	beq +		; yes, flag is already set
+	dex 		; ctrl b (upper-lower)?
+	bne ++		; no, is any char
+	ldx #1		; yes, set flag to 1
++	stx schrart
+	jmp txcont1	; and get next char
+
+++	cmp #$ff		; PI?
+	bne +
+	lda #$5e		; bcode for PI
+	bne txl1
+
++	cmp #$60		; just a char: convert to bcode
+	bcc +
+	and #$7f
+	ora #$40
+	bne txl1
++	and #$3f
+
+txl1	eor $6a		; care for RVS
+	sta $ac
+	lda schrart	; care for mode (1= 2nd part of charset)
+	sta $ad
+	tya		; save string index .y
+	pha
+	jsr charzei	; output char
+	pla
+	tay		; get .y back
+
+txcont0	ldx #0		; flag for ctrl codes (0: inc X)
+	!by $2c
+txcont1	ldx #1		; (1: yes, ctrl code, don't inc)
+
+	pla		; reget ZOOM...
+	sta chgr
+	pla		; X...
+	sta $0a
+	pla
+	sta $09
+	pla		; and Y
+	sta $a4
+	txa		; get ctrl code flag
+	bne +
+
+	clc		; set, so skip to next X position
+	lda $09
+	adc krx		; add kerning to X
+	sta $09
+	bcc +
+	inc $0a
+
++	iny 		; proceed to next char in string
+txtst	cpy helpvec
+	bne txloop
+	rts		; finished
+
+; -----------------------------------------  set pixel colors
+;
+-	lda #$08		; Koordinate nicht plausibel
+	sta status
+	rts
+
+; -----------------------------------------
+;
+punkt	clc
+	lda $09		; Check auf plausibel
+	sbc xmaxlow	; x>319?
+	lda $0a
+	sbc xmaxhigh
+	bcs -		; ja, Fehler
+	lda $a4		; y>199?
+	cmp #200
+	bcs -		; ja, Fehler
+
+	lda multijn	; multi mode?
+	beq +
+	asl $09		; yes, double x
+	rol $0a
++	lda $09
+	and #$07
+	tax		; .x will be used in setdots (below)
+	lda $a4		; y AND 7 (rasterline in tile)
+	and #$07
+	sta $63
+	lda $09		; x AND 248
+	and #$f8
+	sta $09
+
+	lda $f7		; current color
+	cmp #$0b		; 11=test (if yes, skip farbset)
+	beq +
+	lda lowcolflag	; LOW COL active? (no, then skip farbset)
+	beq +
+	lda gflag		; BLOCK active? (yes, then skip farbset)
+	bne +
+
+	lda $a4		; save y-pos
+	pha
+	lda $09		; save x-pos
+	pha
+	lda $0a
+	pha
+	jsr farbset	; colorize
+	pla
+	sta $0a		; restore x-pos
+	pla
+	sta $09
+	pla
+	sta $a4		; restore y-pos
+
++	lda $a4		; compute address
+	lsr
+	lsr
+	lsr
+	pha
+	and #3
+	tay		; y-pos/8
+	clc
+	lda gadrtabl,y
+	adc $63
+	adc $09
+	sta $a8
+	pla
+	tay
+	lda gadrtabh,y
+	adc $0a
+	sta $a9
+	ldy #0
+	sty status
+	jsr kerromaus	; kernal off
+	lda gflag		; BLOCK active?
+	beq +		; no, set dots
+	rts		; yes, leave
+
+; ----------------------------------------- set dots
+;
++	lda multijn	; now set dots, hires?
+	beq sethires
+	jmp setmulti	; no, go to multi (9a7a)
+
+; ----------------------------------------- set hires dots
+;
+sethires	lda $f7		; hires, get color source
+	beq herase
+	cmp #1
+	beq hset
+	cmp #2
+	beq hinvert
+	jmp ptest1
+
+;
+hset0	inx		; inx: for multi double pixels
+hset	lda ($a8),y
+	ora gbittabs,x
+	sta ($a8),y
+	rts
+
+;
+herase0	inx
+herase	lda ($a8),y
+	and gbittabl,x
+	sta ($a8),y
+	rts
+
+;
+hinvert0	inx
+hinvert	lda ($a8),y
+	eor gbittabs,x
+	sta ($a8),y
+	rts
+
+; ----------------------------------------- set multi dots
+;
+setmulti	lda $f7		; color src 0?
+	bne +
+
+	jsr herase	; 0: clear double pixel
+	bne +++		; uncond. branch
+
++	cmp #1		; 1?
+	bne +
+	jsr herase	; clear left, set right pixel
+	jmp ++
+
++	cmp #2		; 2?
+	bne +
+	jsr hset		; set left, clear right pixel
++++	jsr herase0
+	inx
+	rts
+
++	cmp #3		; 3?
+	bne +
+	jsr hset		; set double pixel
+++	jsr hset0
+	inx
+	rts
+
++	cmp #4		; 4?
+	bne testdot
+	jsr hinvert	; invert double pixel
+	jmp hinvert0	; (no inx?)
+;
+testdot	lda ($a8),y	; no, is 11 (test)
+	and gbittabs,x
+	beq +
+	lda #2
+	sta status	; result in status, bits 0 and 1
++	inx
+tdot0	lda ($a8),y
+	and gbittabs,x
+	beq +
+	inc status
++	rts
+
+; -----------------------------------------
+;
+farbset	jsr kerromein
+	lda $09		; (x-pos)/8 ( -> Kacheloffset in Zeile )
+	lsr
+	ror $0a
+	ror $09
+	lda $09
+	lsr
+	ror $0a
+	ror $09
+	lda $09
+	lsr
+	ror $0a
+	ror $09
+	lsr $a4		; (y-pos)/8...
+	lsr $a4
+	lsr $a4
+	jsr a4mal40	; mal 40 (Start der Kachelzeile)
+
+	clc		; Start plus Offset = Kacheladresse
+	lda $a4
+	adc $09
+	sta $a8
+	lda $a5
+	adc $0a
+	sta $a9
+	sta $ab
+;
+	clc		; Low Col: Farben 1 und 2
+	lda $a9
+	adc #$c0		; nach $c000
+	sta $a9
+	ldy #0
+	lda lcfarb12
+	sta ($a8),y
+
+	lda lcfarb3	; Low Col: Farbe 3
+	bmi +		; (>127? dann nichts tun)
+	pha
+	clc
+	lda $ab
+	adc #$d8		; nach $d800
+	sta $a9
+	pla
+	sta ($a8),y
++	rts
+
+; ----------------------------------------- BLOCK in Hires Mode
+;
+blockzei	ldx ay		; exchange x and y of top left edge...
+	lda ax
+	sta ay
+	stx ax
+	ldx ay+1
+	lda ax+1
+	sta ay+1
+	stx ax+1
+	lda ay+1
+	sta $0a
+	lda ax+1
+	sta $a5
+	lda ay
+	sta $09
+	lda ax
+	sta $a4		; ...done
+	lda #$ff		; set flag: don't colorize,
+	sta gflag
+;
+	jsr punkt		; just check if x/y-values are plausible
+			; and compute address
+	lda #0
+	sta gflag		; reset flag
+	lda status
+	cmp #8
+	bne +
+	jmp swarm		; error: bad mode (not plausible)
+;
++	sec
+	lda $a8
+	sbc $63
+	sta $a8
+	lda $a9
+	sbc #0
+	sta $a9
+	clc
+	lda ay
+	sta $09
+	lda ay+1
+	sta $0a
+	lda ax
+	sta $a4
+	lda $a8
+	sta $aa
+	lda $a9
+	sta $ab
+	lda multijn	; in multi?
+	beq +
+	jmp mblock	; yes
+--
++	lda $09
+	sta $6f
+	and #7
+	tax
+	lda $0a
+	sta $70
+	jmp +
+-	lda $09
+	and #7
+	tax
+	bne +
+	jsr a8plus8
++	lda $a4
+	and #7
+	tay
+	jsr kerromaus
+	jsr sethires
+	inc $09
+	bne +
+	inc $0a
++	lda $0a
+	beq +
+	lda $09
+	cmp #$40
+	bcs ++
++	lda $0a
+	sta vgla+1
+	lda $09
+	sta vgla
+	lda ex
+	sta vgle
+	lda ex+1
+	sta vgle+1
+	jsr vglae
+	beq -
+	bcc -
+++	jsr plus320
+	cmp #$c8		; 200?
+	bcs +
+	cmp ey
+	beq --
+	bcc --
++	rts
+
+; ----------------------------------------- BLOCK in Multi Mode
+;
+mblock	lda #$9f		; multi BLOCK
+	cmp ex		; 159? (horiz max multi)
+	bcs +
+	sta ex		; yes, delimit
++	lda #$c7
+	cmp ey		; 199? (vert max)
+	bcs +
+	sta ey		; yes, delimit
++	lda $09
+	sta $6f
+	and #3
+	asl
+	tax
+	jmp mbl0
+;
+-	lda $09
+	and #3
+	asl
+	tax
+	bne mbl0
+	jsr a8plus8
+;
+mbl0	lda $a4
+	and #7
+	tay
+	jsr kerromaus
+	jsr setmulti
+	inc $09
+	lda $09
+	cmp #$a0		; 160?
+	bcs +
+	cmp ex
+	bcc -
+	beq -
++	jsr plus320
+	cmp ey
+	beq mblock
+	bcc mblock
+	rts
+
+; ----------------------------------------- bef ANGL
+;
+befangl	jsr sgetadrn	; get center x
+	sty kmx
+	sty ex
+	sta kmx+1
+	sta ex+1
+	jsr sgetadrc	; get center y
+	sty kmy
+	sty ey
+	sta kmy+1
+	sta ey+1
+	jsr sgetadrc	; get Winkel in Grad
+	sty $a8
+	sta $a9
+	jsr sgetbytc	; get radius x
+	stx krx
+	jsr sgetbytc	; get radius y
+	stx kry
+	jsr getpktf	; get mode
+;
+doarc	lda #$0a		; set flag for ANGLE
+	sta $21
+	jsr kreis1	; draw radius
+	jmp endsmb	; finished
+
+; ----------------------------------------- bef ARC
+;
+befarc	jsr arc1
+	lda strz1
+	sta $a8
+	lda strz2
+	sta $a9
+	jmp doarc
+
+; -----------------------------------------
+;
+arc1	jsr incbasbz
+	lda #0
+	sta drehsinn
+	sta ueberdreh
+	jsr sgetadr	; get center x
+	sty kmx
+	sta kmx+1
+	jsr sgetadrc	; get center y
+	sty kmy
+	jsr sgetadrc	; get start angle
+	sty $a8
+	sta $a9
+	jsr sgetadrc	; get end angle
+	sty $ac
+	sta $ad
+	jsr sgetadrc	; get angle step
+	sta winksw+1
+	sty winksw
+
+	lda $a9
+	sta vgla+1
+	lda $a8
+	sta vgla
+	lda $ad
+	sta vgle+1
+	lda $ac
+	sta vgle
+	jsr vglae
+	bcc +
+	lda drehsinn
+	eor #$0a
+	sta drehsinn
+	ldx $ac
+	ldy $ad
+	lda $a8
+	sta $ac
+	lda $a9
+	sta $ad
+	stx $a8
+	sty $a9
++	lda $ac
+	sta strz1
+	lda $ad
+	sta strz2
+
+getrxryf	jsr sgetbytc	; get radius x
+	stx krx
+	jsr sgetbytc	; get radius y
+	stx kry
+	jsr getpktf	; get mode
+;
+kreis	lda #$13		; draw
+	sta $21
+	jsr kreis1
+	inc $21
+
+; -----------------------------------------
+;
+kreis1	lda $a8		; save angle
+	pha
+	lda $a9
+	pha
+	jsr a8a9div90	; which quadrant?
+	jsr sinmalkrx	; get x
+	sty $aa
+	sta $ab
+	jsr cosmalkry	; get y
+	sty $ae
+	sta $af
+	jsr pkber		; compute start pos
+	lda $ae
+	sta ay
+	lda $aa
+	sta ax
+	lda $ab
+	sta ax+1
+
+	lda ax
+	pha
+	lda ay
+	pha
+	lda ax+1
+	pha
+
+	lda $21		; operation flag: $0a= ANGLE
+	cmp #$13		; $13/$14= CIRCLE/ARC
+	beq +
+	jsr linzei	; when $13: skip draw line
+	jsr kerromein
+
++	pla		; move start pos to end pos
+	sta ex+1
+	pla
+	sta ey
+	pla
+	sta ex
+	pla		; restore angle
+	sta $a9
+	pla
+	sta $a8
+
+	lda $21		; CIRCLE/ARC: 1st pass?
+	cmp #$14
+	beq +
+	rts		; yes, return for 2nd pass
+
++	lda drehsinn	; no, do all other passes
+	cmp #$0a		; turning left/right?
+	bne +
+
+	sec		; turning left:
+	lda $a8		; update angle (angle minus step)
+	sbc winksw
+	sta $a8
+	lda $a9
+	sbc winksw+1
+	sta $a9
+	bcs ++
+
+	lda #$0a		; if below 0: set 360
+	sta ueberdreh
+	lda #$68		; 360°
+	sta $a8
+	lda #1
+	sta $a9
+	jmp ++
+
++	clc		; turning right:
+	lda $a8		; update angle (angle plus step)
+	adc winksw
+	sta $a8
+	lda $a9
+	adc winksw+1
+	sta $a9
+
+++	sta vgla+1	; reached end angle?
+	lda $a8
+	sta vgla
+	lda $ad
+	sta vgle+1
+	lda $ac
+	sta vgle
+
+	lda drehsinn
+	cmp #$0a
+	bne +
+	jmp kreis2	; compare if turning left
+
++	jsr vglae		; compare if turning right
+	beq +
+	bcc +
+	rts
+-
++	jmp kreis1	; loop
+
+; -----------------------------------------
+;
+kreis2	jsr vglae
+	beq -
+	bcs -
+	lda ueberdreh
+	cmp #$0a
+	bne -
+	rts
+
+; -----------------------------------------
+;
+cosmalkry	jsr a8a9bogm
+	jsr scos
+	jsr sfacarg
+	lda kry
+	jmp scm0
+;
+sinmalkrx	jsr a8a9bogm
+	jsr ssin
+	jsr sfacarg
+	lda krx
+;
+scm0	sta $63
+	lda $a9
+	sta $62
+	jsr scflp
+	jsr sfmult
+	jmp sfacadr
+
+; -----------------------------------------
+;
+pkber	lda $20		; quadrant 0 (N->E)
+	bne +
+	jsr kmyminus
+	jmp kmxplus
+;
++	cmp #1		; quadrant 1 (E->S)
+	bne +
+	jsr kmyplus
+kmxplus	clc
+	lda $aa
+	adc kmx
+	sta $aa
+	lda $ab
+	adc kmx+1
+	sta $ab
+	rts
+;
++	cmp #2		; quadrant 2 (S->W)
+	bne +
+	jsr kmxminus
+kmyplus	clc
+	lda $ae
+	adc kmy
+	sta $ae
+	rts
+;
++	jsr kmxminus	; quadrant 3 (W->N)
+kmyminus	sec
+	lda kmy
+	sbc $ae
+	sta $ae
+	bcs +
+	lda #0
+	sta $ae
++	rts
+;
+kmxminus	sec
+	lda kmx
+	sbc $aa
+	sta $aa
+	lda kmx+1
+	sbc $ab
+	sta $ab
+	bcs +
+	lda #0
+	sta $aa
+	sta $ab
++	rts
+
+; -----------------------------------------
+;
+charzei	ldy #0
+	jsr charen0
+	asl $ac		; scr code times 8
+	rol $ad
+	asl $ac
+	rol $ad
+	asl $ac
+	rol $ad
+	clc
+	tya
+	adc $ac		; plus $d000 to ey (address of char)
+	sta ey
+	lda #$d0		; patch!
+	adc $ad
+	sta ey+1
+
+	sty drx		; init drx/ac/ad: = line index
+	sty $ad		; = char size (=1)
+	inc $ad
+	lda #$80
+	sta $ac		; = bit index
+	lda $09		; x to ax
+	sta ax
+	lda $0a
+	sta ax+1
+	lda $a4		; y to ay
+	sta ay
+
+-	ldy drx		; line index (0: 1st line)
+	lda ey		; ey to fe/ff
+	sta $fe
+	lda ey+1
+	sta $ff
+	lda ($fe),y	; get char bit pattern
+	and $ac		; isolate bit
+	beq +
+	jsr punkt		; if bit set: plot
+	jsr kerromein
++	lsr $ac		; proceed bit index
+	inc ax		; inc x
+	bne +
+	inc ax+1
++	lda $ac		; all bits through?
+	bne chz0		; no
+
+	lda #$80		; yes, reset bit index
+	sta $ac
+	clc
+	lda ax		; ax back to start of line
+	sbc #7
+	sta ax
+	lda ax+1
+	sbc #0
+	sta ax+1
+
+	lda $ad		; size matches?
+	cmp chgr
+	bcc +		; no, stay in line
+	inc drx		; yes, inc drx to next line
+	lda #0
+	sta $ad		; init size index to 1
++	inc ay		; inc ay
+	inc $ad		; inc size index
+	lda drx		; all lines through?
+	cmp #8
+	bne chz0
+	jmp charen1	; yes, leave
+
+chz0	lda ax		; ax back to x
+	sta $09
+	lda ax+1
+	sta $0a
+	lda ay		; ay back to y
+	sta $a4
+	jmp -		; loop, next line
+
+; ----------------------------------------- bef PAINT
+;
+befpaint	jsr getxy
+	jsr getpktf
+	stx $66
+
+	lda #11		; test
+	sta $f7
+	jsr punkt
+	lda status	; result (1=set,0=unset)
+	sta $6a
+	cmp $66
+	beq +
+	jsr pnt0
++	jmp endsmb
+
+;
+pnt0	lda ax
+	sta $5c
+	lda ax+1
+	sta $5d
+	lda ay
+	sta $5b
+	lda #1
+	jsr pnt1
+	lda #0
+	sta $f9
+	lda $5b
+	sta pdot
+	tsx
+	stx pstack
+;
+recurs	tsx		; now go!
+	cpx #20		; stack runs low?
+	bcc pntend	; yes, end
+	lda $fd
+	pha
+	lda $fe
+	pha
+	lda $5c
+	pha
+	lda $5d
+	pha
+	lda $5b
+	sta $fd
+	lda pdot
+	sta $fe
+
+--	jsr pnt2
+	bcc pnext
+	jsr pset
+	bcc pnext
+	lda $5b
+	pha
+	lda pdot
+	pha
+-	jsr pset
+	bcc +
+	jsr recurs
+	bcc -
++	pla
+	sta $fe
+	pla
+	sta $fd
+	lda $f9
+	eor #1
+	sta $f9
+	jsr pnt2
+-	jsr pset
+	bcc +
+	jsr recurs
+	bcc -
++	lda $f9
+	eor #1
+	sta $f9
+	jsr pnt2
+	lda $028d		; shift/ctrl/c=?
+	beq --
+
+	ldx pstack	; yes, break
+	txs
+	rts
+
+; -----------------------------------------
+;
+pnext	pla
+	sta $5d
+	pla
+	sta $5c
+	pla
+	sta $fe
+	pla
+	sta $fd
+pntend	rts
+
+; -----------------------------------------
+;
+pset	lda $fd
+	sta $5b
+	lda $fe
+	sta pdot
+--	jsr testfrei
+	bne pnt3
+-	lda $5b
+	beq +
+	dec $5b
+	jsr testfrei
+	beq -
+	inc $5b
++	lda $5b
+	pha
+-	jsr testfrei
+	bne +
+	jsr pset1
+	inc $5b
+	lda $5b
+	cmp #$c8		; 200? (bottom)
+	bne -
++	dec $5b
+	lda $5b
+	sta pdot
+	pla
+	sta $5b
+	cli
+	sec
+	rts
+
+; -----------------------------------------
+;
+pnt3	inc $5b
+	lda pdot
+	cmp $5b
+	bcs --
+	rts
+
+; -----------------------------------------
+;
+pnt2	lda $f9
+pnt1	and #1
+	beq pnt4
+	lda $5c
+	ora $5d
+	beq pnt7
+	lda $5c
+	bne +
+	dec $5d
++	dec $5c
+	sec
+	rts
+
+; -----------------------------------------
+;
+pnt4	lda multijn
+	bne pnt5
+	lda $5d
+	beq pnt6
+	lda $5c
+	cmp #$3f
+	beq pnt7
+
+pnt6	inc $5c
+	bne +
+	inc $5d
++	sec
+	rts
+
+pnt5	lda $5c
+	cmp #$9f
+	bne pnt6
+pnt7	clc
+	rts
+
+; -----------------------------------------
+;
+testfrei	lda $5c
+	ldx $5d
+	ldy $5b
+	sta $09
+	stx $0a
+	sty $a4
+	lda #11		; test
+	sta $f7
+	jsr punkt
+	jsr kerromein
+	lda $66
+	sta $f7
+	lda status
+	cmp $6a
+	rts
+
+; -----------------------------------------
+;
+pset1	lda $5c
+	ldx $5d
+	ldy $5b
+	sta $09
+	stx $0a
+	sty $a4
+	jsr punkt
+	jmp kerromein
+
+; -----------------------------------------
+;
+pdot	!by $36
+pstack	!by $e6
+
+; ----------------------------------------- bef DUP
+;
+befdup	jsr incbasbz
+	jsr sgetadr	; get source x
+	sty ax
+	sta ax+1
+	jsr sgetbytc	; get source y
+	stx ay
+	jsr sgetbytc	; get width
+	stx spaltenanz
+	jsr sgetbytc	; get height
+	stx zeilenanz
+	jsr getxyf	; get target x, y and mode ($f7)
+	jsr sgetbytc	; get zoom factor
+	txa
+	bne +		; at least: 1
+	inx
++	stx chgr		; set zoom factor
+	jsr dupit		; process
+	jmp endsmb
+
+dupit	ldy #0
+	sty helpvec
+	sty helpvec+1
+	sty $ab
+	sty $ac
+	sty $ad
+	lda ax		; save source x
+	sta $c5a4
+	lda ax+1
+	sta $c5a5
+	lda ex		; save target x
+	sta xdiff
+	lda ex+1
+	sta xdiff+1
+	jmp dup1
+
+duploop	inc ay		; inc source y
+	bne dup1
+dup0	inc ax		; inc source x
+	bne dup1
+	inc ax+1
+
+dup1	ldy $f7		; save mode
+	sty $ab
+	ldy #11		; test pixel
+	sty $f7
+	lda ax
+	sta $09
+	lda ax+1
+	sta $0a
+	lda ay
+	sta $a4
+	jsr punkt
+	lda $ab		; restore mode
+	sta $f7
+	lda status	; test result:
+	beq dup2
+	lda ex		; pixel set, so set pixel at target
+	sta $09
+	lda ex+1
+	sta $0a
+	lda ey
+	sta $a4
+	jsr punkt
+	jsr kerromein
+
+dup2	inc helpvec	; zoom x:
+	lda helpvec	; equal to factor?
+	cmp chgr
+	beq dup3
+	jsr incex		; no, inc target x and set 1 more pixel
+	bne dup1
+
+dup3	jsr incex		; yes, advance target x
+	lda #0		; reset zoom counter
+	sta helpvec
+	inc $ac		; inc x-counter
+	lda $ac
+	cmp spaltenanz	; is equal to width?
+	bne dup0		; no, inc source x, set pixels
+
+	lda #0		; yes, reset x-counter
+	sta $ac
+	lda $c5a4		; restore source x
+	sta ax
+	lda $c5a5
+	sta ax+1
+	lda xdiff		; restore target x
+	sta ex
+	lda xdiff+1
+	sta ex+1
+	inc ey		; inc target y
+	inc helpvec+1	; zoom y:
+	lda helpvec+1
+	cmp chgr		; equal to factor?
+	bne dup1		; no, add 1 line
+
+	lda #0		; yes, reset zoom counter
+	sta helpvec+1
+	inc $ad		; inc y-counter
+	lda $ad
+	cmp zeilenanz	; is equal to height?
+	bne +		; no, loop
+	rts		; yes, finished
+
++	jmp duploop
+
+; ----------------------------------------- bef COPY
+;
+befcopy	jsr incbasbz
+	lda xmaxlow	; save current X limit
+	pha
+	lda xmaxhigh
+	pha
+	lda multijn
+	pha
+
+	jsr open14	; open printer and set to hires
+	jsr sethiresm	; returns .y=0
+
+	tya		; init gather byte
+	sta $f8
+;
+cploop	sta $22		; save last Y ordinate (0..200)
+	sta $61		; $61: Y ordinate
+	ldx #6
+-	lda grprntab-1,x	; init printer line
+	jsr bsout
+	dex
+	bne -
+	stx $5f		; init X ordinate (=0)
+	stx $60
+;
+cploop1	lda #160		; X counter (twice 160 = 320 pixels)
+	sta helpvec
+	bne +
+
+--	inc $5f		; inc X, outer scan loop (one row)
+	bne +
+	inc $60
++	lda #7		; rasterline counter (7 needles)
+	sta helpvec+1
+	bne +
+;
+-	inc $61		; inc Y
++	lda $5f		; inner scan loop, feed TSB graphics:
+	sta $09		; set X
+	lda $60
+	sta $0a
+	lda $61		; set Y
+	sta $a4
+	lda #11		; set test value
+	sta $f7
+	jsr punkt		; check: pixel set?
+	jsr kerromein
+	lda status	; if 8 or 0: not set
+	beq +
+	cmp #8		; (8: error)
+	beq +
+	lda $f8		; build gather byte
+	ldy helpvec+1	; get rasterline for set pixel
+	ora gbittabs,y
+	sta $f8		; and gather in $f8
++	dec helpvec+1	; count needles
+	bne -
+
+	lda $f8		; then print gathered byte
+	ora #$80
+	jsr bsout
+	lda #0		; reset gather byte
+	sta $f8
+	lda $22		; reset Y (to 7 rasterlines above)
+	sta $61
+	dec helpvec	; count X
+	bne --
+
+	inc $5f		; reached half of row
+	lda $60		; second time? ($60=1)
+	beq cploop1	; no, continue scan
+	lda $22		; yes, add 7 to Y
+	clc
+	adc #7
+	cmp #$c8		; reached 200?
+	bcc cploop	; not yet, so loop
+
+	lda #$0f		; yes, set mps printer to char mode
+	jsr bsout
+	jsr return
+	jsr sclose	; and close
+
+	pla		; restore X limit
+	sta multijn
+	pla
+	sta xmaxhigh
+	pla
+	sta xmaxlow
+	jmp endsmb	; finished
+
+; ----------------------------------------- bef HRDCPY
+;
+befhrdcpy	jsr open14	; open printer
+	ldx $0288		; set video ram ($cc after MEM!)
+	dex
+	stx $21
+	lda #$d8
+	sta $20
+	ldx #0		; .x counts rows
+	lda #$91		; set upper case chars
+	jsr bsout
+	jsr lineout	; .y=0
+
+hdy1	lda ($20),y	; read char from screen
+	cmp #$ff		; is it PI?
+	beq hdy3		; yes
+	cmp #$80		; is it rvs?
+	bcc hdy0
+	eor #$80		; yes, so:
+	pha
+	lda #$12		; sys send rvs on
+	jsr bsout
+	pla
+hdy0	cmp #$20		; char is upper case or no letter?
+	bcs +
+	ora #$40		; no, make it PETSCII lower
+	bne hdy2
+
++	cmp #$40		; no, is a upper case or a graphic char?
+	bcc hdy2		; no
+	ora #$80		; yes, prepare to print it
+	!by $2c
+hdy3	lda #$de		; this is PI!
+hdy2	cmp #$22		; char is a quote?
+	bne +		; no, print
+	txa		; yes, save .x
+	pha
+	ldx #6
+-	lda quotetab,x	; send graphical bit sequence for quote char
+	jsr bsout
+	dex
+	bpl -
+	pla		; restore .x
+	tax
+	lda #$0f		; send ctrl o (graphics off)
++	jsr bsout
+	lda #$92		; send rvs off
+	jsr bsout
+
+	iny		; then proceed:
+	cpy #40		; one screen row?
+-	bne hdy1
+
+	jsr lineout
+	inx
+	cpx #25		; all rows?
+	bne -		; no, loop
+
+	jsr sclose	; close printer
+	jmp bef0		; finished
+
+; -----------------------------------------
+;
+lineout	ldy #5		; patch to #6 (no line gaps anymore)
+-	lda nline-1,y
+	jsr bsout
+	dey
+	bne -
+	jsr charmode	; change case if lower case is set
+	jmp l20pl40
+
+; -----------------------------------------
+;
+charmode	pha
+	lda $d018		; lower case?
+	cmp #$17
+	bne +
+	lda #$11		; yes, send crsr dwn
+	jsr bsout
++	pla
+	rts
+
+; -----------------------------------------
+;
+; Section 9: Music in TSB
+;
+; -----------------------------------------
+
+; ----------------------------------------- bef MUSIC
+;
+befmusic	jsr sgetbytn
+	stx musicdau	; set tempo (0 isn't caught!)
+	jsr schkcom
+	jsr sgetstr
+	stx musicadr	; set address of notes string
+	sta musicadr+1
+	ldy #0
+	sty musicz1
+	lda $69		; and its length
+	sta musiclen
+	jmp endsmb
+
+; ----------------------------------------- bef PLAY
+;
+befplay	jsr chkonoff
+	txa		; OFF? (or PLAY 0?)
+	beq +		; yes, end music
+
+	lda #10		; set ON
+	sta playflag
+	lda #0		; init music counter
+	sta musicz4
+	cpx #2		; PLAY 2?
+	beq ++		; yes
+	cpx #10		; PLAY ON?
+	beq ++		; yes
+
+			; no, PLAY 1 (PRG waits)
+-	lda playflag	; flag gets cleared in sirqplay (IRQ)
+	cmp #10		; wait until cleared
+	beq -
+
++	jsr playend	; PLAY 0: clear
+++	jmp endsmb	; PLAY 2 or PLAY ON (Basic PRG continues)
+
+; ----------------------------------------- bef ENVELOPE
+;
+befenvelope
+	jsr sgetbytn	; get voice number
+	jsr x123		; (check if in 1..3)
+	stx $a6
+	jsr get2nybc	; get attack and decay values
+	sta $a8
+	jsr get2nybc	; get sustain and release values
+	ldx $a6		; get voice number
+	jsr setsid
+	ldy #6		; .y=index to sust/release register
+	lda $aa		; re-get sustain/release
+	sta ($20),y	; set value to SID
+	sta srtab,x	; and to buffer
+	dey		; index to atck/decay register
+	lda $a8		; re-get attack/decay
+	sta ($20),y	; set value to SID
+	sta adtab,x	; and to buffer
+	jmp endsmb
+
+; ----------------------------------------- bef SOUND
+;
+befsound	jsr sgetbytn	; get voice number
+	jsr chkvoice	; is in 1..4?
+	jsr setsid	; set SID base address
+	jsr sgetadrc	; comma? get frequency value
+	ldy #1
+	jsr optp1		; write to SID
+	jmp endsmb
+
+; ----------------------------------------- bef WAVE
+;
+befwave	jsr sgetbytn	; get voice number
+	jsr x123		; only 1 to 3!
+	stx $aa
+	jsr getpanel
+	jsr bincon	; get switch panel value
+bwv0	ldx $aa		; get voice number
+	jsr setsid	; set $20/1 to SID voice base address
+	ldy #4
+	lda $a8		; set waveform/sync to SID...
+	sta ($20),y
+	ldy $aa
+	sta wavetab,y	; ...and to buffer
+	jsr chrgot	; anything following?
+	beq +
+	jsr optpulse	; yes, get pulse value
++	jmp endsmb
+
+; ----------------------------------------- bef VOL
+;
+befvol	jsr chkonoff
+	stx $d418
+	jmp endsmb	; no, end command
+
+; ----------------------------------------- bef PAGE
+;
+befpage	jsr chkonoff
+	txa		; OFF?
+	beq +++		; yes, set flag
+	cpx #10		; no, ON?
+	bne +		; no, set flag and new value
+
+	lda pagewert	; was ON, get last value
+	bne ++
++	stx pagewert	; was 0: set as new one
+
+++	ldx #10		; set flag
++++	stx pageflag
+	jmp endsmb
+
+; ----------------------------------------- part of WAVE (PULSE parameter)
+;
+optpulse	jsr sgetadrc	; returns .a=hi, .y=lo from INT
+	ldy #3		; index to pulse high
+optp1	sta ($20),y
+	dey
+	lda int
+	sta ($20),y
+	rts
+
+; -----------------------------------------
+;
+setsid	lda mregs,x	; set oscillator address
+	sta $20
+	lda #$d4
+	sta $21
+	rts
+
+; -----------------------------------------
+;
+mstore	dey
+	sta (helpvec),y	; write to adr
+	bne mstore
+	rts
+
+; ----------------------------------------- bef BFLASH
+;
+befbflash	jsr chkonoff	; get first parameter
+	txa		; OFF?
+	beq ++		; yes, switch flag off
+	jsr chrgot	; ON?
+	beq +		; yes, switch flag on
+
+	stx bflashsp	; no, set speed
+	dex
+	stx bflzae	; start flash immediately
+	jsr sgetbytc
+	stx bflashf1	; set color 1
+	jsr sgetbytc
+	stx bflashf2	; set color 2
+
++	lda $d020		; save current border color
+	sta bflashing
+	ldx #10		; switch flag on
+
+++	lda bflashing	; restore border color
+	sta $d020
+
+	stx bflashjn
+	jmp endsmb
+
+; ----------------------------------------- bef CENTRE
+;
+befcentre	jsr gcentpar
+	sec
+	sbc helpvec+2
+	bmi +
+	lsr
+	tax
+	beq +
+
+	lda #$1d		; sys out CRSR right
+-	jsr bsout
+	dex
+	bne -
+
++	ldx helpvec
+	lda helpvec+1
+	stx $22
+	sta $23
+	lda helpvec+2
+	sta $69
+
+-	jmp rtc2		; now sys out string (also: RETRACE!)
+
+; ----------------------------------------- Part of RETRACE
+;
+rtc1	jsr incbasbz
+	bne -		; uncond. branch
+
+; ----------------------------------------- Part of CENTRE
+;
+gcentpar	jsr frominsrt	; get string to be centered
+	stx helpvec	; address
+	sty helpvec+1
+	lda $69		; len
+	sta helpvec+2
+	ldx #40		; 40: width of screen line
+	jsr chrgot	; anything following?
+	beq +
+	jsr sgetbytc	; yes, get new width
++	txa
+	cmp #40		; is (still) 40?
+	bne +		; no, so use that width
+	sbc $d3		; otherwise: subtract pos from 40
++	rts
+
+; ----------------------------------------- bef BCKGNDS
+;
+befbckgnds
+	jsr sgetbytn	; get backgrnd color
+	stx $d021
+	txa		; bit 7 set?
+	bmi +
+
+	lda $d011		; no, activate ECM
+	and #$df
+	ora #$40
+	sta $d011
+	lda $d016		; deactivate multicolor mode
+	and #$ef
+	sta $d016
+
++	jsr sgetbytc	; get 2nd bkgnd
+	stx $d022
+	jsr sgetbytc	; get 3rd bkgnd
+	stx $d023
+	jsr sgetbytc	; get 4th bkgnd
+	stx $d024
+	jmp endsmb
+
+; ----------------------------------------- bef PAUSE
+;
+befpause	jsr chrget
+	bcc ++		; time follows?
+
+	jsr get1str	; no, string first
+	ldy #0		; check length
+-	cpy $69
+	beq +
+	lda ($a9),y	; sys out string
+	jsr bsout
+	iny
+	bne -
++	jsr schkcom	; comma?
+
+++	jsr sgetadr	; get time value to $65/$14
+	jsr chkscolon	; semicolon? (yes, PRINT)
+
+	lda #0		; now pause
+	sta zaesec
+	sta zaeirq
+-	jsr $ffe4		; sys getin keyboard
+; 			; patch here:
+	!by $d0,$0b	; (TSB: bne +)
+			; to $24,$0b:
+			; (SB:  bit $0b)
+	cmp #$0d		; return?
+	beq +		; yes, leave
+	lda zaesec	; check timer
+	cmp int
+	bne -
+
++	jmp endsmb
+
+; ----------------------------------------- bef KEY
+;
+befkey	jsr keyget	; check for KEYGET (doesn't return if successful)
+	bne +		; last byte is delimiter?
+	txa		; yes, set flag
+	eor #10
+	sta keyflag	; (10: tap f-key is off)
+--	jmp endsmb
+;
++	cpx #$11		; more than 16?
+	bcc +
+-	jmp swarm		; yes, bad mode error
+;
++	dex		; parameter after KEY 0?
+	bmi -		; yes, bad mode (### v2.20830)
+	stx $aa		; times 16
+	lda #0
+	asl $aa
+	rol
+	asl $aa
+	rol
+	asl $aa
+	rol
+	asl $aa
+	rol
+	sta $ab
+
+	clc		; plus $c64d (keytab)
+	lda $aa
+	adc #<keytab
+	sta $aa
+	lda $ab
+	adc #>keytab
+	sta $ab
+	jsr schkcom
+	jsr sgetstr	; get string
+	sta $a9
+	stx $a8
+	ldy #0
+-	lda ($a8),y	; and store
+	cmp #$5f		; left arrow?
+	bne +
+	lda #$0d		; yes, replace by cr
++	sta ($aa),y
+	cpy $69
+	beq +
+	iny
+	cpy #16		; max 16 chars
+	bcc -
+	beq --
++	lda #0
+	sta ($aa),y
+	beq --
+
+; -----------------------------------------
+;
+; Section 10: Programmer's Stuff
+;
+; -----------------------------------------
+
+; ----------------------------------------- bef REPEAT
+;
+befrepeat	ldy sprepeat
+	cpy #20
+	bcc +
+err0f	ldx #$0f		; error "overflow"
+	!by $2c
+err29	ldx #$29		; error "until w/o repeat"
+	jmp ($0300)
+
++	lda $7a
+	sta stackrepeat,y
+	iny
+	lda $7b
+	sta stackrepeat,y
+	iny
+	sty sprepeat
+	jmp bef0
+
+; ----------------------------------------- bef UNTIL
+;
+befuntil	jsr incbasbz
+	lda sprepeat
+	cmp #2
+	bcc err29
+;
+	jsr sfrmevl
+	jsr chrgot
+	lda $61
+	beq +
+	dec sprepeat
+	dec sprepeat
+	jmp endsmb
+
++	ldy sprepeat
+	dey
+	lda stackrepeat,y
+	sta progz+1
+	lda stackrepeat-1,y
+	sta progz
+-	jmp bef0
+
+; ----------------------------------------- bef DISABLE
+;
+befdisable
+	lda #0
+	sta onkeyflag
+	beq -		; finish command
+
+; ----------------------------------------- bef EXIT
+;
+befexit	jsr incbasbz
+	jsr chrgot
+	lda #$8b		; IF?
+	jsr schkzei	; (if not: SYNTAX ERROR)
+	jsr sfrmevl	; evaluate
+	lda $61		; true?
+	beq ++
+
++	lda progz		; yes, store basic pz
+	sta $20
+	lda progz+1
+	sta $21
+	lda #$36		; now search for END LOOP
+	sta $22
+	lda #11		; set flag for "not found"
+	sta procnffl
+	ldy #0
+	jsr suchcode1	; (part of CALL)
+
+	lda $20		; branch to found position
+	sta progz
+	lda $21
+	sta progz+1
+	dec sploop	; clear LOOP stack
+	dec sploop
+	tya
+	beq -
+err28	ldx #$28 		; LOOP ERROR (if not found)
+	jmp ($0300)
+
+; ----------------------------------------- bef END PROC
+;
+befendproc
+	ldy spexec
+	cpy #2
+	bcs +
+err26	ldx #$26		; error "end proc w/o exec"
+	jmp ($0300)
+
++	dey
+	lda execstack,y
+	sta progz+1
+	dey
+	lda execstack,y
+	sta progz
+	sty spexec
+-
+++	jmp endsmb
+
+; ----------------------------------------- bef AUTO
+;
+befauto	jsr get10010	; any parameters?
+	beq aut1
+	jsr sgetadr	; yes, get start value...
+	sta autozi+1
+	sty autozi	; and step
+	jsr sgetbytc
+aut1	stx autoinc	; set step
+	lda autozi	; initialize auto (.c=1)
+	sbc autoinc	; (subtract step from start)
+	sta autozi
+	lda autozi+1
+	sbc #0
+	sta autozi+1
+	lda #10		; activate auto
+	sta autoflag
+	bne -
+
+; ----------------------------------------- bef CGOTO
+;
+befcgoto	jsr incbasbz
+cgoto0	jsr sgetadr
+	jsr sgoto1
+	bne ++
+
+; -----------------------------------------
+;
+res0	jsr chrget	; parameters?
+	beq res4		; no
+
+	cmp #$82		; NEXT?
+	beq +
+	jmp cgoto0	; no, goto
+
++	lda errln		; RESUME NEXT
+	ldx errln+1
+	sta int
+	stx int+1
+	jsr sgoto1	; goto errln
+	ldy #5		; skip line header
+	jsr sbzply
+
+; ----------------------------------------- bef PROC
+; 			enhanced
+befproc	jsr flinend	; find end of line
+	beq ++		; end of command (uncond. branch)
+
+; -----------------------------------------
+;
+res4	ldy #0		; RESUME w/o params
+	lda savecont	; proceed where break was
+	ldx savecont+1
+	sta progz
+	stx progz+1
+	lda (progz),y	; at line end?
+	bne res2
+	ldy #5		; yes, skip header of next line
+	!by $24
+res2	iny
+	jsr sbzply
+	jsr srem		; advance to command after break
+++	jmp endsmb	; continue PRG
+
+; ----------------------------------------- bef RESET
+;
+befreset	jsr incbasbz
+	jsr sgetadr
+	sta int+1
+	sta $40		; sys line# DATA
+	sty int
+	sty $3f
+	jsr sstrpz
+	sec
+	lda $5f
+	sbc #1
+	ldy $60
+	bcs +
+	dey
++	sta $41
+	sty $42
+	jmp endsmb
+
+; ----------------------------------------- bef RESUME
+;
+befresume	lda errn		; from ON ERROR?
+	bpl res0		; yes, go there
+
+	lda basbzk+1	; direct mode?
+	cmp #8
+	bcc res3		; yes, leave
+
+	sta progz+1	; no, ON KEY
+	lda basbzk
+	sta progz		; proceed where you came from
+	jsr basromein
+	lda #10
+	sta onkeyflag
+	jmp sintprt0	; now
+
+; ----------------------------------------- bef ON ERROR
+;
+befonerror
+	jsr incbasbz
+	lda progz
+	sta onerrzeig
+	lda progz+1
+	sta onerrzeig+1
+	lda #10
+	sta onerrorflag
+	jsr flinend
+	beq ++		; uncond. branch
+
+swm1	lda $3d
+	ldy $3e
+	sta savecont
+	sty savecont+1
+	rts
+
+; ----------------------------------------- bef NO ERROR
+;
+befnoerr	jsr eck0		; clear on error flag
+	beq res3
+
+; ----------------------------------------- bef LOOP
+;
+befloop	ldy sploop
+	cpy #20
+	bcc +
+	jmp err0f		; error "overflow"
+
++	lda progz
+	sta stackloop,y
+	iny
+	lda progz+1
+	sta stackloop,y
+	iny
+	sty sploop
+res3	jmp bef0
+
+; ----------------------------------------- bef RETRACE
+;
+befretrace
+	lda #<version	; out "ad86"
+	ldx #>version
+	ldy #12
+	sta $22
+	stx $23
+	sty $69
+	jmp rtc1
+
+; ----------------------------------------- bef TRACE
+;
+beftrace	jsr chkonoff
+	stx traceflag
+-
+++	jmp endsmb
+
+; ----------------------------------------- bef END LOOP
+;
+befendloop
+	ldy sploop
+	cpy #2
+	bcs +
+err27	ldx #$27		; error "end loop w/o loop"
+	!by $2c
+err2a	ldx #$2a		; error ": cmd inactive"
+	jmp ($0300)
+
++	dey
+	lda stackloop,y
+	sta progz+1
+	lda stackloop-1,y
+	sta progz
+	jmp bef0
+
+; ----------------------------------------- bef ON KEY
+;
+befonkey	jsr incbasbz
+	jsr sgetstr	; get controlstring
+	sta okstring+1	; address
+	stx okstring
+	ldy $69		; len
+	sty okstrlen
+	jsr srem		; proceed to command after ON KEY
+	lda progz		; save PZ
+	ldy progz+1
+	sta onkeyzeig
+	sty onkeyzeig+1
+	lda #$5d		; set "]" (emergency key) for 1st init
+	sta keyon
+	jsr chkkey	; fake: is in ctrl string?
+	bcs +
+
+	sty onkeypos	; save position (or 0)
++	lda #10
+	sta onkeyflag
+	ldy #0
+	jsr flinend	; skip rest of line
+	beq -
+
+; -----------------------------------------
+;
+onkey1	lda onkeypos	; key pressed?
+	bne +
+	jsr $ffe4		; no, sys get key
+	beq oky0
+	sta keyon		; store key, is in ctrl string?
+	jsr chkonkey	; yes, if .c=0
+	bcs oky0
+
++	lda #0		; found
+	sta onkeyflag
+	lda progz		; save PZ (for RESUME)
+	ldx progz+1
+	sta basbzk
+	stx basbzk+1
+	lda onkeyzeig	; set PZ to ON KEY command
+	ldx onkeyzeig+1
+	sta progz
+	stx progz+1
+
+; -----------------------------------------
+;
+chkkey	lda #0
+	sta onkeypos
+chkonkey	lda okstring	; get on key ctrl string
+	ldx okstring+1
+	sta $20
+	stx $21
+
+	ldy #0
+-	cpy okstrlen	; len
+	beq oky0
+	lda ($20),y	; is key in ctrl string?
+	iny
+	cmp keyon
+	bne -
+	clc		; yes: .c=0
+oky0	rts
+
+; ----------------------------------------- bef SECURE
+;
+befsecure	jsr chkonoff
+	lda #$41		; $41: search code for DISAPA
+	sta $22
+	clc
+	lda $2b
+	adc #$ff
+	sta $20
+	lda $2c
+	adc #$ff
+	sta $21
+	ldy #0
+	jsr suchcode1	; part of EXEC
+-	lda $20
+	bne +
+	dec $21
++	dec $20
+	lda #0
+	sta ($20),y
+	jsr simtok
+	lda #$3a		; ":"
+	sta ($20),y
+	bne -
+
+; ----------------------------------------- bef OFF
+;
+endflash	jsr dec7a
+befoff	ldx #0
+-	lda flashing
+	bmi -
+	stx flashfl
+	txa
+-	sta flashfls,x
+	inx
+	cpx #16
+	bcc -
+	jmp bef0
+
+; ----------------------------------------- bef AT (exchange two strings)
+;
+befat	jsr ateval
+	jmp endsmb
+
+ateval	jsr incbasbz
+	jsr sfrmevl
+	jsr schkstr
+	lda $64
+	sta $f7
+	lda $65
+	sta $f8
+	jsr schkcom
+	jsr sfrmevl
+	jsr schkstr
+	ldy #0
+-	lda ($f7),y
+	sta $f9
+	lda ($64),y
+	sta ($f7),y
+	lda $f9
+	sta ($64),y
+	iny
+	cpy #3
+	bne -
+	jmp schkklz
+
+; ----------------------------------------- bef EXEC
+;
+befexec	lda progz		; save basic pz to stack
+	pha
+	lda progz+1
+	pha
+	jsr srem		; now skip to next command
+			; (to find the return address for END PROC)
+
+	ldy spexec	; EXEC stack full?
+	cpy #20
+	bcc +
+	jmp err0f		; yes, OVERFLOW ERROR
+
++	lda progz		; no, save new basic pz to EXEC stack
+	sta execstack,y	; (return address after END PROC)
+	iny
+	lda progz+1
+	sta execstack,y
+	iny		; and update stackpointer
+	sty spexec
+
+	pla		; restore basic pz (EXEC position)
+	sta progz+1
+	pla
+	sta progz
+
+	ldx execflag	; is an EXEC w/o EXEC?
+	beq befcall
+	jsr dec7a		; yes, basic pz minus 1, then:
+
+; ----------------------------------------- bef CALL
+;
+befcall	jsr basromaus	; switch basic rom off
+	jsr cfreset	; check exec stack (doesn't return if successful)
+
+	jsr setsstart	; set start address for search
+	lda #$31		; search for PROC (code $31)
+	sta $22
+	lda #10		; identify caller routine
+	sta procnffl
+
+search	jsr suchcode	; now search (doesn't return if fail)
+	jsr compare
+	bne search
+
+	jsr fillfast	; successful, now fill fast stack
+
+found	ldy #0		; branch to found position
+	lda $20
+	sta progz
+	lda $21
+	sta progz+1
+	jmp befproc	; and process PROC (skip rest of that line)
+
+; -----------------------------------------
+;
+suchcode	ldy #0
+weiter	jsr inc20
+suchcode1	lda ($20),y	; end of line?
+	beq through
+
+	cmp #$64		; sb token?
+	beq simtok	; yes, check if searchcode
+	cmp #$22		; no, string to follow?
+	bne weiter	; no, continue search
+
+-	jsr inc20		; skip string bytes
+	lda ($20),y	; (next byte: line end?)
+	beq through
+	cmp #$22		; until next quote
+	bne -
+	beq weiter	; then continue search
+
+; -----------------------------------------
+;
+			; SB token found, .y=0
+simtok	jsr inc20		; next byte:
+	lda ($20),y
+	cmp $22		; byte to search for?
+	bne weiter	; no, continue search
+
+; ----------------------------------------- Search Code found
+;
+space	iny		; yes, next byte:
+	lda ($20),y	; is space?
+	cmp #$20
+	bne +
+	jsr inc20		; yes, skip
++	lda ($7a),y	; next byte at caller position:
+	cmp #$20		; is space?
+	bne +
+	jsr incbasbz	; yes, skip
++	dey		; .y=0 again
+	rts		; return to calling command
+			; (CALL, EXIT, SECURE or fastcall)
+
+; -----------------------------------------
+;
+through	ldy #2		; if end of line:
+	ora ($20),y	; is end of program?
+	beq +
+
+	ldx #4		; no, just skip next line header
+-	jsr inc20
+	dex
+	bne -
+	beq suchcode
+
+; -----------------------------------------
+;
++	ldy procnffl	; if end of program:
+	cpy #10		; is call from CALL (or EXEC)?
+	bne +
+
+err21	ldx #$21		; yes, PROC NOT FOUND ERROR
+	stx procnffl
+	dec spexec
+	dec spexec
+	jmp ($0300)
+
++	cpy #11		; or is call from EXIT?
+	beq ++		; yes, continue there (via RTS)
+
+; -----------------------------------------
+;
+compare	iny		; found, now compare labels:
+	lda ($20),y	; at position found
+	beq +
+	cmp (progz),y	; with bytes from call
+	bne ++		; not equal if different
+
++	lda (progz),y	; line end at call?
+	beq ++
+	cmp #$3a		; or ":"? (end of command)
+	bne compare	; eqal if yes
+++	rts		; returns equal/not equal
+
+; ----------------------------------------- part of CALL
+;
+fillfast	ldx prstack	; stack voll?
+	inx
+	beq ++		; ja, keine einträge mehr annehmen
+
+	dex		; sonst: eintragen in stack
+	lda $20
+	sta proctable,x
+	inx
+	lda $21
+	sta proctable,x
+	cpx #$ff		; letzter eintrag?
+	beq +
+	inx		; sonst: zeiger erhöhen
++	stx prstack
+++	rts
+
+; -----------------------------------------
+;
+cfreset	lda #0
+	sta execflag
+
+; ----------------------------------------- part of CALL
+;
+fastcall	ldx prstack	; einträge im labelstack?
+	beq ++		; nein
+	inx		; voll?
+	beq ++		; ja
+
+fast	dex		; nein
+	jsr incbasbz	; pz auf 1. zeichen
+
+m8	dex
+	lda proctable,x	; vektor auf label setzen
+	sta $21
+	dex
+	lda proctable,x
+	sta $20
+	ldy #$ff		; .y=$ff wg. labelvergleich
+	jsr space		; führendes blank überlesen
+	jsr compare	; vergleichen von aufruf und label
+	beq +
+	txa		; alle labels durch?
+	bne m8		; nein, weiter
+	jmp dec7a		; sonst: pz eins zurück, normale suche:
+
++	pla
+	pla
+	jmp found
+
+; -----------------------------------------
+;
+setsstart	clc		; start search at basic start
+	lda $2b
+	adc #3		; skip line header
+	sta $20
+	lda $2c
+	adc #0
+	sta $21
+++	rts
+
+; ----------------------------------------- bef CHECK
+;
+befcheck	lda #>proctable	; set proctable address ($c400)
+	ldy #<proctable
+	sta $21
+	sty $20
+	tya		; clear stack
+-	sta ($20),y
+	iny
+	bne -
+
+	ldx #$ff
+	jsr setsstart	; von programmstart 13
+--	ldy #0
+-	jsr inc20
+	lda $21		; bis variablenstart
+	cmp $2e
+	bne +
+	lda $20		; ende erreicht?
+	cmp $2d
+	beq fsende
++	lda ($20),y	; nein, ist laufendes byte ein tsb token?
+	cmp #$64
+	bne -
+	iny
+	lda ($20),y	; ja, nämlich PROC?
+	cmp #$31
+	bne --		; 30
+
+	inx		; ja, adresse in liste eintragen
+	lda $20
+	clc
+	adc #2
+	sta proctable,x
+	lda $21
+	adc #0
+	inx
+	sta proctable,x
+	cpx #$ff		; liste voll?
+	bne --		; 21
+
+	dex		; ja, flag setzen ($ff)
+
+fsende	inx		; programmende erreicht:
+	stx prstack	; neues prstack setzen
+	jmp bef0		; 8
+
+; ----------------------------------------- bef LIN
+;
+beflin	jsr chkdrv	; is drive present?
+	jsr incbasbz	; yes, you can save
+	jsr del1
+	beq +
+	jsr del5
+	tay
+	beq +
+	jmp swarm		; error bad mode
+
++	lda $58
+	ldx $59
+	sta $c1		; start address for save
+	stx $c2
+;	ldy #0
+	lda ($5a),y
+	tax
+	iny
+	lda ($5a),y
+	stx $ae
+	sta $af
+	stx $fb
+	sta $fc
+	lda ($ae),y
+	sta helpvec+1
+	dey
+	lda ($ae),y
+	sta helpvec
+	lda $ae
+	ora $af
+	bne +
+	sty helpvec
+	sty helpvec+1
+	lda $2d
+	ldx $2e
+	sta $ae
+	stx $af
+	bne ++
++	tya
+	sta ($ae),y
+	iny
+	sta ($ae),y
+	clc
+	lda $ae
+	adc #2
+	sta $ae
+	bcc ++
+	inc $af
+
+++	jsr chrget
+	jsr basromein
+	jsr $e1d4		; sys get params for load/save
+	jsr $f5ea		; sys SAVE
+
+	lda helpvec
+	ora helpvec+1
+	beq bl01
+	ldy #0
+	lda helpvec
+	sta ($fb),y
+	lda helpvec+1
+	iny
+	sta ($fb),y
+bl01	jmp endsmb
+
+; ----------------------------------------- bef D!POKE
+;
+befdpoke	jsr chrget	; skip TSB-Token for d!
+	cmp #$97		; now: POKE?
+	beq + 		; no, return to d!
+	rts
+
++	pla		; yes, remove call from d!
+	pla
+	jsr sgetadrn	; D!POKE: get adr
+	sty helpvec
+	sta helpvec+1
+	jsr schkcom
+	jsr sgetadr2	; get value
+	pha
+	tya
+	ldy #0
+	sta (helpvec),y	; store value to adr
+	pla
+	iny
+	sta (helpvec),y
+	bne bl01		; uncond. branch
+
+; ----------------------------------------- bef D!
+;
+befdelete	jsr befdpoke
+	jsr del1
+	beq +
+	jmp swarm		; error bad mode
+
++	jsr sstrpz	; compute start of bline
+	bcc del3
+	ldy #0
+	lda ($5a),y
+	tax
+	iny
+	lda ($5a),y
+	sta $5b
+	stx $5a
+del3	ldy #0
+-	lda ($5a),y
+	sta ($58),y
+	inc $58
+	bne +
+	inc $59
++	inc $5a
+	bne +
+	inc $5b
++	lda $2d
+	cmp $5a
+	bne -
+	lda $2e
+	cmp $5b
+	bne -
+	lda $58
+	sta $2d
+	lda $59
+	sta $2e
+	jsr sbind
+	jmp delend
+
+; ----------------------------------------- Analyse LIST Parameters for LIN and D!
+;
+del1	lda $2b		; from basic start
+	ldx $2c
+	sta $58
+	stx $59
+	sec
+	lda $2d		; up to var start
+	sbc #2
+	sta $5a
+	lda $2e
+	sbc #0
+	sta $5b
+	ldx #$ff
+	stx int+1
+	jsr chrgot
+	bcc ++
+	cmp #$2d		; "-"?
+	beq +
+-	cmp #$ab		; token "-"?
+	bne del2
++	jsr chrget	; get char
+	bcc del4		; char?
+	bcs -		; token?
+++	jsr sadr2int	; no, digit
+	pha
+	jsr sstrpz
+	lda $5f
+	ldx $60
+	sta $58
+	stx $59
+	pla
+	beq ++
+	ldx #$ff
+	stx int+1
+	cmp #$2d		; "-"?
+	beq +
+	cmp #$ab		; token "-"?
+	bne del2
++	jsr chrget
+	bcs del2
+del4	jsr sadr2int
+	bne del2
+del5	jsr sstrpz
+++	lda $5f
+	ldx $60
+	sta $5a
+	stx $5b
+	cmp $58
+	txa
+	sbc $59
+	bcc +
+	lda #0
+	rts
++	lda #1
+del2	rts
+
+; ----------------------------------------- bef MERGE
+;
+befmerge	jsr incbasbz
+	lda #0		; force LOAD
+	sta $0a
+	jsr merge1	; sys get params for LOAD/SAVE
+	lda $0a
+	ldx $2d		; get start of variables as prg start
+	ldy $2e
+	jsr load
+	bcs +
+	jsr $ffb7		; sys read status
+	and #$bf		; EOF?
+	beq domerge
+	jmp $e19c		; sys yes, load error
++	jmp $e0f9		; sys no, break in...
+
+; -----------------------------------------
+;
+domerge	jsr sbind
+	ldy #1
+	lda ($2d),y
+	beq dom0
+
+	iny
+	lda ($2d),y
+	sta int
+	iny
+	lda ($2d),y
+	sta int+1
+	jsr sstrpz
+	ldy #3
+-	lda ($2d),y
+	sta basinbuf,y
+	dey
+	bpl -
+	ldy #3
+-	iny
+	lda ($2d),y
+	sta basinbuf,y
+	bne -
+	clc
+	iny
+	sty $0b
+	lda $2d
+	sta $5a
+	adc $0b
+	sta $58
+	ldy $2e
+	sty $5b
+	bcc +
+	iny
++	sty $59
+	jsr tsbblcopy
+	lda $31
+	ldy $32
+	sta $2d
+	sty $2e
+	ldy $0b
+	dey
+-	lda basinbuf,y
+	sta ($5f),y
+	dey
+	bpl -
+	bmi domerge
+
+dom0	jmp delend
+
+; ----------------------------------------- bef OPTION
+;
+befoption	jsr chkonoff
+	stx optflag
+	jmp endsmb
+
+; ----------------------------------------- bef LOCAL
+;
+--	jsr incbasbz	; loop for next var
+	bne +
+;
+beflocal	jsr setoff	; set .x to 0
++	txa
+	pha
+	jsr sgetvar	; search variable
+	pla
+	tax
+	lda $5f		; get address
+	sta localtab,x	; and store in LOCALTAB
+	inx
+	lda $60
+	sta localtab,x
+
+	inx		; transfer name of variable to LOCALTAB
+	ldy #0		; so, each LOCAL entry has 4 bytes
+-	lda ($5f),y
+	sta localtab,x
+	inx
+	iny
+	cpy #2
+	bne -
+
+	ldy #0		; hide variable in system table
+	lda #$ff
+	sta ($5f),y
+
+	cpx #84		; buffer filled? (max 21 entries)
+	bcs lcf0		; yes, finish LOCALTAB
+
+	jsr chrgot	; anything following?
+	beq lcf0		; no, finish LOCALTAB
+	cmp #$2c		; comma following?
+	beq --		; yes, next variable
+;
+lcf0	lda #0		; no, set tab terminator ($0000)
+	sta localtab,x
+	inx
+	sta localtab,x
+	jmp endsmb
+
+; -----------------------------------------
+;
+outasc	ldx #0
+-	lda linenum,x
+	beq +
+	jsr bsout
+	inx
+	bne -
++	rts
+
+; -----------------------------------------
+;
+; section 11: Extension Area (from $c000 to $cfff)
+;
+; -----------------------------------------
+
+; -----------------------------------------
+; ----------------------------------------- Screen colors when MEM active/
+; ----------------------------------------- Graphics colors when in graphics mode
+; -----------------------------------------
+; c000
+	!fill 1000,$ad	; graphics or text colors
+	!fill 24		; gap
+
+; -----------------------------------------
+; c400
+proctable	!fill 256		; table area for proc
+
+; -----------------------------------------
+; c500
+	!fill 256		; sb variables
+
+; -----------------------------------------
+; c600
+	!fill 77		; sb variables
+
+; c64d (keytab):
+	!by $50,$41,$47,$45,$32,$33,$0d,$00,$00,$00,$00,$00,$00,$00,$00,$00	; 1:  PAGE23+cr
+	!by $52,$55,$4e,$3a,$0d,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00	; 2:  RUN:+cr
+	!by $4c,$49,$53,$54,$20,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00	; 3:  LIST
+	!by $4c,$4f,$41,$44,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00	; 4:  LOAD
+	!by $44,$55,$4d,$50,$0d,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00	; 5:  DUMP+cr
+	!by $50,$4c,$41,$43,$45,$30,$9d,$00,$00,$00,$00,$00,$00,$00,$00,$00	; 6:  PLACE0
+	!by $45,$52,$52,$4f,$52,$0d,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00	; 7:  ERROR+cr
+	!by $43,$4f,$4c,$4f,$55,$52,$31,$31,$2c,$31,$32,$2c,$30,$0d,$00,$00	; 8:  COLOUR11,12,0+cr
+
+	!by $44,$49,$53,$50,$4c,$41,$59,$0d,$00,$00,$00,$00,$00,$00,$00,$00	; 9:  DISPLAY+cr
+	!by $44,$49,$52,$22,$24,$22,$0d,$00,$00,$00,$00,$00,$00,$00,$00,$00	; 10: DIR"$"+cr
+	!by $46,$49,$ce,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00	; 11: FI+shift n
+	!by $44,$49,$53,$4b,$22,$53,$3a,$00,$00,$00,$00,$00,$00,$00,$00,$00	; 12: DISK"S:
+	!by $0e,$08,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00	; 13: lock lower case chars
+	!by $53,$43,$52,$4c,$44,$20,$31,$2c,$38,$2c,$33,$2c,$22,$00,$00,$00	; 14: SCRLD,$1,8,3,"
+	!by $43,$53,$45,$54,$20,$32,$3a,$00,$00,$00,$00,$00,$00,$00,$00,$00	; 15: CSET,$2:
+	!by $44,$4f,$20,$4e,$55,$4c,$4c,$0d,$00,$32,$00,$00,$00,$00,$00,$00	; 16: DO NULL+cr
+; c74d
+ata	!by $41,$54,$41
+
+; ----------------------------------------- Part of PLACE (for Arrays)
+; c750
+skiparr	ldy #$02
+	clc
+	lda ($5f),y
+	adc $5f
+	tax
+	iny
+	lda ($5f),y
+	adc $60
+	sta $60
+	sta $21
+	txa
+	sta $5f
+	sta $20
+	rts
+
+; -----------------------------------------
+;
+arrdims	jsr klaa		; "("
+	jsr getdims	; dims out
+	jsr klaz		; ")"
+	jsr colo		; ":"
+	jsr return	; cr
+	jmp return	; cr
+
+; -----------------------------------------
+;
+getdims	jsr inc20
+	jsr inc20
+	jsr inc20
+	lda ($20),y
+	sta $0b
+	sta $af
+	asl
+	sta $02
+	ldx #$ff
+	stx helpvec
+-	ldy $02
+	lda ($20),y
+	tax
+	dey
+	lda ($20),y
+	dex
+	cpx #$ff
+	bne +
+	sec
+	sbc #1
++	jsr $bdcd		; sys int out
+	ldy $02
+	ldx $b0
+	inx
+	lda ($20),y
+	sta $02c0,x
+	dey
+	inx
+	lda ($20),y
+	sta $02c0,x
+	stx helpvec
+	stx helpvec+1
+	dec $02
+	dec $02
+	beq +
+	jsr komma		; out ","
+	bne -
+
++	inc helpvec
+	lda helpvec
+	tax
+	asl
+	sta $02
+	lda #0
+-	sta $02c0,x	; and clear for next one
+	inx
+	cpx $02
+	bmi -
+	rts
+
+; ----------------------------------------- bef DUMP
+;
+befdump	lda $2d		; get start of vars
+	sta $20
+	lda $2e
+	sta $21
+dit6	jsr return	; sys out cr
+	lda $21
+	ldy #0
+	cmp $30		; is at start of arrays?
+	bcc dit0
+	beq +
+	bcs dit1
++	lda $20
+	cmp $2f
+	bcc dit0
+dit1	jmp bef0		; yes, end of command
+
+; -----------------------------------------
+;
+dit0	lda ($20),y	; get 1st char of varname
+	sta $a6
+	bpl dit3		; check type
+	and #$7f
+	jsr bsout		; first is shifted (FN or integer)
+	jsr inc20
+	lda ($20),y	; get 2nd char of shifted varname
+	bmi dit4
+	jsr bsout		; not shifted, so FN function
+	lda #$21		; !
+	jsr bsout
+	ldy #6
+	bne dit5
+
+dit4	and #$7f		; 2nd is shifted, so integer
+	jsr bsout
+	lda #$25		; %
+	jsr bsout
+	jsr outeql
+	jsr inc20
+	lda ($20),y
+	sta $62
+	jsr inc20
+	lda ($20),y
+	sta $63
+	ldx #$90
+	sec
+	jsr sxflppl
+	jsr sfacasc
+	jsr outasc
+	ldy #4
+	bne dit5
+
+dit3	jsr bsout
+	jsr inc20
+	lda ($20),y	; get 2nd char of unshifted varname
+	sta $a6
+	bpl dit7
+
+	and #$7f		; shifted, so string
+	jsr bsout
+	lda #$24		; $
+	jsr bsout
+	jsr outeql
+
+	jsr quote		; string start
+	jsr inc20
+	lda ($20),y	; len
+	sta $a8
+	jsr inc20
+	lda ($20),y	; address
+	sta $23
+	jsr inc20
+	lda ($20),y
+	sta $24
+-	cpy $a8		; string out
+	beq dit8
+	lda ($23),y
+	jsr bsout
+	iny
+	bne -
+dit8	jsr quote		; string end
+	ldy #3
+
+dit5	jsr inc20		; skip to next variable
+	dey
+	bne dit5
+
+	jsr getkey	; key pressed?
+	jmp dit6		; start over
+
+; -----------------------------------------
+;
+dit7	jsr bsout		; 2nd char unshifted, so float
+	jsr inc20
+	lda $20
+	ldy $21
+	jsr sfldfack
+	jsr sfacasc
+	jsr outeql
+	jsr outasc
+	ldy #5
+	bne dit5
+
+; ----------------------------------------- bef GLOBAL
+;
+befglobal	ldx #0
+--	lda localtab,x
+	sta $5f
+	inx
+	lda localtab,x
+	sta $60
+	bne +
+	jmp bef0
+
++	inx
+	ldy #0
+-	lda localtab,x
+	sta ($5f),y
+	inx
+	iny
+	cpy #2
+	bne -
+	beq --
+
+; ----------------------------------------- bef FIND
+;
+beffind	jsr incbasbz
+	lda #$ff
+	sta $a8
+	sta $a9
+	ldy #0
+	lda $2b		; get start of basic code
+	sta $20
+	lda $2c
+	sta $21
+	bne infind
+;
+fnd0	lda (progz),y
+	beq tofind
+	lda ($20),y
+	beq fcont
+	lda (progz),y
+	cmp ($20),y
+	bne fcont
+	iny
+	bne fnd0
+;
+fcont	jsr inc20
+	ldy #0
+	lda ($20),y
+	bne fnd0
+	jsr inc20
+	sty pendflag
+	lda ($20),y
+	bne infind
+	lda #1
+	sta pendflag
+infind	jsr inc20
+	lda ($20),y
+	bne +
+	lda pendflag
+	cmp #1
+	bne +
+	jmp $e386		; sys Ready (.x=$80)
+
++	jsr inc20
+	lda ($20),y
+	sta $a6
+	jsr inc20
+	lda ($20),y
+	sta $a7
+	jsr inc20
+	bne fnd0		; uncond. branch
+
+; -----------------------------------------
+;
+tofind	lda $a6
+	cmp $a8
+	bne +
+	lda $a7
+	cmp $a9
+	beq ++
++	lda $a6
+	sta $a8
+	sta $63
+	lda $a7
+	sta $62
+	sta $a9
+	jsr scflp		; make line number digits
+	jsr sfacasc
+	jsr outasc
+	sec
+	jsr $fff0		; sys get crsr pos
+	tya
+-	sbc #10
+	bcs -
+	eor #$ff
+	adc #1
+	tax
+	inx
+-	dex
+	bne +
+++	jmp fcont
+
++	jsr leerzch	; out space
+	bne -
+
+; -----------------------------------------
+;
+rtc2	jsr basromein
+	lda $69
+	jsr $ab24
+	jmp endsmb	; finish command
+
+; -----------------------------------------
+;
+ptest1	sty status
+	jsr tdot0
+	jmp kerromein
+
+; -----------------------------------------
+;
+use3a	jsr sgetstr1
+	jmp prestor
+
+; -----------------------------------------
+;
+cpanel	jsr basromaus
+	jmp bwv0
+
+; -----------------------------------------
+;
+cgoto1	jsr basromaus
+	jmp cgoto0
+
+; ----------------------------------------- Part of DOWN
+;
+maddhg	jsr l20pl40	; go to bottom
+	dex
+	bne maddhg
+	rts
+
+; -----------------------------------------
+;
+graph0	jsr basromein
+	jsr $7000		; sys get params for LOAD/SAVE
+	jsr $a660		; sys CLR
+	jmp bef0
+
+; -----------------------------------------
+;
+merge1	jsr basromein
+	jsr $e1d4		; sys get params for LOAD/SAVE
+	jmp basromaus
+
+; ----------------------------------------- Part of bef LOCAL
+;
+localtab	!fill 88
+
+; -----------------------------------------
+;
+
+	!fill 258		; free space
+
+; -----------------------------------------
+; cb00 (temporarily used by command MAP)
+
+	!fill 256		; free space
+
+; -----------------------------------------
+;
+; Section 12: MEM Screen Area $CC00 to $CFFF
+;
+; -----------------------------------------
+
+; ----------------------------------------- bef RENUMBER
+;
+befrenum	jsr get10010	; .a=0
+	beq +
+
+	jsr sgetadr	; get start line number
+	sty $a4		; result in .y (lo) and .a (hi)
+	sta $a5
+	jsr isstep0	; get step, is it 0? Doesn't return if	yes
+	sty ay		; in .y (lo) and in...
+	jsr basromaus
+	lda $c4		; ...c4 (hi)
+
++	jsr isprg		; do renumber
+	jsr renum1	; get start of basic (to a8/9)
+
+-	lda ($a8),y	; store line link to 09/a
+	sta $09
+	jsr inca8a9
+	lda ($a8),y
+	sta $0a
+	jsr inca8a9
+	iny
+	lda $a5		; in case: line num gt 63999?
+	cmp #$fa
+	bcs sbready	; yes, just leave
+	sta ($a8),y	; no, now write new line nums to basic
+	dey
+	lda $a4
+	sta ($a8),y
+	lda $09		; until end of prg
+	ora $0a
+	beq sbready
+	jsr ren0		; set link to nexr line
+	lda $a4		; add step to last line num
+	adc ay
+	sta $a4		; store new line num
+	lda $a5
+	adc ay+1
+	sta $a5
+	bcc -		; cont.
+
+;
+sbready	jsr $a659		; then: sys basic bef CLR
+	jmp $a474		; sys out: ready. RENUMBER finished
+
+; -----------------------------------------
+
+renum1	tay
+rnn1	lda $2b		; get start of basic prog
+	ldx $2c
+	sta $a8
+	stx $a9
+	rts		; 10
+
+; -----------------------------------------
+;
+ren0	lda $09
+	sta $a8
+	lda $0a
+	sta $a9
+	rts
+
+; ----------------------------------------- Part of RENUMBER
+;
+isprg	tax		; save .a
+	ldy #0		; is there any PRG?
+	lda ($2b),y
+	iny
+	ora ($2b),y
+	bne +
+	jmp scd5		; no, finished
+
++	txa		; restore .a
+	sta ay+1		; .a: step (hi)
+	sec
+	lda $a4		; start line minus step
+	sbc ay
+	sta $20		; nach $20/1
+	lda $a5
+	sbc ay+1
+	sta $21
+	lda $2b		; get basic start
+	ldx $2c
+	sta $a8		; to $a8/9
+	stx $a9
+
+ren2	ldy #0		; find PRG end
+	lda ($a8),y	; get line link low
+	tax
+	iny
+	ora ($a8),y	; 0? (prg end)
+	beq ren3
+	lda ($a8),y	; get line link hi
+	pha
+	iny
+	lda ($a8),y	; get line num to INT
+	sta int
+	iny
+	lda ($a8),y
+	sta int+1
+	txa
+	sta $a8		; reget line link low
+	pla		; and hi
+	sta $a9
+	jmp ren2		; back to ren2
+
+ren3	jsr basromein
+	jsr enternum	; count all lines
+	cmp #$fa		; exceeded limit? (63999)
+	bcs +		; yes, bad mode
+	ldy #0
+	jsr rnn1		; basic start to a8/9
+	bne rbnc		; renumber in line
+
+; ----------------------------------------- RENUMBER: Scan Basic Line
+;
+rbnb	jsr inca8a9
+rbnc	jsr inca8a9
+	lda ($a8),y	; (.y=0) get hi line num
+	beq rnb2		; (rts) leave if at prg end
+	jsr inca8a9
+	lda ($a8),y	; store position to 39/a
+	sta $39
+	jsr inca8a9
+	lda ($a8),y
+	sta $3a
+--	ldx #7		; check 6 reference tokens
+rnb0	jsr inca8a9
+-	lda ($a8),y	; relevant token?
+	beq rbnb		; line end: next line
+	cmp tokens-1,x
+	beq +		; yes, relevant token found
+	dex
+	bne -		; next reference
+	beq --		; next byte in basic line
+
++	cpx #6		; found RCOMP or RESET?
+	bcc rnb6		; no V2 token
+	lda $a8		; pre-token ($64) correct?
+	bne +
+	dec $a9
++	dec $a8
+	lda ($a8),y
+	jsr inca8a9
+	cmp #$64
+	bne rnb0		; no, continue search
+rnb6	jsr rnb1		; yes, write new line num
+	beq +		; uncond. branch (.y=0)
+
+rnb5	jsr inca8a9
++	cmp #0		; line end?
+	beq --		; yes, cont. search
+	cmp #$3a		; ":"?
+	beq --		; yes, cont. search
+	lda ($a8),y
+	cmp #$20		; skip spaces
+	beq rnb5
+	cmp #$2c		; ","? (list after ON?)
+	beq rnb6		; yes: write line nums
+	cmp #$ab		; token of "-"? (after LIST)
+	beq rnb6		; yes: write line num
+	ldx #7		; otherwise: cont. search
+	bne -		; uncond. branch
+
+rnb2	rts
+
+; ----------------------------------------- RENUMBER: Write New Line Nums
+;
+-	jsr inca8a9
+rnb1	lda $a8		; what is following token?
+	ldx $a9
+	sta progz
+	stx progz+1
+	jsr chrget
+	cmp #$ab		; token of "-"? (in LIST)
+	beq -		; yes, skip
+	jsr chrgot	; line num?
+	bcs rnb2		; no, cont. search
+
+	jsr $a96b		; sys linenumber to adr in INT
+	jsr enternum	; compute new line num
+	jsr $bc49		; sys int to float (returns .y=0)
+	jsr $bddf		; sys fac to asc (in linenum $0100, returns .a=0)
+	tax
+-	lda linenum,x
+	beq +		; end of digits
+	inx
+	bne -
++	inx
+	stx $71		; len of new line num to 71
+rnb8	ldy #0		; does it fit in old location?
+	sec
+	lda progz
+	sbc $a8
+	cmp $71
+	bmi rnb3		; no, move prg 1 byte ahead
+	bne rnb4		; or is it shorter?
+
+-	jsr inca8a9	; no, fits
+rnb7	ldx #0		; write new line num to old position
+	lda linenum,y	; set flag for success (.a=1)
+	beq +
+	sta ($a8,x)
+	iny
+	bne -
+
++	lda #1		; return to scan of basic lines
+	ldy #0
+	rts
+
+; ----------------------------------------- Fill up Line Num space
+;
+rnb4	jsr inca8a9	; fill shorter nums w/ spaces
+	tax
+	dex
+	lda #$20
+-	sta ($a8),y
+	iny
+	dex
+	bne -
+	ldy #0
+	beq rnb7		; now write into basic line
+
+; ----------------------------------------- Stretch Basic PRG
+
+rnb3	jsr moveprg	; make prg 1 byte longer (returns .a=0)
+	dec $71
+	tax
+	beq rnb8		; does line num fit now?
+
+; ----------------------------------------- RENUMBER: Count Basic Lines
+;
+enternum	ldy #0		; reset counter (58/9)
+	sty $59
+	sty $58
+	lda $20		; get start line num (to 62/3)
+	ldx $21
+	stx $62
+	sta $63
+	lda $2b		; ge tbasic start (to 5f/60)
+	ldx $2c
+	sta $5f
+	stx $60
+-	iny
+	iny
+	iny
+	lda ($5f),y	; line num hi
+	cmp int+1		; equals refenrece line num (max prg num at 1st time)?
+	bne +
+	dey
+	lda ($5f),y
+	cmp int
+	beq rnb9		; yes, check limit and leave sub
+	iny		; no, now...
++	dey
+	dey
+	inc $58		; ...count lines
+	bne +
+	inc $59
++	lda ($5f),y
+	tax
+	dey
+	lda ($5f),y
+	sta $5f
+	txa
+	sta $60		; at prg end?
+	bne -		; no, cont. counting
+	jmp $bdc2		; yes, sys out "in linenumber", reference line not found
+
+; ----------------------------------------- RENUMBER: Check for max line num
+;
+--	dec $59
+-	dec $58
+rnb9	clc		; add step count times to start line num
+	lda $63		; (so getting new line num)
+	adc ay
+	sta $63
+	lda $62
+	adc ay+1
+	sta $62
+	lda $58		; count down lines
+	bne -
+	lda $59
+	bne --
+	ldy $63
+	lda $62
+	cmp #$fa		; result greater than 63999?
+	bcs +		; yes (bad mode error)
+	ldx #$90		; no, start scanning
+	sec
++	rts
+
+; ----------------------------------------- RENUMBER: Move PRG by 1 Byte
+;
+moveprg	lda $a8		; current position
+	ldx $a9
+	sta $58		; as reference
+	stx $59
+	ldx $2d		; start at prg end
+	ldy $2e
+	dex
+	bne +
+	dey
++	stx $a8
+	sty $a9
+	ldy #1		; move by 1 byte larger
+	ldx #0
+-	lda ($a8,x)
+	sta ($a8),y
+	lda $a8		; count down bytes
+	bne +
+	dec $a9
++	dec $a8
+	lda $a9		; until start position
+	cmp $59
+	bne -
+	lda $a8
+	cmp $58
+	bne -
+	jsr $a533		; then sys bind lines (returns .a=0)
+	inc $2d		; increase prg end by 1
+	bne +
+	inc $2e
++	rts
+
+; ----------------------------------------- Check for Step of 0
+;
+isstep0	jsr basromein	; is step 0?
+	jsr bloadadr
+	beq +
+	rts
+
++	jsr basromaus
+	jmp err0e		; error, affects "tsb.mem"!
+
+; ----------------------------------------- bef PLACE
+;
+befplace	jsr basromein
+	jsr chrget
+	jsr $b113		; sys is char? (one array)
+	bcc +
+	jmp onearray	; yes
+
++	cmp #$30		; no, is "0"? (all arrays)
+	beq +
+	jmp $af08		; no, sys syntax error
+
++	jsr return	; yes, cr
+	jsr initvecs	; init vecs
+-	lda $21
+	cmp $32
+	bne +
+	lda $20
+	cmp $31
+	bne +
+	jmp endplace
+
++	jsr arrays	; array found, out
+	jsr skiparr
+	jsr return	; out cr
+	bne -
+;
+arrays	ldy #0
+	lda ($20),y
+	sta $45
+	bmi intarr
+	jsr bsout		; out array name 1
+	jsr inc20
+	lda ($20),y
+	sta $46
+	bmi strarr
+	jsr bsout		; out float array name 2
+	lda #0
+	beq +
+;
+intarr	and #$7f		; out int array name 1
+	jsr bsout
+	jsr inc20
+	lda ($20),y
+	sta $46
+	and #$7f		; out int array name 2
+	jsr bsout
+	jsr proz		; out "%"
+	lda #$80
+;
++	sta $0e
+	jsr arrdims	; out dims
+	jsr $b194		; sys first element
+-	jsr arrbreak	; STOP? (doesn't return if yes)
+	lda helpvec+1
+	sta helpvec
+	jsr outpos	; out position in array
+	ldx #0		; set as numeric
+	stx $0d
+	jsr fltarr	; out float array
+	bne -
+	rts
+
+; -----------------------------------------
+;
+strarr	and #$7f		; out string array name 2
+	jsr bsout
+	jsr doll		; out "$"
+
+	jsr arrdims	; out dims
+	jsr $b194		; sys first element
+-	jsr arrbreak	; STOP? (doesn't return if yes)
+	lda helpvec+1
+	sta helpvec
+	jsr outpos	; out position in array
+	ldx #$ff		; set as string
+	stx $0d
+	jsr $af2b		; sys get variable
+	jsr quote		; out quote
+	ldy #2
+	lda ($64),y
+	cmp #8
+	bcc +
+	jsr $ab21		; sys out string
++	jsr quote		; out quote
+	jsr nextarr
+	bne -
+	rts
+
+; -----------------------------------------
+;
+outpos	jsr klaa
+	lda $af		; show position in array
+	sta $02
+	sta $0b
+	asl
+	sta helpvec
+-	ldx helpvec
+	lda $02c0,x	; lo nach .y
+	tay
+	inx
+	lda $02c0,x
+	pha
+	tax		; hi nach .x
+	tya
+	pha		; beide auf Stack (hi zuerst)
+	txa
+	inc helpvec
+	inc helpvec
+	jsr outdigits	; zuvor: klaa
+	dec $02
+	beq +
+	jsr komma
+	bne -
++	jsr klaz
+	jsr leerzch	; zuvor: klaz
+	jsr outeql
+	jsr leerzch
+	ldy #4
+	jmp $b2ea		; sys search for element
+
+; -----------------------------------------
+;
+fltarr	jsr $af2b		; get variable
+	jsr $bddd		; fac to asc
+	jsr $ab1e		; sys string out
+
+nextarr	jsr arrbreak
+	jsr return
+	lda $af
+	asl
+	sta $02
+	tax
+	ldy #0
+-	inc $02c0,x
+	bne +
+	inc $02c1,x
++	lda $02c0,x
+	cmp $02c0,y
+	bne +
+	lda $02c1,x
+	cmp $02c1,y
+	bne +
+	lda #0
+	sta $02c0,x
+	sta $02c1,x
+	inx
+	inx
+	iny
+	iny
+	cpy $02
+	bne -
++	rts
+
+; -----------------------------------------
+;
+onearray	sta $45		; store first char
+	ldx #0
+	jsr chrget
+	bcc +
+	jsr $b113		; sys is char?
+	bcc ++		; no
+
++	tax		; yes
+-	jsr chrget	; more chars in varname?
+	bcc -		; yes, skip all
+	jsr $b113
+	bcs -
+
+++	cmp #$24		; now: is "$"?
+	beq +
+	cmp #$25		; is "%"?
+	bne ++		; no
+
+	lda #$80		; mark as int
+	ora $45
+	sta $45
++	txa
+	ora #$80
+	tax
+++	stx $46		; mark as string
+	jsr return	; out cr
+
+	jsr initvecs
+-	lda $21
+	cmp $32
+	bne +
+	lda $20
+	cmp $31
+	beq err2d		; error (array not found)
++	ldy #0
+	lda ($20),y
+	cmp $45
+	bne +
+	iny
+	lda ($20),y
+	cmp $46
+	beq ++
++	jsr skiparr
+	jmp -
+
+++	jsr arrays	; found array, out
+endplace	jmp bef0		; affects "tsb.mem"!
+
+; -----------------------------------------
+
+err2d	ldx #$2d		; error "array nor found"
+	jmp ($0300)
+
+; -----------------------------------------
+;
+arrbreak	jsr $ffe1		; sys STOP?
+	beq stopped	; yes
+	jsr getkey	; get key - affects "tsb.mem"!
+	jsr $ffe1
+	beq stopped
+	rts
+;
+stopped	pla
+	pla
+	jmp nrm2		; back to all normal
+			; affects "tsb.mem"!
+
+; -----------------------------------------
+;
+initvecs	lda $2f
+	sta $20
+	sta $5f
+	lda $30
+	sta $21
+	sta $60
+	rts
+
+; -----------------------------------------
+;
+outdigits	jsr $b395		; sys int to float (hi .a, lo .y)
+	jsr $bddf		; sys fac to asc
+	jmp $ab1e		; sys string out
+
+; -----------------------------------------
+; gap
+	!by 0,0,0,0,0
+
+; -----------------------------------------
+
