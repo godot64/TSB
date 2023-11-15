@@ -26,6 +26,7 @@
 	helpvc2	= $b2
 	helpvc3	= $b4
 	video	= $0288		; current address of video (high byte)
+; TSB:
 	schkcom	= $8030		; checks for comma
 	chkscolon	= $813e		; checks for all following data
 	sgetbytc	= $81fc		; get byte value (to .x) after checking for comma
@@ -33,6 +34,14 @@
 	endsmb	= $8229		; finish TSB command
 	incbasbz	= $83d8		; increment basic pointer
 	sgetstr	= $86b6		; get string
+; TSB neo:
+;	endsmb	= $80d2		; finish TSB command
+;	schkcom	= $8b89		; checks for comma
+;	chkscolon	= $8bc7		; checks for all following data
+;	sgetbytn	= $8c2f		; get byte value (to .x) after proceeding 1 byte
+;	sgetbytc	= $8c34		; get byte value (to .x) after checking for comma
+;	sgetstr	= $8c3d		; get string
+;	incbasbz	= $8e2a		; increment basic pointer
 
 
 ; ----------------------------------- MAP: FILL with 2x2 tiles derived from pattern$
@@ -66,7 +75,7 @@ torow	dex		; if 0: skip computation of screen row
 	inc setcram+2
 	bne torow		; loop to reach correct row
 
-; ----------------------------------- 
+; -----------------------------------
 
 writemap	jsr schkcom	; get pattern string (e.g. string array MA$):
 	jsr sgetstr	; len 69, adr 22/3
@@ -151,6 +160,6 @@ setcram	sta $0000,x	; store to color ram (self modified earlier)
 	pla		; reget value
 	rts
 
-; ----------------------------------- 
+; -----------------------------------
 
 

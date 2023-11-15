@@ -3,10 +3,10 @@
 ;
 ; Exomizer-Aufruf für einen TSB-Onefiler:
 ;
-; exomizer sfx $1900 "onefile.prg" -o "fertig.prg" -x "dec $d020 inc $d020"
+; exomizer sfx $1900 "onefile.prg" -o "fertig" -x "dec $d020 inc $d020"
 ;
 ;
-; benötigt wird der...
+; ben�tigt wird der...
 ; ----------------------------------------- Starter
 
 	pport	= $01
@@ -14,9 +14,20 @@
 	dst	= $fd
 	exec	= $0600
 	pages	= exec+$c0
-	tuned	= $9a50
 	init	= $033c
 	kopieren	= into+$7d
+
+; tsb vectors
+	dscbmout	= $9a50
+	befcold	= $8147
+	early	= $81a5
+	sirq	= $969e
+
+; neo vectors
+;	dscbmout	= $80c5
+;	befcold	= $8055
+;	early	= $80bf
+;	sirq	= $844c
 
 ; -----------------------------------------
 
@@ -35,15 +46,15 @@ into	ldy #0
 	ldx #1
 	jsr kopieren	; (copy 1 page)
 
-	lda #<(initit-$3c)
-	ldx #>(initit-$3c)
+	lda #<(initit-$41)
+	ldx #>(initit-$41)
 	sta src
 	stx src+1
-	lda #<(init-$3c)
-	ldx #>(init-$3c)
+	lda #<(init-$41)
+	ldx #>(init-$41)
 	sta dst
 	stx dst+1
-	ldy #$3c
+	ldy #$41
 	ldx #1
 	jsr kopieren
 	jmp exec		; continue at exec/move
@@ -68,7 +79,7 @@ start	sei
 	lda #8
 	sta dst+1
 c02	jsr copy
-	dec dst
+	dec dst		; adress back to page start
 
 	ldx pages+1	; then reverse copy TSB to $8000
 	txa
@@ -129,21 +140,23 @@ merk	!by 0
 ; ----------------------------------------- Init
 
 initit	lda #$60		; RTS-Befehl für vorzeiten Ausstieg aus TSB-Init einpatchen
-	sta $81a5
-	jsr $8147		; TSB Initialisieren
+	sta early
+	jsr befcold	; TSB Initialisieren
 	lda #$20
-	sta $81a5		; Init wiederherstellen
+	sta early		; Init wiederherstellen
 
 	sei
-	lda #$9e		; TSB-IRQ aktivieren
+	lda #<sirq	; TSB-IRQ aktivieren
 	sta $0314
-	lda #$96
+	lda #>sirq
 	sta $0315
 
 	jsr $e1b5		; Zeiger auf Basic-Anfang setzen
-	lda #$60
-	sta tuned+13
-	jsr tuned		; Groß-Klein-Schrift fixieren
+	lda #$60		; patch
+	sta dscbmout+13
+	jsr dscbmout	; Groß-Klein-Schrift fixieren
+	lda #$20		; unpatch
+	sta dscbmout+13
 
 	jmp $a7ae		; und dann in die TSB-Interpreterschleife springen (RUN)
 

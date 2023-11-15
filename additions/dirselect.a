@@ -34,11 +34,16 @@
 	drive	= $be
 	numkeys	= $c6
 
-	sgetvar	= $80bd	; TSB-Vektoren: Variable suchen
+; old vectors
+	sgetvar	= $8096	; TSB-Vektoren: Variable suchen
 	sgetbytc	= $81fc	; holt Byte-Wert nach .x
 	sgetstr	= $86b6	; fasst frmevl und frestr zusammen
-
-	chrgot	= $0079	; Kernal-Vektoren
+; neo vectors
+;	sgetvar	= $8b65	; TSB-Vektoren: Variable suchen
+;	sgetbytc	= $8c34	; holt Byte-Wert nach .x
+;	sgetstr	= $8c3d	; fasst frmevl und frestr zusammen
+; Kernal-Vektoren
+	chrgot	= $0079
 	errout	= $a43a
 	chkcom	= $aefd
 	home	= $e566
@@ -89,17 +94,17 @@ diskname	!fill 19,32
 
 start	lda $030c 	; 780 (.a) = 0? 781 (Anz. Pages) in .x
 	bne +
-	lda #$6a		; Defaultpuffer: $6a00
+	lda #$6a		; wenn .a=0: Defaultpuffer auf $6a00 setzen
 +	cpx #0		; Anzahl Pages = 0?
 	bne +
-	ldx #6		; dann Defaultanzahl Einträge: 96 (bis $6fff, 6*16)
+	ldx #6		; dann Defaultwert Einträge: 6 (6*16=96, bis $6fff)
 +	jsr setbuffer
 	lda #24		; Anzahl Ausgabezeilen vorbesetzen (default: 24)
 	sta lines
 	lsr
 	sta half		; halbe Höhe (für _cont)
 	lda #16 		; String-Länge: generell 16
-	jsr $b47d 	; macht Platz für String
+	jsr $b47d 	; macht Platz für String (SYS-V2)
 	stx svarlo
 	sty svarhi	; (Länge wird verworfen, da immer 16)
 	jsr getparam	; weitere Parameter holen
@@ -578,7 +583,8 @@ getparam	ldx $d3		; aktuelle Cursorspalte als Ausgabespalte holen (max 22!)
 	stx topout	; (Boundaries werden z.B. von INSERT oder FILL überwacht!)
 
 	jsr chkcom 	; Directory-String holen (muss einen Filter enthalten, z.B. "$*"!)
-	jsr sgetstr
+	jsr sgetstr	; len: $69, addr: .x/.y
+	lda $69
 	jsr setfnp
 
 	jsr chkcom

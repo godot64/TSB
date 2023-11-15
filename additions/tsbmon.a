@@ -70,6 +70,10 @@
 
 	tsbcols	= $83c9	; set tsb screen colors
 
+; tsbneo addresses:
+;
+;	tsbcols	= $8bb8	; set tsb screen colors
+
 ; all other:
 
 	irq_lo	= $0314	; vector: hardware irq interrupt address lo
