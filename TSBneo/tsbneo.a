@@ -358,7 +358,7 @@ sbasbef	tsx
 	stx stack		; save stack pointer
 	lda onkeyflag
 	beq sintprt0
-	jsr onkey1
+	jsr onkey2
 
 sintprt0	jsr chrget	; get next char
 	jsr stateofdo	; what about DO..DONE and ELSE?
@@ -1480,7 +1480,7 @@ textchr	!tx "chr$(13)",0
 ;
 version	!tx "ad23"	; Signature
 	!by $0d
-	!tx "2.31113"	; Version Number
+	!tx "2.31125"	; Version Number
 
 ; -----------------------------------------
 ;
@@ -8716,10 +8716,9 @@ befresume	lda errn		; from ON ERROR?
 	sta progz+1	; no, ON KEY
 	lda basbzk
 	sta progz		; proceed where you came from
-	jsr basromein
 	lda #10
 	sta onkeyflag
-	jmp sintprt0	; now
+	jmp fresume
 
 ; ----------------------------------------- bef ON ERROR
 ;
@@ -8799,8 +8798,7 @@ err2a	ldx #$2a		; error ": cmd inactive"
 
 ; ----------------------------------------- bef ON KEY
 ;
-befonkey	jsr incbasbz
-	jsr sgetstr	; get controlstring
+befonkey	jsr sgetstrn	; get controlstring
 	sta okstring+1	; address
 	stx okstring
 	ldy $69		; len
@@ -8827,10 +8825,10 @@ befonkey	jsr incbasbz
 onkey1	lda onkeypos	; key pressed?
 	bne +
 	jsr $ffe4		; no, sys get key
-	beq oky0
+	beq oky1
 	sta keyon		; store key, is in ctrl string?
 	jsr chkonkey	; yes, if .c=0
-	bcs oky0
+	bcs oky1
 
 +	lda #0		; found
 	sta onkeyflag
@@ -8842,6 +8840,9 @@ onkey1	lda onkeypos	; key pressed?
 	ldx onkeyzeig+1
 	sta progz
 	stx progz+1
+	jmp scd5
+
+oky1	jmp basromein
 
 ; -----------------------------------------
 ;
@@ -9463,7 +9464,7 @@ beflocal	jsr setoff	; set .x to 0
 	lda #$ff
 	sta ($5f),y
 
-	cpx #84		; buffer filled? (max 21 entries)
+	cpx #80		; buffer filled? (max 20 entries)
 	bcs lcf0		; yes, finish LOCALTAB
 
 	jsr chrgot	; anything following?
@@ -9840,6 +9841,16 @@ use3a	jsr sgetstr1
 
 ; -----------------------------------------
 ;
+onkey2	jsr basromaus
+	jmp onkey1
+
+; -----------------------------------------
+;
+fresume	jsr basromein
+ 	jmp sintprt0	; now
+
+; -----------------------------------------
+;
 cpanel	jsr basromaus
 	jmp bwv0
 
@@ -9870,7 +9881,7 @@ merge1	jsr basromein
 
 ; ----------------------------------------- Part of bef LOCAL
 ;
-localtab	!fill 88
+localtab	!fill 76
 
 ; -----------------------------------------
 ;
