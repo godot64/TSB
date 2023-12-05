@@ -1480,7 +1480,7 @@ textchr	!tx "chr$(13)",0
 ;
 version	!tx "ad23"	; Signature
 	!by $0d
-	!tx "2.31125"	; Version Number
+	!tx "2.31205"	; Version Number
 
 ; -----------------------------------------
 ;
@@ -5591,7 +5591,7 @@ chkdirmd	stx numkeys
 use8	lda $63
 	cmp #$2a		; "*"?
 	beq +
-	lda #$20		; " "
+	lda #$20		; " " (!patch! to leading "0")
 	bne +
 use9a	tax
 	lda #$30		; "0"
@@ -8962,8 +8962,7 @@ befexec	lda progz		; save basic pz to stack
 
 ; ----------------------------------------- bef CALL
 ;
-befcall	jsr basromaus	; switch basic rom off
-	jsr cfreset	; check exec stack (doesn't return if successful)
+befcall	jsr cfreset	; check exec stack (doesn't return if successful)
 
 	jsr setsstart	; set start address for search
 	lda #$31		; search for PROC (code $31)
@@ -8983,6 +8982,10 @@ found	ldy #0		; branch to found position
 	lda $21
 	sta progz+1
 	jmp befproc	; and process PROC (skip rest of that line)
+
+; -----------------------------------------
+;
+	!by 0,0,0
 
 ; -----------------------------------------
 ;
@@ -9227,8 +9230,7 @@ beflin	jsr chkdrv	; is drive present?
 	inc $af
 
 ++	jsr chrget
-	jsr basromein
-	jsr $e1d4		; sys get params for load/save
+	jsr merge1	; set file parameters
 	jsr $f5ea		; sys SAVE
 
 	lda helpvec
@@ -9241,6 +9243,10 @@ beflin	jsr chkdrv	; is drive present?
 	iny
 	sta ($fb),y
 bl01	jmp endsmb
+
+; -----------------------------------------
+;
+	!by 0,0,0
 
 ; ----------------------------------------- bef D!POKE
 ;
