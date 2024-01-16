@@ -1480,7 +1480,7 @@ textchr	!tx "chr$(13)",0
 ;
 version	!tx "ad23"	; Signature
 	!by $0d
-	!tx "2.31205"	; Version Number
+	!tx "2.40116"	; Version Number
 
 ; -----------------------------------------
 ;
@@ -3275,7 +3275,7 @@ allnrm	lda vecrenum	; vector of bef RENUMBER
 
 	lda #<befrenum-1	; repair RENUM vector
 	sta vecrenum	; 87b4
-	lda #>befrenum
+	lda #>befrenum-1
 	sta vecrenum+1
 	lda #<befplace-1	; repair PLACE vector
 	sta vecplace	; 86e2
