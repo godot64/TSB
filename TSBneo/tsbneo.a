@@ -1480,7 +1480,7 @@ textchr	!tx "chr$(13)",0
 ;
 version	!tx "ad23"	; Signature
 	!by $0d
-	!tx "2.40116"	; Version Number
+	!tx "2.40118"	; Version Number
 
 ; -----------------------------------------
 ;
@@ -3237,8 +3237,6 @@ befnrm	jsr nrm00
 nrm2	jsr allnrm	; here: returned from TSB.MEM
 	jmp bef0		; (affects "tsb.mem"!)
 
-
-;
 nrm00	lda #4		; video at $0400
 	sta video
 	lda #$c7		; VIC bank 0 ($0000)
@@ -3274,11 +3272,11 @@ allnrm	lda vecrenum	; vector of bef RENUMBER
 }
 
 	lda #<befrenum-1	; repair RENUM vector
-	sta vecrenum	; 87b4
+	sta vecrenum
 	lda #>befrenum-1
 	sta vecrenum+1
 	lda #<befplace-1	; repair PLACE vector
-	sta vecplace	; 86e2
+	sta vecplace
 	lda #>befplace
 	sta vecplace+1
 +	rts
@@ -3957,7 +3955,7 @@ memnrml	lda #$cc		; video now at $cc00
 	sta $20
 	sta $a8
 	tax
-	tay
+	tay		; .y=0
 -	lda ($20),y
 	sta ($a8),y
 	inc $20
@@ -3974,7 +3972,7 @@ memnrml	lda #$cc		; video now at $cc00
 	lda #$3b		; video at $cc00 (lower)
 	sta $d018
 	jsr repchrget	; save bef vectors and leave
-	jmp setbmode	; at a035: set bad mode to PLACE & RENUMBER
+	jmp setbmode	; set bad mode to PLACE & RENUMBER
 
 ; ----------------------------------------- MEM Distributor
 ;
@@ -9930,7 +9928,7 @@ befrenum	jsr get10010	; .a=0
 	iny
 	lda $a5		; in case: line num gt 63999?
 	cmp #$fa
-	bcs sbready	; yes, just leave
+	bcs sbready	; yes, greater, just leave
 	sta ($a8),y	; no, now write new line nums to basic
 	dey
 	lda $a4
@@ -9938,7 +9936,7 @@ befrenum	jsr get10010	; .a=0
 	lda $09		; until end of prg
 	ora $0a
 	beq sbready
-	jsr ren0		; set link to nexr line
+	jsr ren0		; set link to next line
 	lda $a4		; add step to last line num
 	adc ay
 	sta $a4		; store new line num
@@ -10145,7 +10143,7 @@ enternum	ldy #0		; reset counter (58/9)
 	ldx $21
 	stx $62
 	sta $63
-	lda $2b		; ge tbasic start (to 5f/60)
+	lda $2b		; get basic start (to 5f/60)
 	ldx $2c
 	sta $5f
 	stx $60
