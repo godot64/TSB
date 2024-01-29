@@ -1,0 +1,111 @@
+; -----------------------------------------
+;
+; Tuned Simons' Basic Neo
+; by Arndt Dettke, 2024
+;
+; based on Simons' Basic by David Simons, 1984
+;
+; -----------------------------------------
+;
+; Extension Command:
+;   X!INST <str1>,<str2>,<pos>
+; Purpose:
+;   write <str1> into <str2> at <pos>
+;   without generating string garbage
+;
+; v1.00, 2024-01-27
+;
+; -----------------------------------------
+
+	*= $ca00
+	!ct pet
+
+; -----------------------------------------
+
+; system:
+	progz	= $7a
+
+; tsb routines:
+	endsmb	= $80d2	; finish command
+	err0e	= $9127	; illegal quantity error
+	err17	= $9242	; string too long error
+	err0b	= $a3b5	; syntax error
+	inca8a9	= $8df5	; increment a8/a9
+	incbasbz	= $8e2a	; increment basic pointer
+	schkcom	= $8b89	; check for comma
+	sgetbytc	= $8c34	; check comma, get byte value
+	sgetstr1	= $8c69	; get string
+
+; tsb vars:
+	pos	= $c51f	; position of insert, 1st is 1
+	strlen1	= $c55e	; len of String 1
+	strlen2	= $c55c	; len of String 2
+
+; -----------------------------------------
+; ----------------------------------------- Command: X!INST
+; -----------------------------------------
+
+befxinst	ldy #0
+	jsr incbasbz
+	lda (progz),y	; correct syntax? ("x!inst"):
+	cmp #$64		; additional token?
+	bne synterr
+	jsr incbasbz
+	lda (progz),y
+	cmp #87		; yes, token of INST?
+	bne synterr
+	jsr incbasbz
+
+	jsr sgetstr1	; yes, retrieve string1
+	sta $a9		; 1st at $a8/9, len at strlen1
+	stx $a8
+	ldy $69
+	dey
+	sty strlen1
+	jsr schkcom	; comma?
+
+	jsr sgetstr1	; yes, retrieve string2
+	sta $a7		; 2nd at $a6/7, len at strlen2
+	stx $a6
+	ldy $69
+	dey
+	sty strlen2
+
+	jsr sgetbytc	; get comma and position to insert
+	dex		; pos: 0? (not allowed)
+	bmi illegal
+	stx pos		; no, save to pos
+	cpx strlen2	; beyond strlen2? (not allowed)
+	beq +
+	bcs illegal
+
++	lda strlen1	; no, 1st: empty string?
+	bmi leave		; yes, do nothing
+	ldy strlen2	; 2nd: empty string?
+	bmi leave		; yes, do nothing
+	clc
+	lda pos		; len of 1st plus pos: beyond len of 2nd?
+	adc strlen1
+	tax
+	cpx strlen2
+	beq +
+	bcs stlerror	; yes, error
+
++	ldy pos		; now move: String1 to String2
+	ldx #0
+-	lda ($a8,x)
+	sta ($a6),y
+	dec strlen1	; String1 finished?
+	bmi leave		; yes, leave
+	jsr inca8a9
+	iny		; move until strlen2
+	cpy strlen2
+	bcc -
+	beq -
+leave	jmp endsmb	; then finish
+
+; -----------------------------------------
+
+synterr	jmp err0b		; syntax error
+illegal	jmp err0e		; illegal quantity error
+stlerror	jmp err17		; string too long error
