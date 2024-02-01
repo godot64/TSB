@@ -1480,7 +1480,7 @@ textchr	!tx "chr$(13)",0
 ;
 version	!tx "ad23"	; Signature
 	!by $0d
-	!tx "2.40118"	; Version Number
+	!tx "2.40131"	; Version Number
 
 ; -----------------------------------------
 ;
@@ -2681,7 +2681,7 @@ fnplace	jsr getstrgs	; check "(", get 2 strings
 	lda plpos
 	cmp strlen2	; oldstr checked?
 	bne -
-	lda #0		; yes, result: 0
+	tya		; yes, result: 0
 	beq --
 
 
@@ -2694,7 +2694,9 @@ csgetari3	cpy #$5b		; INSERT?
 ;
 fninsert	jsr getstrgs	; check "(", get 2 strings
 	jsr getbytc	; get position ($c51f)
-	stx pos
+	dex		; +3 bytes
+	bmi iqerr
+	stx helpvec+1
 	jsr $aef7		; sys ")"?
 
 	lda $9d		; direct mode?
@@ -2711,6 +2713,7 @@ err15	ldx #$15		; error "illegal direct"
 	!by $2c
 err17	ldx #$17		; error "string too long"
 	jmp ($0300)
+iqerr	jmp err0e		; error "illegal quantity"
 
 +	jsr neustr	; neuen String einrichten (62/3, len: 61)
 			; hier:
@@ -2718,7 +2721,7 @@ err17	ldx #$17		; error "string too long"
 	ldy #0		; Zähler auf Null
 	sty $bf		; auch für den zweiten Durchgang
 	beq +
--	cpy pos		; Position erreicht?
+-	cpy helpvec+1	; Position erreicht?
 	bcs ++
 	lda ($a9),y	; nein, übertragen
 	sta ($62),y
@@ -2727,7 +2730,7 @@ err17	ldx #$17		; error "string too long"
 	bne -		; nein, loop (ja: weiter)
 
 ++	sty helpvec	; Position merken
-	sty dwert		; auch für dritten Durchgang
+	sty helpvc2	; auch für dritten Durchgang
 -	ldy $bf 		; startet mit Null
 	cpy strlen1	; Einfügelänge erreicht?
 	beq +
@@ -2738,15 +2741,15 @@ err17	ldx #$17		; error "string too long"
 	inc helpvec
 	bne -		; loop
 
-+	ldy dwert		; kein Rest?
++	ldy helpvc2	; kein Rest?
 	bne +		; nein, neuen String erzeugen
 
 -	lda ($a9),y	; sonst: Rest übertragen
-	inc dwert
+	inc helpvc2
 	ldy helpvec
 	sta ($62),y
 	inc helpvec
-	ldy dwert
+	ldy helpvc2
 +	cpy strlen2
 	bcc -
 
@@ -2754,10 +2757,63 @@ jpushstr	lda #$ff		; create result string
 	sta $0d
 	jmp pushstr
 
+; ----------------------------------------- ari4 -> ari5
+;
+csgetari4	cpy #$57		; INST?
+	bne csgetari5
+
+; ----------------------------------------- func INST
+;
+fninst	jsr getstrgs	; check "(", get 2 strings
+	jsr getbytc	; get position ($c51f)
+	dex
+	bmi iqerr
+	stx helpvec+1				; new
+	jsr $aef7		; sys ")"?
+
+	lda $9d		; direct mode?
+	beq +
+	jmp err15		; yes, error (illegal direct)
+
++	clc
+	lda strlen1	; newlen + pos > oldlen?
+	beq +
+	adc helpvec+1				; new
+	cmp strlen2
+	bcc +
+	beq ++
+	jmp err17		; yes, "string too long"
+
++	lda strlen2	; otherwise: build newstring (62/63)
+++	jsr neustr	; sys: set stringdescriptor
+
+	ldy #0
+	sty $bf
+	sty helpvec
+
+-	lda ($a9),y	; get char from oldstring
+	cpy helpvec+1	; at inst position?		; new
+	bcc ++		; no
+
+	ldy $bf		; yes, inststring finished?
+	cpy strlen1
+	bcs +
+	inc $bf		; no,
+	lda ($a7),y	; get char from inststring
++	ldy helpvec
+
+++	sta ($62),y	; write to newstring
+	inc helpvec
+	ldy helpvec	; all chars?
+	cpy strlen2
+	bcc -
+
+	jmp jpushstr	; yes, create new string on stringheap
+
 ; -----------------------------------------
 ;
-csgetari4	cpy #$53		; DIV?
-	bne csgetari5
+csgetari5	cpy #$53		; DIV?
+	bne csgetari6
 
 ; ----------------------------------------- func DIV
 ; 			original
@@ -2811,8 +2867,8 @@ err14	ldx #$14		; error "division by zero"
 
 ; -----------------------------------------
 ;
-csgetari5	cpy #$52		; MOD?
-	bne csgetari6
+csgetari6	cpy #$52		; MOD?
+	bne csgetari7
 
 ; ----------------------------------------- func MOD
 ; 			original
@@ -2823,8 +2879,8 @@ fnmod	jsr divinit
 
 ; -----------------------------------------
 ;
-csgetari6	cpy #$59		; LIN?
-	bne csgetari7
+csgetari7	cpy #$59		; LIN?
+	bne csgetari8
 
 ; ----------------------------------------- func LIN
 ; 			modified
@@ -2836,8 +2892,8 @@ fnlin	sec
 
 ; -----------------------------------------
 ;
-csgetari7	cpy #$58		; TEST?
-	bne csgetari8
+csgetari8	cpy #$58		; TEST?
+	bne csgetari9
 
 ; ----------------------------------------- func TEST
 ; 			modified
@@ -2853,58 +2909,6 @@ fntest	jsr klgetadr	; check "(", get adress value
 	jsr kerromein
 	cli
 	jmp sxyflp3
-
-; -----------------------------------------
-;
-csgetari8	cpy #$57		; INST?
-	bne csgetari9
-
-; ----------------------------------------- func INST
-;
-fninst	jsr getstrgs	; check "(", get 2 strings
-	jsr getbytc	; get position ($c51f)
-	stx pos
-	jsr $aef7		; sys ")"?
-
-	lda $9d		; direct mode?
-	beq +
-	jmp err15		; yes, error
-
-+	clc
-	lda strlen1	; newlen + pos > oldlen?
-	beq +
-	adc pos
-	cmp strlen2
-	bcc +
-	beq ++
-	jmp err17		; yes, "string too long"
-
-+	lda strlen2	; otherwise: build newstring (62/63)
-++	jsr neustr	; sys: set stringdescriptor
-
-;
-	ldy #0
-	sty $bf
-	sty helpvec
-
--	lda ($a9),y	; get char from oldstring
-	cpy pos		; at inst position?
-	bcc ++		; no
-
-	ldy $bf		; yes, inststring finished?
-	cpy strlen1
-	bcs +
-	inc $bf		; no,
-	lda ($a7),y	; get char from inststring
-+	ldy helpvec
-
-++	sta ($62),y	; write to newstring
-	inc helpvec
-	ldy helpvec	; all chars?
-	cpy strlen2
-	bcc -
-
-	jmp jpushstr	; yes, create new string on stringheapn (40)
 
 ; -----------------------------------------
 ;
@@ -3048,17 +3052,17 @@ csgetarig	cpy #$28		; AT?
 
 ; ----------------------------------------- func AT
 ;
-fnat	jsr sgetbyt1
-	cpx #40		; check limits (40/25)
+fnat	jsr sgetbyt1	; ! row (.x)
+	cpx #25		; check limits (40/25)
+	bcs +
+	stx helpvec
+
+	jsr sgetbytc	; ! column (.y)
+	cpx #40
 	bcs +
 	txa
-	pha
-	jsr sgetbytc
-	clc
-	pla
-	cpx #25
-	bcs +
 	tay
+	ldx helpvec	; .c=0: set cursor
 	jsr $fff0		; sys plot
 	jsr schkklz	; ")"?
 
@@ -6668,62 +6672,68 @@ befblock	jsr getxyxyf	; get top left and bottom right edges
 
 ; ----------------------------------------- bef REC
 ;
+; Rechteck:      A ------ B
+;                |        |
+;                D ------ C
+;
 befrec	jsr getxyxyf	; get x (AX), y (AY), Breite (EX), Höhe (EY) und Farbe ($f7)
 
-	lda ey		; ey retten
+	lda ey		; ey (Höhe) retten nach 61
 	sta $61
-	lda ay		; ey=ay (und ay retten)
+	lda ay		; ey=ay (und ay retten nach 62)
 	sta $62
 	sta ey
-	clc		; ax plus Breite (gleich Endpunkt X) -> 5f/60
-	lda ax
+
+	clc		; ax plus Breite (ex; endspalte X)
+	lda ax		; start-x merken auf stack
 	pha
 	adc ex
-	sta $5f		; merken Lo
+	sta $5f		; summe merken Lo -> 5f
 	sta ex
 	lda ax+1
 	pha
 	adc ex+1
-	sta $60		; merken Hi
+	sta $60		; summe merken Hi -> 60
 	sta ex+1
-	jsr linzei	; obere Linie (von ax nach ex auf ay) = AB
-;
-	pla
+	jsr linzei	; obere Linie (von ax nach ex auf höhe ay) = kante AB
+
+	pla		; start-x zurückholen nach ax
 	tax
 	sta ax+1
 	pla
-	pha
+	pha		; und gleich wieder merken auf stack
 	sta ax
 	txa
 	pha
-	clc		; ay plus Höhe (gleich Endpunkt Y) -> 61/62
+
+	clc		; ay plus höhe aus 61/62 (ey, gleich endzeile Y)
 	lda ay
 	adc $61
 	sta ay
 	sta ey
-	jsr incax
-	jsr linzei	; untere Linie (von ax nach ex auf ay+ey) = DC
-;
-	pla
+	jsr incax		; start-x plus 1 (wegen mögl. invertierung)
+	jsr linzei	; untere linie (von ax nach ex auf höhe ay+ey) = kante DC
+
+	pla		; start-x zurückholen
 	sta ax+1
 	sta ex+1
-	pla		; ex=ax
+	pla		; fixieren: ex=ax (linke kante)
 	sta ax
 	sta ex
-	jsr chkcrnr	; linke Linie (von ay nach ey auf ax) = AD
-;
-	lda $5f		; ax=ex
-	sta ax
+	jsr chkcrnr	; linke Linie (von ay nach ey auf spalte ax) = kante AD
+
+	lda $5f		; rechte spalte zurückholen (ax+ex)
+	sta ax		; fixieren: ax=ex (rechte kante)
 	sta ex
 	lda $60
 	sta ax+1
 	sta ex+1
-	lda $61		; height=0?
+	lda $61		; höhe=0?
 	beq +
-	dec ey		; no, height minus 1 (to save bottom right corner)
-+	jsr chkcrnr	; rechte Linie (von ay nach ey-1 auf ax+ex) = BC
+	dec ey		; nein, höhe minus 1 (wegen mögl. invertierung)
++	jsr chkcrnr	; rechte kante (von ay nach ey(-1) auf ax+ex) = kante BC
 
--	jmp endsmb
+-	jmp endsmb	; fertig
 
 ; -----------------------------------------
 ;
@@ -9885,12 +9895,12 @@ merge1	jsr basromein
 
 ; ----------------------------------------- Part of bef LOCAL
 ;
-localtab	!fill 76
+localtab	!fill 78		; 76 + 2 empty bytes
 
 ; -----------------------------------------
-;
+; ca00 (temporarily used by command X!)
 
-	!fill 258		; free space
+	!fill 256		; free space
 
 ; -----------------------------------------
 ; cb00 (temporarily used by command MAP)
