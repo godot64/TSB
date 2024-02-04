@@ -1,18 +1,13 @@
 ; -----------------------------------------
 ;
-; vdcbasic2_tsb v2c.0103
-; by GoDot, 21 Jan 2024:
-; Goodwell's version of VDCBasic 2c
+; vdcbasic_tsb v2c.0104
+; by GoDot (12 Jan 2024)
+; adapted from Goodwell's version of VDCBasic 2c (2023)
+; by Mac Bacon (2013) and originally by Felix 'skOi!nk' Rosenhahn (2003)
 ; adapted to TSB for the C128's C64 mode
 ;
-; Routines Section
+; v1.04 (04 Feb 2024)
 ;
-; -----------------------------------------
-
-	*=$7000
-
-	jmp start		; init system for use under TSB
-
 ; -----------------------------------------
 
 !src "vdclib.a"		; macros and code parts (by ACME)
@@ -22,31 +17,291 @@
 ; -----------------------------------------
 ; Zuweisungen
 
-	MODIFIED8	= $ff	; dummy value
+	MODIFIED8		= $ff	; dummy value
+	FST_FE_TOKEN	= $27	; BASIC 7 commands beyond  $fe $27
+	FST_CE_TOKEN	= $0b	; BASIC 7 functions beyond $ce $0b
+	commstart		= FST_FE_TOKEN-1
+	funcstart		= FST_CE_TOKEN-1
 
 	pport	= $01	; Processor Port
 	int	= $14
 	linnum	= $20	; uint16 for POKE, PEEK(), etc.
-	help	= $54	; JMP to TSB routines
+	prgindex	= $7a
 	helpvec	= $b0	; TSB's temporary variables ($b0..$b5)
 	arg1	= $b0	; actually tape and rs232 vars
 	arg2	= $b2
 	arg3	= $b4
 	arg4	= $a8
 	arg5	= $a9
+	helpvc2	= $b6	; counter in VCC
 
+	help	= $54	; JMP to TSB routines
+	function	= help
 	chrget	= $0073
 	chrgot	= $0079
+	bsout	= $ffd2
 	cset	= $d000	; Charset in C64
 	ax	= $c597	; 	word: X-Anfangswert
 	ay	= $c599	; 	word: Y-Anfangswert
 	ex	= $c5a9	; 	word: Endwert x
 	ey	= $c5ab	; 	word: Endwert y
 
+	tsblist	= $823f
+	tsbinterp	= $80dc
 	schkklz	= $8b56	; check for closing parenthesis
 	charen1	= $8e46	; switch c64 chargen on
 	charen0	= $8e54	; switch c64 chargen off
+	dec7a	= $8e31	; prgindex minus 1
 	sxyflp3	= $8cbf	; convert float to integer, result in $64 (hi) and $65 (lo)
+	sgetari	= $8f4b	; decode expressions of all kind
+	befold	= $9bc9	; performs an OLD
+
+
+; -----------------------------------------
+; entry point: intercept four BASIC vectors
+
+	* = $7900
+
+; ----------------------------------------- VDC-Basic TSB Init
+
+start	lda #$79		; delimit RAM
+	sta $38
+
+	ldx #$07		; set new vdcbasic vectors
+-	lda vectors, x
+	sta $0304, x
+	dex
+	bpl -
+
+; output installation message
+	jsr clear
+	lda #<message
+	ldy #>message
+	jsr $ab1e		; now: go!
+	jmp startup
+
+; -----------------------------------------
+
+detokenizer
+	php
+	sty helpvec	; register retten
+	stx helpvec+1
+
+sl2	ldx #>keywords	; zeiger setzen
+	stx linnum+1
+	ldx #<keywords
+	stx linnum
+	cmp #$fe		; ist VDC token im .a?
+	beq list		; ja, list vdc
+	cmp #$ce
+	beq list0
+
+back	ldy helpvec	; nein, flags für weitermachen im ROM-List
+	ldx helpvec+1
+lr1	plp
+	jmp tsblist
+
+; -----------------------------------------
+;
+list0	ldx #>functions
+	stx linnum+1
+	ldx #<functions
+	stx linnum
+	ldy helpvec
+	iny
+	lda ($5f),y
+	sbc #funcstart
+	jmp +
+
+list	ldy helpvec
+	iny
+	lda ($5f),y	; nächstes Zeichen (Token: $27..) holen
+	sbc #commstart
++	tax		; Token als zähler
+	ldy #0
+	cpx #1		; is first?
+	beq ml7		; yes, skip search
+
+list1	dex		; bis zum richtigen Befehlswort blättern...
+	beq list2
+ml5	jsr inc20
+	lda (linnum),y	; ...überlesen:
+	bpl ml5		; normale Zeichen: skip
+	bmi list1		; bei geshiftetem Zeichen: nächstes Befehlswort
+
+list2	jsr inc20
+ml7	lda (linnum),y	; dann richtiges befehlswort ausgeben
+	bmi ml8		; (bis zum geshifteten Zeichen)
+	jsr bsout
+	iny
+	bne ml7
+ml8	and #$7f		; geshiftetes zeichen ausgeben
+	jsr bsout
+	jsr rvsoff	; und rvs off (falls OPTION aktiv ist)
+	plp
+	ldy helpvec
+	iny
+	iny
+	lda ($5f),y
+	bne detokenizer
+
+; ----------------------------------------- Execute Commands
+
+execvdc 	jsr chrget	; skip possible command delimiter
+	beq execvdc
+	ldy #0
+	lda (prgindex),y	; current byte:
+	cmp #$fe		; VDC-Basic command?
+	bne +		; no, change to next interpreter
+	iny		; yes, get token number
+	lda (prgindex),y
+	sbc #FST_FE_TOKEN
+	asl
+	tay
+	lda ipointer+1, y	; and address of command
+	pha
+	lda ipointer, y
+	pha
+	jmp chrgot	; exec command
+
++	jsr dec7a
+	jmp tsbinterp	; none of these, continue in TSB
+
+; ----------------------------------------- Execute Functions
+
+decoder	ldy #1
+	lda (prgindex),y	; current byte:
+	cmp #$ce		; VDC-Basic function?
+	bne +		; no, change to next interpreter
+	iny		; yes, get token number
+	lda (prgindex),y
+	sbc #FST_CE_TOKEN
+	asl
+	tay
+	lda fpointer+1, y	; and address of function
+	sta function+2
+	lda fpointer, y
+	sta function+1
+	jmp function	; exec function
+
++	jmp sgetari	; (no vdc expression,) continue in TSB
+
+
+; ----------------------------------------- VDC Tokenizer
+;
+tokenizer	jsr $8178		; 1st: tokenize TSB (and then V2)
+
+	ldy #4		; check $0200 (until $00)
+next	iny
+next1	lda $01fb,y
+	bne ma1
+ende	rts
+
+ma1	cmp #$22		; quote? (and also: $00)
+	bne ziffer
+ma4	sta helpvec+1
+ma2	iny
+	lda $01fb,y	; line end?
+	beq ende		; yes, finished
+	cmp helpvec+1	; quote end?
+	bne ma2		; no, skip string
+	beq next		; yes, cont. scan
+
+ziffer	cmp #$41		; is a char? (less than "a"?)
+	bcc next
+	cmp #$db		; (more than "Z"?)
+	bcs next
+
+	sty helpvec	; yes, save index into $0200 in helpvec
+	ldx #>keywords
+	stx linnum+1
+	ldx #<keywords
+	stx linnum
+
+	ldx #commstart	; init token counter to #$26 (1st token: $27)
+	stx codezae
+	ldx #0
+
+cmpare	sec		; check chars in keyword list against basic line
+	sbc (linnum,x)
+	beq mt1		; if equal, next char
+	cmp #$80		; found keyword? (last char is shifted)
+	beq mt6		; yes, transform to token
+
+mt5	lda (linnum,x)	; no, end of keyword list?
+	beq next		; yes, get next char in basic line
+	bmi mt4		; shifted?
+	jsr inc20		; no, skip keyword until shifted
+	bne mt5
+
+mt4	inc codezae	; yes, next command word (count it)
+	ldy helpvec	; re-get $0200 index
+	!by $a9
+mt1	iny		; from cmpare: keyword chars still equal, so
+	lda $01fb,y	; cont. compare
+	jsr inc20
+	bne cmpare
+
+mt6	cpy helpvec	; index moved?
+	beq tonext	; no, advance
+
+token1	ldx helpvec	; otherwise:
+	lda #$fe		; write vdc token,
+	sta $01fb,x
+token2	lda codezae	; write counter as token number
+	cmp #$37		; 38/39: these are functions!
+	bcc +
+
+	pha		; then: set CE-Token 0b/0c
+	lda #$ce
+	sta $01fb,x
+	pla
+	sbc #$2d
+
++	inx
+	sta $01fb,x
+	inc $01fb,x
+
+vor	iny		; move up rest of line
+	inx
+	lda $01fb,y
+	sta $01fb,x
+	bne vor
+mt13	inx
+	lda #0		; delete beyond by $00
+	sta $01fb,x
+	lda $01fb+1,x
+	bne mt13
+
+	ldy helpvec	; get next char from basic line
+	iny
+tonext	jmp next
+
+; -----------------------------------------
+; keywords and pointers, starting at $fe.27 and $ce.0b
+; fe27:
+keywords	!pet "rgW", "rgA", "rgR"
+	!pet "vmW", "vmA", "vmO"
+	!pet "vmF", "vmC"
+	!pet "rtV", "vtR", "vcC", "swP"
+	!pet "rsT", "syN"
+	!pet "disP", "attR", "crsR"
+; RGR instead of RGO because GO gets tokenized by Basic V2
+; ce0b:
+functions	!pet "rgD", "vmD"
+	!byte 0			; terminator
+
+ipointer	!word rgw - 1, rga - 1, rgo - 1
+	!word vmw - 1, vma - 1, vmo - 1
+	!word vmf - 1, vmc - 1
+	!word rtv - 1, vtr - 1, vcc - 1, swp - 1
+	!word rst - 1, syn - 1
+	!word disp - 1, attr - 1, crsr - 1
+
+fpointer	!word rgd, vmd
+
+vectors	!word tokenizer, detokenizer, execvdc, decoder
+message	!pet 13,"vdcbasic tsb v1.04 installed",13,0
 
 ; ----------------------------------------- Tables
 ; Tabellen
@@ -99,15 +354,13 @@ vdcinit			; register, value
 ; 7045 ------------------------------------ Get 2 Arguments
 ; read args (uint16, uint8) and activate I/O
 
-get2parms
-	jsr sgetadr
+get2parms	jsr sgetadrn
 	jmp sgetbytc	; >> int, X
 
 ; 704b ------------------------------------ Get 3 Arguments
 ; read args (uint16, uint8) and activate I/O
 
-get3parms			; complex_instruction_parse3args:
-	jsr sgetadr
+get3parms	jsr sgetadrn
 	sty arg1
 	sta arg1 + 1
 	jsr sgetadrc
@@ -144,13 +397,7 @@ getmparms	jsr get3parms
 ; 70d7
 endpeek	tay
 	jsr sxyflp3	; convert result to float
-	jsr schkklz	; check for closing parenthesis
-
-	pla		; restore linnum
-	sta linnum
-	pla
-	sta linnum+1        ; restore linnum
-	rts
+	jmp schkklz	; check for closing parenthesis
 
 ; 70e5 ------------------------------------
 
@@ -162,7 +409,7 @@ endpeek	tay
 			; .return_version ; read fake "VDC version" register
 	lda vdc_state
 	and #%...#####
-	jmp endpeek
+	jmp +
 
 ; -----------------------------------------
 ; Befehle
@@ -171,25 +418,26 @@ endpeek	tay
 ; 70f0 ------------------------------------ RGD
 ; read VDC register
 
-rgd	lda linnum + 1	; we must backup this because it might be in use by caller
-	pha
-	lda linnum
-	pha
+rgd	jsr chrget	; skip token indicator ($ce)
+	jsr chrget	; skip token
+	jsr chrget	; read parenthesis
 	jsr klgetadr	; check for opening parenthesis, get address value
 	ldx int
 	cpx #254		; first fake register
 	bcs .read_fake_register
 	jsr vdc_reg_X_to_A	; normal registers
-	jmp endpeek	; end of PEEK, does TAY:PLA:STA$16:PLA:STA$17:JMP$84d4
++	jmp endpeek
 
 ; 7105 ------------------------------------ RGW
 ; RGW:
 ; Register Write (.a to vdc.xx)
 
-rgw	jsr get2parms	; >> int, X
+rgw	jsr chrget
+	jsr get2parms	; >> int, X
 	txa
 	ldx int
-	jmp A_to_vdc_reg_X	; vdclib
+	jsr A_to_vdc_reg_X	; vdclib
+	jmp endsmb
 
 ; 710e ------------------------------------ RGA
 ; VDC register &= value
@@ -204,26 +452,31 @@ rga	lda #opcode_AND_8	; makro
 
 rgo	lda #opcode_ORA_8	; selfmodify opcode!
 	sta .rgoSMOD
+	jsr chrget
 	jsr get2parms	; >> int, X
 	stx int + 1	; store value in unused high-byte of address
 	ldx int
 	jsr vdc_reg_X_to_A
 .rgoSMOD	and int + 1	; MODIFIED to perform either AND $xx or ORA $xx
-	jmp A_to_vdc_reg_X
+	jsr A_to_vdc_reg_X
+	jmp endsmb
 
 ; 7125 ------------------------------------ RST
 ; Reset
 
-rst	jsr sgetbyt1	; get 0, 1 or 2
+rst	jsr incbasbz
+	jsr incbasbz
+	jsr sgetbyt1	; get 0, 1 or 2
 	txa
 	lsr		; 1?
 	bcc +
 	pha		; yes, reset VDC
 	jsr resetvdc
 	pla
-+	lsr		; 2?
-	bcc .rts
-	jmp copycset	; yes, copy ROM charset to VDC
++	lsr		; 2? (or 3?)
+	bcc +
+	jsr copycset	; yes, copy ROM charset to VDC
++	jmp endsmb
 
 ; 7137 ------------------------------------ Reset VDC
 
@@ -246,6 +499,8 @@ copycset	ldy #>cset		; from $d000 (in C64)
           lda #0
           sta helpvec
           jsr A_to_vdc_reg_X
+	ldx #31			; ! prepare VRAM access: set data reg
+	stx vdc_reg		; !
 
           ldy #0			; transfer:
 edlc_10	jsr charen0		; switch char generator on
@@ -254,13 +509,13 @@ edlc_10	jsr charen0		; switch char generator on
           jsr charen1		; and switch char generator off
 	cli
 	pla
-	jsr A_to_vdc_data		; and write to VDC
+	+vdc_sta			; ! and write to VDC
           iny
           cpy #8			; 8 bytes per character
           bcc edlc_10
 
           lda #0
-edlc_20   jsr A_to_vdc_data		; followed by 8 zeros
+edlc_20   +vdc_sta			; ! followed by 8 zeros
           dey
           bne edlc_20
 
@@ -274,8 +529,6 @@ edlc_20   jsr A_to_vdc_data		; followed by 8 zeros
           cmp #$e0			; up to $e000
           bcc edlc_10
 	rts
-
-	nop
 
 ; 718a ------------------------------------ CRSR
 ; set cursor address
@@ -294,23 +547,27 @@ attr	lda #vdcr_attr_hi
 
 disp	lda #vdcr_display_hi
 	pha
-	jsr sgetadr	; >> int
+	jsr chrget
+	jsr sgetadrn 	; >> int
 	pla
 	tax
 	lda int + 1	; get high byte for first register (yes, sixteen-bit VDC registers are big-endian)
 	jsr A_to_vdc_reg_X
 	inx
 	lda int		; get low byte for second register
-	jmp A_to_vdc_reg_X
+	jsr A_to_vdc_reg_X
+	jmp endsmb
 
 ; 71a3 ------------------------------------ VMW
 ; VRAM location = value
 
-vmw	jsr get2parms	; >> int, X
+vmw	jsr chrget
+	jsr get2parms	; >> int, X
 	txa
 	ldy int
 	ldx int + 1
-	jmp A_to_vram_XXYY
+	jsr A_to_vram_XXYY
+	jmp endsmb
 
 ; 71ae ------------------------------------ VMA
 ; VRAM location &= value
@@ -322,6 +579,7 @@ vma	lda #opcode_AND_8
 
 vmo	lda #opcode_ORA_8
 	sta .SELFMOD
+	jsr chrget
 	jsr get2parms	; >> int, X
 	ldy int
 	stx int		; store value in (no longer needed) low-byte of address
@@ -329,21 +587,20 @@ vmo	lda #opcode_ORA_8
 	jsr vram_AAYY_to_A
 .SELFMOD	and int		; MODIFIED to perform either AND $xx or ORA $xx
 	ldx int + 1
-	jmp A_to_vram_XXYY
+	jsr A_to_vram_XXYY
+	jmp endsmb
 
 ; 71c9 ------------------------------------ VMD
 ; read VRAM location
 
-vmd	lda linnum + 1	; we must backup this because it might be in use by caller
-	pha
-	lda linnum
-	pha
+vmd	jsr chrget	; skip token indicator ($ce)
+	jsr chrget	; skip token
+	jsr chrget	; read parenthesis
 	jsr klgetadr	; check for opening parenthesis, get address value
 	ldy int
 	lda int + 1
 	jsr vram_AAYY_to_A
-	jmp endpeek	; end of PEEK,
-			; does TAY:PLA:STA$16:PLA:STA$17:JMP$84d4
+	jmp endpeek
 
 ; 71dc ------------------------------------ VMF
 ; fill VRAM with value
@@ -351,7 +608,8 @@ vmd	lda linnum + 1	; we must backup this because it might be in use by caller
 
 	+addcode_vdc_do_YYAA_cycles
 ; 71fd
-vmf	jsr get3parms	; > AAYY = arg3
+vmf	jsr incbasbz
+	jsr get3parms	; > AAYY = arg3
 	tya		; take a look at low byte
 	bne +
 	dec arg3 + 1
@@ -366,58 +624,61 @@ vmf	jsr get3parms	; > AAYY = arg3
 	jsr A_to_vram_XXYY
 	lda arg3		; set count
 	ldy arg3 + 1
-	jmp vdc_do_YYAA_cycles
+	jsr vdc_do_YYAA_cycles
+	jmp endsmb
 
 ; 7221 ------------------------------------ VMC
 ; copy VRAM to VRAM
 
-vmc	jsr getmparms 	; > AAYY = arg3
+vmc	jsr incbasbz
+	jsr getmparms 	; > AAYY = arg3
 
 	ldx #24		; BLOCK COPY (reg24)
 	jsr vdc_reg_X_to_A	; get value of vdcreg in .x to .a
 	ora #128
 	jsr A_to_vdc_reg_X	; write .a to vdcreg in .x
 
-	ldy arg1 + 1	; get source address
-	lda arg1
-	ldx #32
-	jsr AY_to_vdc_regs_Xp1 ; write .a (lo) and .y (hi) to vdcregs in .x
+-	ldy arg1		; get source address
+	lda arg1 + 1
+	ldx #32		; write .a (hi) and .y (lo) to vdcregs in .x
+	jsr AY_to_vdc_regs_Xp1
 
--	ldy arg2 + 1	; loop: get target address
-	lda arg2
+	ldy arg2		; loop: get target address
+	lda arg2 + 1
 	jsr AY_to_vdc_regs_18_19
-	lda arg3		; get counter
-	ldy arg3 + 1
-	jsr vdc_do_YYAA_cycles ;
-	dec arg4
+	ldy arg3 + 1	; get byte counter
+	lda arg3
+	jsr vdc_do_YYAA_cycles
+	dec arg4		; repetition counter
 	beq +
 	clc
-	lda arg2
+	lda arg2		; add value to target address
 	adc arg5
 	sta arg2
-	bcc -
+	bcc -		; and loop
 	inc arg2+1
 	jmp -
 
-+	rts
++	jmp endsmb	; until finished
+
 
 ; 7258 ------------------------------------ VCC
 ; copy charset from RAM to VRAM
 ; get low byte of RAM pointer into Y and clear base pointer's low byte instead
 
-vcc	jsr get3parms
-	ldy arg1
+vcc	jsr incbasbz
+	jsr get3parms	; src: arg1, dst: arg2, len: arg3
+	ldy #0		; arg1: $b0  arg2: $b2  arg3: $b4
 	ldx #0
-	stx arg1
+	stx arg3		; arg3 gets abandoned and fixed to 256 chars
 
----	ldx #18		; set VRAM pointer hi to target (arg2)
+---	ldx #18		; set VRAM pointer to target (arg2):
 	lda arg2 + 1
-	stx vdc_reg
-	sta vdc_data
+          jsr A_to_vdc_reg_X	; hi
 	inx
 	lda arg2		; and lo
 	stx vdc_reg
-	sta vdc_data
+          jsr A_to_vdc_reg_X
 	ldx #31		; prepare VRAM access: set data reg
 	stx vdc_reg
 	clc		; prepare target address for next iteration (plus 16)
@@ -425,27 +686,26 @@ vcc	jsr get3parms
 	sta arg2
 	bcc +
 	inc arg2 + 1
-+	lda #8		; set loop counter (8 bytes per char)
-	sta arg3 + 1	; character size
-	ldx #0		; ROMs and I/O
++	jsr copychar
+	dec arg3		; yes, all 256 done?
+	bne ---
+	jmp endsmb	; yes, finished
 
 ; loop to copy a single character pattern
---	lda (arg1), y	; read byte from RAM
-
-	iny		; increment RAM pointer
-	beq .fix_hi
-
-.back	+vdc_sta		; write byte to VRAM
-
-	dec arg3 + 1	; check whether done with this char
-	bne --
-
-	dec arg3		; all characters done?
-	bne ---
+copychar	ldx #8		; set loop counter (8 bytes per char)
+-	lda (arg1), y	; read byte from C64-RAM (src)
+	iny		; increment RAM pointer .y
+	bne +		; when 0: inc src hi
+	inc arg1 + 1	; inc src hi after 1 page, .y=0
++	+vdc_sta		; and write byte to VRAM
+	dex		; check whether done with this char
+	bne -
+	ldx #8		; fill vdc char to 16 bytes
+	lda #0
+-	+vdc_sta
+	dex
+	bne -		; loop until char copied
 	rts
-
-.fix_hi	inc arg1 + 1
-	jmp .back
 
 ; 72a3 ------------------------------------ Transfer
 ;
@@ -466,7 +726,7 @@ rtv_vtr_swp_shared_setup
 	txa
 	sbc arg3 + 1
 	sta arg3 + 1
-	rts		; > X=0 (callers depend on it)
+	rts		; .x=0 (callers depend on it)
 
 ; 72b9 ------------------------------------ Transfer
 ; copy RAM to VRAM
@@ -478,20 +738,24 @@ VDC_COUNTER	= arg3
 	+addcode_ram_to_vram
 	+addcode_vram_to_ram
 ; 7311
-rtv	jsr get3parms
+rtv	jsr incbasbz
+	jsr get3parms
 	ldy arg2
 	lda arg2 + 1
 	jsr rtv_vtr_swp_shared_setup
-	jmp ram_to_vram
+	jsr ram_to_vram
+	jmp endsmb
 
 ; 731e ------------------------------------ VTR
 ; copy VRAM to RAM
 
-vtr	jsr get3parms
+vtr	jsr incbasbz
+	jsr get3parms
 	ldy arg1
 	lda arg1 + 1
 	jsr rtv_vtr_swp_shared_setup
-	jmp vram_to_ram
+	jsr vram_to_ram
+	jmp endsmb
 
 ; 732b ------------------------------------ SWP
 ; exchange contents of RAM and VRAM
@@ -500,7 +764,7 @@ swp	jsr get3parms
 	ldy arg1
 	lda arg1 + 1
 	jsr rtv_vtr_swp_shared_setup	; >> X=0
-; get lowbyte into Y and clear base pointer's lowbyte instead
+; get lowbyte into .y and clear base pointer's lowbyte instead
 	ldy arg2
 	stx arg2
 
@@ -535,7 +799,7 @@ swp	jsr get3parms
 	bne ---
 	inc arg3 + 1
 	bne ---
-	rts
+	jmp endsmb
 
 .fix_vram_hi
 	inc arg1 + 1
@@ -550,13 +814,16 @@ swp	jsr get3parms
 ; read reg/value pairs into buffer, SYN, write data to vdc regs
 ; remember start of array
 
-syn	jsr chrgot	; anything else?
+syn	jsr incbasbz
+	jsr incbasbz
+	jsr chrgot	; anything else following?
 	bne .syn_with_args
+	jsr just_syn
+	jmp endsmb
 			; wait for end of text window
-.just_syn
--	lda vdc_state		; wait until we are in text window
+just_syn	lda vdc_state	; wait until we are in text window
 	and #$20
-	bne -
+	bne just_syn
 			; wait until we are out of text window
 -	lda vdc_state
 	and #$20
@@ -568,14 +835,14 @@ syn	jsr chrgot	; anything else?
 	stx .spbuf
 	bne .entry
 
--	jsr schkcom		; parse reg (not 1st!)
+-	jsr schkcom	; parse reg (not 1st!)
 .entry	jsr sgetbyt1
 	txa
 	pha
-	jsr sgetbytc		; parse value
+	jsr sgetbytc	; parse value
 	txa
 	pha
-	jsr chrgot		; more? (on stack!)
+	jsr chrgot	; more? (on stack!)
 	bne -
 
 ; remember end of array
@@ -584,7 +851,7 @@ syn	jsr chrgot	; anything else?
 
 ; remember interrupt mask
 	php
-	jsr .just_syn		; this will activate i/o
+	jsr just_syn
 	sei
 
 ; write buffered reg/value pairs to vdc
@@ -605,19 +872,11 @@ syn	jsr chrgot	; anything else?
 .spbuf = * + 1:
 	ldx #MODIFIED8	; restore stack!
 	txs
-	rts
-
-; -----------------------------------------
-; ----------------------------------------- TSB Integration
-; -----------------------------------------
-; 73d9
-start	ldx #0
-	jsr setvdc
-	rts
+	jmp endsmb
 
 ; 73df ------------------------------------ Init VDC
-; init VDC
 
+initvdc	ldx #0
 setvdc	ldy vdcinit,x	; register
 	bmi +
 	inx
@@ -628,4 +887,7 @@ setvdc	ldy vdcinit,x	; register
 	bpl setvdc
 +	inx
 	rts
+
+startup	jsr initvdc
+	jmp befold	; perform OLD
 

@@ -3,9 +3,14 @@
 
 ; ----------------------------------- bef MAP
 ;
-; MAP column, row , pattern$, colors%(n) [; expression]
+; MAP writes 2x2 char patterns into screen ram to build
+; game worlds, each pattern is single colored
 ;
-; COLUMN and ROW are screen positions. They get internally
+; Syntax:
+;
+; MAP row, column, pattern$, cols%(n) [; expression]
+;
+; ROW and COLUMN are screen positions. They get internally
 ; doubled, so max length of PATTERN$ is 20.
 ; PATTERN$ contains a map for tiles in a playing ground
 ; (and may (or should) be an array), base code is 35 (#).
@@ -18,7 +23,11 @@
 ; from an array or just a (literal) string or something like
 ; AT(col,row)"text" (all kinds of PRINT parameters).
 ;
+; v1.01 2024-02-04
+;
 ; -----------------------------------
+
+	neo	= 1
 
 	int	= $14		; word, integer value
 	progz	= $7a		; basic program pointer
@@ -26,6 +35,8 @@
 	helpvc2	= $b2
 	helpvc3	= $b4
 	video	= $0288		; current address of video (high byte)
+
+!if neo=0 {
 ; TSB:
 	schkcom	= $8030		; checks for comma
 	chkscolon	= $813e		; checks for all following data
@@ -34,15 +45,16 @@
 	endsmb	= $8229		; finish TSB command
 	incbasbz	= $83d8		; increment basic pointer
 	sgetstr	= $86b6		; get string
-; TSB neo:
-;	endsmb	= $80d2		; finish TSB command
-;	schkcom	= $8b89		; checks for comma
-;	chkscolon	= $8bc7		; checks for all following data
-;	sgetbytn	= $8c2f		; get byte value (to .x) after proceeding 1 byte
-;	sgetbytc	= $8c34		; get byte value (to .x) after checking for comma
-;	sgetstr	= $8c3d		; get string
-;	incbasbz	= $8e2a		; increment basic pointer
-
+} else {
+; TSBneo:
+	schkcom	= $8b89		; checks for comma
+	chkscolon	= $8bc7		; checks for all following data
+	sgetbytc	= $8c34		; get byte value (to .x) after checking for comma
+	sgetbytn	= $8c2f		; get byte value (to .x) after proceeding 1 byte
+	endsmb	= $80d2		; finish TSB command
+	incbasbz	= $8e2a		; increment basic pointer
+	sgetstr	= $8c3d		; get string
+}
 
 ; ----------------------------------- MAP: FILL with 2x2 tiles derived from pattern$
 ; every 4 pattern values must be consecutive (1, then 2..3..4)
@@ -52,13 +64,15 @@ fillpat	lda video		; get video address hi
 	lda #$d8		; get color ram address hi
 	sta setcram+2
 
-	jsr sgetbytn	; get value COLUMN to .x
+	jsr sgetbytn	; get value ROW to .x
+	stx helpvc2
+	jsr sgetbytc	; get value COLUMN to .x
 	txa		; times 2
 	asl
 	sta setvram+1	; store to video...
 	sta setcram+1	; and to color ram pointers (self modification)
 
-	jsr sgetbytc	; get value ROW to .x
+	ldx helpvc2	; COLUMN
 torow	dex		; if 0: skip computation of screen row
 	bmi writemap	; continue
 	clc		; compute screen row address (add 80 .x times)
