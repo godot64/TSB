@@ -1,12 +1,12 @@
 ; -----------------------------------------
 ;
-; vdcbasic_tsb v2c.0104
+; vdcbasic_tsb v2c
 ; by GoDot (12 Jan 2024)
 ; adapted from Goodwell's version of VDCBasic 2c (2023)
 ; by Mac Bacon (2013) and originally by Felix 'skOi!nk' Rosenhahn (2003)
 ; adapted to TSB for the C128's C64 mode
 ;
-; v1.04 (04 Feb 2024)
+; v1.05 (04 Feb 2024)
 ;
 ; -----------------------------------------
 
@@ -109,9 +109,15 @@ list0	ldx #>functions
 	stx linnum
 	ldy helpvec
 	iny
+	tax
 	lda ($5f),y
+	cmp #$0d		; größer als Token für VMD?
+	bcs toback	; ja, kein Schlüsselwort
+	sec
 	sbc #funcstart
 	jmp +
+toback	txa
+	bne back
 
 list	ldy helpvec
 	iny
@@ -301,7 +307,7 @@ ipointer	!word rgw - 1, rga - 1, rgo - 1
 fpointer	!word rgd, vmd
 
 vectors	!word tokenizer, detokenizer, execvdc, decoder
-message	!pet 13,"vdcbasic tsb v1.04 installed",13,0
+message	!pet 13,"vdcbasic tsb v1.05 installed",13,0
 
 ; ----------------------------------------- Tables
 ; Tabellen
