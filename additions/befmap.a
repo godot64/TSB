@@ -23,7 +23,7 @@
 ; from an array or just a (literal) string or something like
 ; AT(col,row)"text" (all kinds of PRINT parameters).
 ;
-; v1.01 2024-02-04
+; v1.02 2024-02-05
 ;
 ; -----------------------------------
 
@@ -55,44 +55,55 @@
 	incbasbz	= $8e2a		; increment basic pointer
 	sgetstr	= $8c3d		; get string
 }
+	setcol	= $c9f1
+	setvram	= setcol+4	; routine to set data
+	pcolor	= setvram+5
+	setcram	= setvram+7
 
 ; ----------------------------------- MAP: FILL with 2x2 tiles derived from pattern$
 ; every 4 pattern values must be consecutive (1, then 2..3..4)
 
-fillpat	lda video		; get video address hi
+fillpat	lda $c9ff		; already running?
+	cmp #$60
+	beq +
+	ldx #(modend-setvals)
+-	lda setvals,x	; no, install
+	sta setcol,x
+	dex
+	bpl -
+
++	lda video		; get video address hi
 	sta setvram+2
 	lda #$d8		; get color ram address hi
-	sta setcram+2
+	sta setcram+1
 
 	jsr sgetbytn	; get value ROW to .x
 	stx helpvc2
 	jsr sgetbytc	; get value COLUMN to .x
-	txa		; times 2
-	asl
-	sta setvram+1	; store to video...
-	sta setcram+1	; and to color ram pointers (self modification)
+	stx setvram+1	; store to video...
+	stx setcram	; and to color ram pointers
 
-	ldx helpvc2	; COLUMN
+	ldx helpvc2	; ROW:
 torow	dex		; if 0: skip computation of screen row
 	bmi writemap	; continue
-	clc		; compute screen row address (add 80 .x times)
+	clc		; compute screen row address (add 40 .x times)
 	lda setvram+1
-	adc #80
+	adc #40
 	sta setvram+1
 	bcc +
 	inc setvram+2
-	clc		; add 80 to color ram respectively
-+	lda setcram+1
-	adc #80
-	sta setcram+1
+	clc		; add 40 to color ram respectively
++	lda setcram
+	adc #40
+	sta setcram
 	bcc torow
-	inc setcram+2
+	inc setcram+1
 	bne torow		; loop to reach correct row
 
 ; -----------------------------------
 
 writemap	jsr schkcom	; get pattern string (e.g. string array MA$):
-	jsr sgetstr	; len 69, adr 22/3
+	jsr sgetstr	; len 69, adr 22/3 in .a and .x
 	sta helpvec+1
 	stx helpvec
 	lda $69
@@ -103,10 +114,10 @@ writemap	jsr schkcom	; get pattern string (e.g. string array MA$):
 	ldx $47		; get addr of 1st value in array...
 	ldy $48
 	inx
-	stx colors+1
+	stx setcol+1
 	bne +
 	iny
-+	sty colors+2	; ...and set address (self modification)
++	sty setcol+2	; ...and set address
 	pla		; reget len of string
 	beq empty		; if 0: skip map output
 
@@ -127,8 +138,8 @@ loop	lda (helpvec),y	; get pattern from MA$
 	asl		; double pattern value (for CO%)
 	tax		; shift pattern value to .x
 ; cb73
-colors	lda $0000,x	; get color value from CO% (self modified earlier)
-	sta pcolor+1	; store for whole tile
+	jsr setcol	; get color value from CO%
+	sta pcolor	; store for whole tile
 
 	txa		; add 64 to pattern value in .a
 storex	ldx helpvc3	; and reget .x
@@ -158,7 +169,7 @@ storex	ldx helpvc3	; and reget .x
 skip2	inx		; add 2 to .x for color values (are in an INT array)
 	inx
 	iny		; add 1 to .y (for next pattern)
-patlen	cpy #20		; reached LEN? (all patterns?)
+patlen	cpy #20		; reached LEN? (all patterns processed?)
 	bcc loop		; no, loop to proceed
 
 empty	jsr chkscolon	; anything following? (output if yes)
@@ -166,14 +177,16 @@ empty	jsr chkscolon	; anything following? (output if yes)
 	jmp endsmb	; command finished
 
 ; ----------------------------------- Store to Screen
-
-setvram	sta $0000,x	; store .a to video (self modified earlier)
+; runs at $c9f1
+setvals	lda $0000,x	; get color value from CO%
+	rts
+	sta $0000,x	; store .a to video
 	pha		; keep value
-pcolor	lda #0		; color (preset: blk)
-setcram	sta $0000,x	; store to color ram (self modified earlier)
+	lda #0		; color (preset: blk)
+	sta $0000,x	; store to color ram
 	pla		; reget value
 	rts
-
 ; -----------------------------------
 
+modend	!eof
 
