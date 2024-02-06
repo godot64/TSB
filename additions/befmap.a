@@ -8,7 +8,7 @@
 ;
 ; Syntax:
 ;
-; MAP row, column, pattern$, cols%(n) [; expression]
+; MAP row, column, pattern$, cols%(n)
 ;
 ; ROW and COLUMN are screen positions. They get internally
 ; doubled, so max length of PATTERN$ is 20.
@@ -19,11 +19,8 @@
 ; COLORS% contains the base color of each tile in the map
 ; (and *must* be an array of integers, max N for one
 ; tileset is 48).
-; Optional parameter EXPRESSION could transport a tile string
-; from an array or just a (literal) string or something like
-; AT(col,row)"text" (all kinds of PRINT parameters).
 ;
-; v1.02 2024-02-05
+; v1.03 2024-02-06
 ;
 ; -----------------------------------
 
@@ -122,34 +119,34 @@ writemap	jsr schkcom	; get pattern string (e.g. string array MA$):
 	beq empty		; if 0: skip map output
 
 ; ----------------------------------- Map output
-; cb5e
+;
 	ldy #0		; init .x and .y
 	ldx #0
 
-loop	lda (helpvec),y	; get pattern from MA$
-	cmp #32		; skip pattern "space"...
+loop	lda (helpvec),y	; get pattern from MA$ (petscii code number)
+	cmp #32		; skip "space"...
 	beq skip2
-	cmp #160		; ...or pattern "shift space" (saves time)
-	bcs skip2
+	cmp #160		; or "shift space" (faster)
+	beq skip2
 
 	sec		; subtract base value 35 from pattern value
 	sbc #35
-	stx helpvc3	; save .x
-	asl		; double pattern value (for CO%)
-	tax		; shift pattern value to .x
-; cb73
+	stx helpvc3	; save .x (as index into charset)
+	asl		; double pattern value (for CO% distances)
+	tax		; shift value to .x as index into CO%
+;
 	jsr setcol	; get color value from CO%
 	sta pcolor	; store for whole tile
 
-	txa		; add 64 to pattern value in .a
-storex	ldx helpvc3	; and reget .x
+	txa		; double index again (every 4 chars are 1 tile)
+	ldx helpvc3	; reget .x (charset index)
 	asl
-	clc
+	clc		; add 64 (offset to char "@")
 	adc #$40
 	jsr setvram	; store pattern and color
 	adc #1		; proceed to next pattern, same color,
 	inx		; next position:
-	jsr setvram	; store, we now have pattern: "ab"
+	jsr setvram	; store, we now have processed pattern "ab"
 	adc #1
 	pha		; save pattern to stack
 	txa		; add 39 to .x (position)
@@ -159,8 +156,8 @@ storex	ldx helpvc3	; and reget .x
 	jsr setvram	; store pattern and color one row below
 	adc #1		; proceed to next pattern, same color,
 	inx		; next position:
-	jsr setvram	; store, we now have pattern: "ab"
-			; 		          "cd"
+	jsr setvram	; store, we now have processed pattern "ab"
+			; 			         "cd"
 	txa		; subtract 41 from .x (position)
 	sec
 	sbc #41
@@ -172,9 +169,7 @@ skip2	inx		; add 2 to .x for color values (are in an INT array)
 patlen	cpy #20		; reached LEN? (all patterns processed?)
 	bcc loop		; no, loop to proceed
 
-empty	jsr chkscolon	; anything following? (output if yes)
-
-	jmp endsmb	; command finished
+empty	jmp endsmb	; command finished
 
 ; ----------------------------------- Store to Screen
 ; runs at $c9f1
