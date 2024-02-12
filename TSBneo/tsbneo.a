@@ -1480,7 +1480,7 @@ textchr	!tx "chr$(13)",0
 ;
 version	!tx "ad23"	; Signature
 	!by $0d
-	!tx "2.40131"	; Version Number
+	!tx "2.40212"	; Version Number
 
 ; -----------------------------------------
 ;
@@ -2406,12 +2406,12 @@ enhexbin	jsr sgetadr
 	lda #0		; transfer and convert to string
 	tay
 	sta linenum,x
-mkstrng	iny
+mkstrng	iny		; startaddress at $0100 (.a/.y)
 	jsr $b487		; sys make string
 	jsr $b6a3		; sys frestr
 	jsr $b47d		; sys set string
-	jsr $b68c		; sys generate string
-	jmp $b4ca		; sys string on stack
+	jsr $b68c		; sys generate string (to heap)
+	jmp $b4ca		; sys put string on string stack
 
 ; -----------------------------------------
 ;
@@ -2587,6 +2587,7 @@ fnjoy	ldy #$00		; set $dc00
 	and #1		; delimit to 0/1
 	tay
 
+--
 +	lda (helpvec),y	; get joy
 	sta $20
 	and #$6f		; skip fire
@@ -2614,7 +2615,8 @@ fnjoy	ldy #$00		; set $dc00
 	sta joywert
 
 +	ldy joywert	; convert to float
-	jmp sxyflp3	; $8CCB
+	beq fpl0		; beq -- ($f0 $e1) if JOY should wait
+	bne fpl0		; $8CCB
 
 
 ; -----------------------------------------
@@ -2667,11 +2669,10 @@ fnplace	jsr getstrgs	; check "(", get 2 strings
 	cpy strlen1	; as long as str1?
 	bne -
 	inc plpos		; yes, position found, create value
-	lda plpos
---	tay
+	ldy plpos
 	lda #0
-	sta $0d
-	jmp sxyflp3
+--	sta $0d
+fpl0	jmp sxyflp3
 
 +	ldy #0		; char not found yet, advance in oldstr
 	inc $a9
@@ -6348,6 +6349,9 @@ moboff	and mbittabl,x	; OFF
 ; ----------------------------------------- bef DETECT
 ;
 befdetect	jsr sgetbytn
+	txa
+	and #1
+	tax
 	stx detectart
 	lda $d01e,x	; no check for 0 or 1 in .x!
 	sta detecterg
@@ -6539,8 +6543,7 @@ befgraphics
 
 ; -----------------------------------------
 ; gap
-	!by 0,0,0,0,0,0,0,0
-	!by 0
+	!by 0,0,0,0,0
 
 ; ----------------------------------------- bef HIRES
 ;
@@ -7225,7 +7228,7 @@ farbset	jsr kerromein
 
 ; ----------------------------------------- BLOCK in Hires Mode
 ;
-blockzei	ldx ay		; exchange x and y of top left edge...
+blockzei	ldx ay		; exchange x and y of top left corner...
 	lda ax
 	sta ay
 	stx ax
@@ -7245,9 +7248,9 @@ blockzei	ldx ay		; exchange x and y of top left edge...
 	sta gflag
 ;
 	jsr punkt		; just check if x/y-values are plausible
-			; and compute address
+			; returns address of first dot
 	lda #0
-	sta gflag		; reset flag
+	sta gflag		; reset colorization flag
 	lda status
 	cmp #8
 	bne +
@@ -7255,7 +7258,7 @@ blockzei	ldx ay		; exchange x and y of top left edge...
 ;
 +	sec
 	lda $a8
-	sbc $63
+	sbc $63		; subtract rasterline in tile (0..7, value from routine PUNKT)
 	sta $a8
 	lda $a9
 	sbc #0
@@ -7275,32 +7278,35 @@ blockzei	ldx ay		; exchange x and y of top left edge...
 	beq +
 	jmp mblock	; yes
 --
-+	lda $09
-	sta $6f
++	lda $09		; pixelposition berechnen
+	sta $6f		; kachelposition merken (in 6f/70)
 	and #7
 	tax
 	lda $0a
 	sta $70
 	jmp +
--	lda $09
+
+-	lda $09		; pixelposition berechnen (0..7)
 	and #7
-	tax
+	tax		; ->.x (für sethires)
 	bne +
-	jsr a8plus8
-+	lda $a4
+	jsr a8plus8	; 0: nächste kachel
+
++	lda $a4		; rasterzeile in kachel berechnen
 	and #7
-	tay
+	tay		; ->.y (für sethires)
 	jsr kerromaus
-	jsr sethires
-	inc $09
+	jsr sethires	; punkt setzen (und damit: linie erzeugen)
+	inc $09		; x erhöhen
 	bne +
 	inc $0a
 +	lda $0a
 	beq +
 	lda $09
-	cmp #$40
-	bcs ++
-+	lda $0a
+	cmp #$40		; $0140? (320?)
+	bcs ++		; ja, nächste rasterzeile
+
++	lda $0a		; rechten rand erreicht?
 	sta vgla+1
 	lda $09
 	sta vgla
@@ -7310,14 +7316,14 @@ blockzei	ldx ay		; exchange x and y of top left edge...
 	sta vgle+1
 	jsr vglae
 	beq -
-	bcc -
-++	jsr plus320
-	cmp #$c8		; 200?
+	bcc -		; nein, loop
+++	jsr plus320	; ja, nächste rasterzeile
+	cmp #$c8		; 200 rasterzeilen?
 	bcs +
-	cmp ey
-	beq --
+	cmp ey		; unterer rand?
+	beq --		; nein, loop
 	bcc --
-+	rts
++	rts		; ja, fertig
 
 ; ----------------------------------------- BLOCK in Multi Mode
 ;
@@ -7329,7 +7335,8 @@ mblock	lda #$9f		; multi BLOCK
 	cmp ey		; 199? (vert max)
 	bcs +
 	sta ey		; yes, delimit
-+	lda $09
+
++	lda $09		; first entry:
 	sta $6f
 	and #3
 	asl
@@ -7346,9 +7353,10 @@ mblock	lda #$9f		; multi BLOCK
 mbl0	lda $a4
 	and #7
 	tay
-	jsr kerromaus
+	jsr kerromaus	; set pixel
 	jsr setmulti
-	inc $09
+
+	inc $09		; advance
 	lda $09
 	cmp #$a0		; 160?
 	bcs +
@@ -9152,7 +9160,7 @@ befcheck	lda #>proctable	; set proctable address ($c400)
 	bne -
 
 	ldx #$ff
-	jsr setsstart	; von programmstart 13
+	jsr setsstart	; von programmstart
 --	ldy #0
 -	jsr inc20
 	lda $21		; bis variablenstart
@@ -9167,7 +9175,7 @@ befcheck	lda #>proctable	; set proctable address ($c400)
 	iny
 	lda ($20),y	; ja, nämlich PROC?
 	cmp #$31
-	bne --		; 30
+	bne --
 
 	inx		; ja, adresse in liste eintragen
 	lda $20
@@ -9179,13 +9187,13 @@ befcheck	lda #>proctable	; set proctable address ($c400)
 	inx
 	sta proctable,x
 	cpx #$ff		; liste voll?
-	bne --		; 21
+	bne --
 
 	dex		; ja, flag setzen ($ff)
 
 fsende	inx		; programmende erreicht:
 	stx prstack	; neues prstack setzen
-	jmp bef0		; 8
+	jmp bef0
 
 ; ----------------------------------------- bef LIN
 ;
