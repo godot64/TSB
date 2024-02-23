@@ -529,19 +529,6 @@ token2	lda codezae	; write counter as token number
 	sta $01fb,x
 	inc $01fb,x
 
-disapa	cmp #$40		; command SECURE?
-	bne vor
-	lda #$3a		; yes, enter ":"
-	ldy #0
-mt12	inx
-	iny
-	sta $01fb,x	; 4 times colon
-	cpy #4
-	bmi mt12
-	txa
-	tay
-	jmp next1
-
 vor	iny		; move up rest of line
 	inx
 	lda $01fb,y
@@ -556,6 +543,10 @@ mt13	inx
 	ldy zwisp2	; get next char from basic line
 	iny
 tonext	jmp next
+
+; ------------------------------------------------------------
+
+	!by 0,0,0,0,0
 
 ; ----------------------------------------- Detokenizer Entry Point
 ;
@@ -754,6 +745,16 @@ auto	clc
 
 	ldy $aa
 	jmp $a486		; sys Eingabewarteschleife (ohne inc)
+
+; ----------------------------------------- bef MOBCOL
+;
+befmobcol	jsr getx8n	; get sprite number
+	stx $aa
+	jsr sgetbytc	; get mob color
+	ldy $aa
+	txa
+	sta $d027,y
+	jmp endsmb	; (17)
 
 ; ----------------------------------------- Warmstart
 ;
@@ -1172,7 +1173,7 @@ tabbef	!tx "hireS"	; 1
 	!tx "maP"		; >
 	!by $be		; ?
 	!tx "securE"
-	!tx "disapA"	; 65
+	!tx "mobcoL"	; 65
 	!tx "circlE"
 	!tx "on erroR"
 	!tx "no erroR"
@@ -1320,7 +1321,7 @@ vecplace	!wo befplace-1	;  16 place    (changed from 86e2)
 vecmap	!wo err2a-1	;  62 map (>)
 	!wo swarm-1	;     	(?)
 	!wo befsecure-1	;  64 secure
-	!wo bef0-1	;  65 disapa
+	!wo befmobcol-1	;  65 mobcol (formerly: disapa)
 	!wo befcircle-1	;  66 circle
 	!wo befonerror-1	;  67 on error
 	!wo befnoerr-1	;  68 no error
@@ -1480,7 +1481,7 @@ textchr	!tx "chr$(13)",0
 ;
 version	!tx "ad23"	; Signature
 	!by $0d
-	!tx "2.40212"	; Version Number
+	!tx "2.40215"	; Version Number
 
 ; -----------------------------------------
 ;
@@ -8443,6 +8444,10 @@ befbckgnds
 	stx $d024
 	jmp endsmb
 
+; ------------------------------------------------------------
+
+	!by 0,0,0
+
 ; ----------------------------------------- bef PAUSE
 ;
 befpause	jsr chrget
@@ -8459,7 +8464,6 @@ befpause	jsr chrget
 +	jsr schkcom	; comma?
 
 ++	jsr sgetadr	; get time value to $65/$14
-	jsr chkscolon	; semicolon? (yes, PRINT)
 
 	lda #0		; now pause
 	sta zaesec
