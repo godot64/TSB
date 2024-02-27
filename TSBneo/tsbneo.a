@@ -321,10 +321,9 @@ into	lda #8		; set drive 8 and LOAD/SAVE vectors
 	bpl -
 	ldx #>ssnmi	; (hard) nmi vector hi ($800c)
 	stx $fffa+1	; (in case kernal is off at reset)
-	nop		; in case...
 	stx nmivec+1	; NMI = $8017
-	nop		; in case...
 	stx brkvec+1
+	stx $9b		; meanwhile: switch off JiffyDOS keys
 	lda #<sbrk	; SBRK = $8031
 	sta brkvec
 	lda #<ssnmi	; sys nmi vector lo ($800c)
@@ -1481,7 +1480,7 @@ textchr	!tx "chr$(13)",0
 ;
 version	!tx "ad23"	; Signature
 	!by $0d
-	!tx "2.40215"	; Version Number
+	!tx "2.40227"	; Version Number
 
 ; -----------------------------------------
 ;
