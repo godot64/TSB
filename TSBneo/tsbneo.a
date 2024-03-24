@@ -1480,7 +1480,7 @@ textchr	!tx "chr$(13)",0
 ;
 version	!tx "ad23"	; Signature
 	!by $0d
-	!tx "2.40227"	; Version Number
+	!tx "2.40323"	; Version Number
 
 ; -----------------------------------------
 ;
@@ -2096,7 +2096,7 @@ basromaus	lda pport
 ; ----------------------------------------- CLOSE 1
 ;
 sclose	jsr $ffcc		; sys clrch
-	lda #1
+	lda $b8
 	jmp $ffc3		; sys close 1
 
 ; ----------------------------------------- from SOPEN
@@ -5654,7 +5654,7 @@ usel6	ldx linenum	; get first char
 	bne +		; no
 	cpx #32		; first char: 32 (=space)?
 	bne usel0		; no, take this char
-	ldx #$2b		; yes, set 43 (="+")
+	tax		; yes, set 43 (="+")
 usel0	txa
 	inc $44
 	sta outstring,y	; and store
@@ -5671,20 +5671,24 @@ gno0	sta outstring,y
 	inc $44
 -	rts
 
-; -----------------------------------------
+; ----------------------------------------- Part of SCRSV/SCRLD
 ;
 chkstate	jsr $ffcf
 	ldx status
 	beq -
-	pla
-	pla
-	jmp ss5
+	jsr scrrest	; bei Fehler: restore SCRLD, returns .x=4
+	jmp warmstart	; 4: "file not found"
+
+; -----------------------------------------
+;
+sintro	jsr intro
+	stx $b5		; store hibyte
+	ldx $b8		; file#
+	rts
 
 ; ----------------------------------------- bef SCRLD
 ; (patch by Hans Haberl), recoded by Peter Hagemann (sa=5)
-befscrld	jsr intro
-	stx $b5		; store hibyte
-	ldx $b8		; file#
+befscrld	jsr sintro
 	jsr $ffc6		; chkin
 	jsr chkstate	; file exists?
 	jsr $ffcf		; yes, skip load address
@@ -5693,11 +5697,9 @@ befscrld	jsr intro
 
 ; ----------------------------------------- bef SCRSV
 ;
-befscrsv	jsr intro
-	stx $b5		; Startadr. High merken
-	ldx $b8		; file#
+befscrsv	jsr sintro
 	jsr $ffc9		; CHKOUT
-	tya		; $00 = Low-Byte Startadresse
+	tya		; .y=$00 = Low-Byte Startadresse
 skipslo	jsr bsout
 	lda $b5		; und High-Byte Startadresse schreiben
 skipshi	jsr bsout
@@ -5735,10 +5737,13 @@ skipvr	jsr distr		; process
 
 ; -----------------------------------------
 ;
-ss5	jsr $ffcc		; clrch
-	lda $b8		; file#
-	jsr $ffc3		; close
+ss5	jsr sclose	; close
 	jmp endsmb
+
+; ----------------------------------------- RESTORE for SCRLD/SCRSV
+
+scrsvrst	jsr scrrest	; RESTORE
+	bne leave1
 
 ; -----------------------------------------
 ;
@@ -5776,14 +5781,53 @@ bmphi
 ++	sta $f7 		; merken
 	lda #$ff		; Verteiler Hibyte
 	sta $f9		; (an $00f8): $ff(cf/d2)
-	rts
+bend	rts
 
 ; -----------------------------------------
-;
-chkfchlen	jsr sgetbytc	; get len
-	cpx #89		; too long?
-	bcc bend
-	jmp err0e		; yes: illegal quantity
+
+scrsvplus	jsr chrget	; DEF follows?
+	cmp #$8c		; Token for RESTORE?
+	beq scrsvrst
+	cmp #$96		; Token for DEF?
+	bne bend
+
+; ----------------------------------------- DEF after SCRLD/SV
+; by P. Hagemann
+defscrsv	jsr sgetbytn
+	stx helpvec	; Hibyte Ziel nach helpvec
+	jsr sgetbytc	; Anzahl Pages in helpvec+1
+	stx helpvec+1
+
+	jsr gyf0		; get mode and sa
+	ldx helpvec	; 1st par 0? (yes, don't set anything)
+	beq leave2
+	ldy helpvec+1
+	lda $f7		; sa: in $f7
+	ror		; 2 or 3/5 ?
+	bcs +		; odd?
+
+	stx vramhi+1	; even: Hibyte bei sa 2
+	sty nvrbl+1	; Pages
+	bcc ++		; unbed. Sprung
+
++	stx bmphi+1	; odd: Hibyte bei 3/5
+	sty nbmpbl+1	; Pages
+
+++	ldx ey		; Modus: 0,1,2
+	beq leave2	; Modus 0: nix ändern
+	lda #$2c		; sonst BIT schreiben
+	sta skipcr	; BIT: Colorram übergehen => nur Videoram
+	dex		; Modus 1: mit Startadresse
+	beq leave2	; Sonst (Modus >= 2)
+	sta skipslo	; BIT: ohne Startadresse
+	sta skipshi
+
+leave2	jsr dec7a
+leave1	pla
+	pla
+	pla
+	pla
+	jmp bef0
 
 ; ----------------------------------------- Part of SCRSV/SCRLD
 ; by Peter Hagemann
@@ -5809,14 +5853,18 @@ ss3	inc $fc
 	lda status
 	beq bl
 ;
-bend	rts
+	rts
 
-; ----------------------------------------- RESTORE for SCRLD/SCRSV
+; -----------------------------------------
+;
+chkfchlen	jsr sgetbytc	; get len
+	cpx #89		; too long?
+	bcc bend
+	jmp err0e		; yes: illegal quantity
+
+; ----------------------------------------- 
 ; by P. Hagemann
-scrsvrst	ldx #4
-	stx vramhi+1	; vram back to $0400
-	stx nvrbl+1	; 4 pages
-	ldx #$e0		; bitmap start at $e000
+scrrest	ldx #$e0		; bitmap start at $e000
 	stx bmphi+1
 	ldx #$20		; 32 pages
 	stx nbmpbl+1
@@ -5824,51 +5872,14 @@ scrsvrst	ldx #4
 	stx skipvr
 	stx skipslo
 	stx skipshi
-	jmp leave1	; finish
+	ldx #4
+	stx vramhi+1	; vram back to $0400
+	stx nvrbl+1	; 4 pages
+	rts
 
-scrsvplus	jsr chrget	; DEF follows?
-	cmp #$8c		; Token for RESTORE?
-	beq scrsvrst
-	cmp #$96		; Token for DEF?
-	bne bend
+; -----------------------------------------
 
-; ----------------------------------------- DEF after SCRLD/SV
-; by P. Hagemann
-defscrsv	jsr sgetbytn
-	stx helpvec	; Hibyte Ziel nach helpvec
-	jsr sgetbytc	; Anzahl Pages in helpvec+1
-	stx helpvec+1
-
-	jsr gyf0		; get mode and sa
-	ldx helpvec	; 1st par 0? (yes, don't set anything)
-	beq leave2
-	ldy helpvec+1
-	lda $f7		; sa: in $f7
-	ror		; 2 or 3/5 ?
-	bcs +		; odd?
-
-	stx vramhi+1	; even: Hibyte bei sa 2
-	sty nvrbl+1	; Pages
-	jmp ++		; unbed. Sprung
-
-+	stx bmphi+1	; odd: Hibyte bei 3/5
-	sty nbmpbl+1	; Pages
-
-++	ldx ey		; Modus: 0,1,2
-	beq leave2	; Modus 0: nix ändern
-	lda #$2c		; sonst BIT schreiben
-	sta skipcr	; BIT: Colorram übergehen => nur Videoram
-	dex		; Modus 1: mit Startadresse
-	beq leave2	; Sonst (Modus >= 2)
-	sta skipslo	; BIT: ohne Startadresse
-	sta skipshi
-
-leave2	jsr dec7a
-leave1	pla
-	pla
-	pla
-	pla
-	jmp bef0
+	!by 0,0,0
 
 ; -----------------------------------------
 ;
