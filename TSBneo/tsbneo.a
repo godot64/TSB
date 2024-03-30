@@ -1480,7 +1480,7 @@ textchr	!tx "chr$(13)",0
 ;
 version	!tx "ad23"	; Signature
 	!by $0d
-	!tx "2.40323"	; Version Number
+	!tx "2.40329"	; Version Number
 
 ; -----------------------------------------
 ;
@@ -5862,7 +5862,7 @@ chkfchlen	jsr sgetbytc	; get len
 	bcc bend
 	jmp err0e		; yes: illegal quantity
 
-; ----------------------------------------- 
+; -----------------------------------------
 ; by P. Hagemann
 scrrest	ldx #$e0		; bitmap start at $e000
 	stx bmphi+1
@@ -9777,85 +9777,91 @@ befglobal	ldx #0
 ; ----------------------------------------- bef FIND
 ;
 beffind	jsr incbasbz
-	lda #$ff
-	sta $a8
-	sta $a9
-	ldy #0
+	ldy #$ff
+	sty $a8
+	sty $a9
+	iny
 	lda $2b		; get start of basic code
 	sta $20
 	lda $2c
 	sta $21
 	bne infind
 ;
-fnd0	lda (progz),y
-	beq tofind
-	lda ($20),y
-	beq fcont
-	lda (progz),y
+fndq	jsr incbasbz	; weitersuchen
+fnd1	jsr inc20
+fnd0	lda (progz),y	; Ende des Suchworts?
+	beq tofind	; dann ausgeben
+	cmp #$22		; quote?
+	beq fndq		; ja, überlesen und weitersuchen
+	lda ($20),y	; Ende der Code-Zeile?
+	beq fcont		; dann weitersuchen
+	lda (progz),y	; Suchwort mit Code vergleichen
 	cmp ($20),y
-	bne fcont
-	iny
-	bne fnd0
-;
-fcont	jsr inc20
-	ldy #0
-	lda ($20),y
-	bne fnd0
-	jsr inc20
-	sty pendflag
-	lda ($20),y
-	bne infind
-	lda #1
-	sta pendflag
-infind	jsr inc20
-	lda ($20),y
-	bne +
-	lda pendflag
-	cmp #1
-	bne +
-	jmp $e386		; sys Ready (.x=$80)
-
-+	jsr inc20
-	lda ($20),y
-	sta $a6
-	jsr inc20
-	lda ($20),y
-	sta $a7
-	jsr inc20
+	bne fcont		; ungleich, dann weitersuchen
+	iny		; gleich, dann weiter vergleichen
 	bne fnd0		; uncond. branch
+;
+fcont	ldy #0		; Vergleichsflag zurücksetzen
+	jsr proceed	; Zeilenende?
+	bne fnd0
+	sty pendflag	; ja, Flag für PRG-Ende vorbereiten
+	jsr proceed	; PRG-Ende?
+	bne infind
+	inc pendflag	; ja, Flag setzen
+infind	jsr proceed	; weitersuchen, $00 gefunden?
+	bne +		; nein, weitersuchen
+	lda pendflag	; ja, PRG-Ende?
+	beq +
+	jmp $e386		; ja, sys Ready (set .x=$80)
+
++	jsr proceed	; aktuelle Zeilennummer merken
+	sta $a6
+	jsr proceed
+	sta $a7
+	jmp fnd1		; uncond. branch
 
 ; -----------------------------------------
 ;
-tofind	lda $a6
-	cmp $a8
+tofind	lda $a6		; Zeilenummer für die Ausgabe setzen
+	cmp $a8		; bereits ausgegeben?
 	bne +
 	lda $a7
 	cmp $a9
-	beq ++
+	beq ++		; ja, dann nicht nochmal ausgeben
 +	lda $a6
 	sta $a8
 	sta $63
 	lda $a7
-	sta $62
 	sta $a9
-	jsr scflp		; make line number digits
+	sta $62
+	jsr scflp		; sonst: make line number digits
 	jsr sfacasc
-	jsr outasc
-	sec
+	jsr outasc	; Ausgabe
+	sec		; Einrückung für nächste Zeilenummer berechnen
 	jsr $fff0		; sys get crsr pos
 	tya
--	sbc #10
+-	sbc #10		; minus 10
 	bcs -
-	eor #$ff
+	eor #$ff		; Betrag, wenn negativ
 	adc #1
-	tax
+	tax		; dann Anzahl Leerzeichen in .x
 	inx
 -	dex
 	bne +
-++	jmp fcont
+++	jmp fcont		; weitersuchen
 
-+	jsr leerzch	; out space
-	bne -
++	jsr leerzch	; .x Leerzeichen einrücken
+	bne -		; uncond. branch
+
+; -----------------------------------------
+
+proceed	jsr inc20
+	lda ($20),y
+	rts
+
+; -----------------------------------------
+
+	!by 0
 
 ; -----------------------------------------
 ;
