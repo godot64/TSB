@@ -98,7 +98,7 @@
 	xmaxhigh		= $c52e	; 	Maximalwert X (hi) bei Grafik
 	ueberdreh		= $c52f	; 	Flag bei Kreisberechnungen
 	prstack		= $c530	; 	Zeiger in den PROC-Stack
-	movetab		= $c531	; $cb1e	enthült Screen-Zeile (bis 41 Bytes)
+	movetab		= $c531	; $cb1e	enthält Screen-Zeile (bis 41 Bytes)
 	str1		= $c55a	; $cbab	word: Adresse String 1 bei DUP
 	strlen2		= $c55c	; $cbb4	word: Adresse von String 2 bei PLACE
 	strlen1		= $c55e	; $cbb7	word: Adresse von String 1 bei PLACE
@@ -814,7 +814,7 @@ serrout	txa		; any error?
 ; ----------------------------------------- Load Extensions
 ;
 loadext	stx helpvec
-	jsr chkdrv	; drive ready?
+	jsr chkdrv	; drive ready? (error if not)
 	ldx helpvec
 	ldy #>names
 	lda #7		; yes, set 7 chars
@@ -1349,7 +1349,7 @@ vecmap	!wo err2a-1	;  62 map (>)
 	!wo befinsert-1	;  91 insert   (fn insert)
 	!wo swarm-1	;     bad mode (fn pot)
 	!wo swarm-1	;     bad mode (fn penx)
-vecbmode	!wo swarm-1	;     (^)
+vecbmode	!wo err2a-1	;     (^)
 	!wo swarm-1	;     bad mode (fn peny)
 	!wo befsound-1	;  96 sound    (fn sound)
 	!wo befgraphics-1	;  97 graphics (fn graphics)
@@ -1480,7 +1480,7 @@ textchr	!tx "chr$(13)",0
 ;
 version	!tx "ad23"	; Signature
 	!by $0d
-	!tx "2.40329"	; Version Number
+	!tx "2.40417"	; Version Number
 
 ; -----------------------------------------
 ;
@@ -2108,12 +2108,12 @@ newopen	jsr $e219		; sys get parameters
 
 ; ----------------------------------------- OPEN Printer
 ;
-open14	lda #1		; open 1,4
+open14	lda #101		; open 101,4
 	ldx #4
 	ldy #$ff
 	jsr $ffba
 	jsr $ffc0
-	ldx #1		; cmd 1
+	ldx #101		; cmd 101
 	jmp $ffc9
 
 ; ----------------------------------------- New LOAD/SAVE
@@ -4597,15 +4597,15 @@ fromdir	bne +		; anything following?
 ;
 fileopen	jsr $ffbd		; sys setnam
 	ldx $ba
-	lda #1
+	lda #101
 	ldy #0
 	jsr $ffba		; sys setlfs
-	jsr $ffc0		; sys OPEN
+	jsr $ffc0		; sys OPEN #101
 	bcc +
 	tax		; .x=Error# (f.i.: 5)
 	jmp ($0300)
-+	ldx #1
-	jmp $ffc6		; sys chkin 1
++	ldx #101
+	jmp $ffc6		; sys chkin #101
 
 ; ----------------------------------------- all MOVE befs
 ;
@@ -5017,18 +5017,18 @@ err32	jmp swarm		; error "bad mode"
 ;
 befinsert	jsr get1ststr	; get string and len
 	cmp #9
-	bne jerr0e	; yes, error
+	bne jerr0e	; len not 9, error
 
 	pha		; save len
 	ldx #0
 	stx $a6
 	lda #$2c		; comma follows?
 	cmp (progz,x)
-	bne err32		; no, bad mode
+	bne err32		; no, bad mode (resetting stack)
 
 	pla
 	tay
-	dey		; .y= len
+	dey		; .y= len (-1)
 	sty helpvec
 	lda $c7		; save RVS flag
 	sta helpvec+1
@@ -5044,21 +5044,21 @@ befinsert	jsr get1ststr	; get string and len
 +	and #$3f
 ++	dec $c7		; rvs?
 	bmi +
-	ora #$80		; yes
+	ora #$80		; yes, make reverted
 +	sta $02c0,x	; store converted box chars
 	lda helpvec+1	; restore RVS flag
 	sta $c7
 	inx
 	dey
 	bpl -
-	jsr getrcwd	; get position params
-	jsr mkbox
-	jmp mve3		; out box
+	jsr getrcwd	; now get position params
+	jsr mkbox		; out box
+	jmp mve3		; out colors for box
 
 ; -----------------------------------------
 ;
-get1ststr	jsr frominsrt	; get box definition
-	sty $21
+get1ststr	jsr frominsrt	; get box definition string
+	sty $21		; address
 	stx $20
 	lda $69		; len<>9 or even empty?
 	beq jerr0e
@@ -5098,11 +5098,11 @@ mkrow	ldy helpvec	; one row
 	bne +
 	iny
 	inc spaltenanz
-+	sta movetab,y
++	sta movetab,y	; write right corner
 	dey
 	pla
-	jsr fillmt
-	stx movetab
+	jsr fillmt	; write edge/middle
+	stx movetab	; write left corner
 	rts
 
 ; -----------------------------------------
