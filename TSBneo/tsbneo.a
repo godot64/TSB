@@ -226,7 +226,7 @@
 ; -----------------------------------------
 ;
 ;	ab $cb00 neuer Code möglich bis $cbd5
-; 	die Page $cb wird nicht mehr gelöscht
+; 	die Pagea $ca und $cb werden nicht mehr gelöscht
 ;
 ; -----------------------------------------
 
@@ -337,6 +337,7 @@ into	lda #8		; set drive 8 and LOAD/SAVE vectors
 	jsr $e422		; sys out start message of sb
 	ldx #$fb
 	txs
+
 dscbmout	ldy #0		; show "tuned"
 -	lda tuned,y
 	beq endsmb
@@ -424,8 +425,8 @@ ipr3	sty doindex	; clear variables
 ;
 ipr5	jsr incbasbz	; process tsb command:
 	lda (progz),y	; get token
-	bpl +		; v2 token?
-	eor #$8f		; yes, convert to TSB usable token
+	bpl +		; is v2 token?
+	eor #$8f		; yes, convert to TSB usable token ($60..$62)
 +	tax		; use as index into command address table
 	jsr basromaus
 	sta portspei
@@ -441,7 +442,7 @@ ipr5	jsr incbasbz	; process tsb command:
 
 ; ----------------------------------------- TSB Tokenizer
 ;
-tokenize	ldy #4		; check $0200 (until $00)
+tokenize	ldy #4		; first check $0200 (until $00)
 next	iny
 next1	lda $01fb,y
 	bne ma1
@@ -551,10 +552,10 @@ tonext	jmp next
 ;
 slist	php		; start of LIST
 
-	jsr slist3	; first: TSB-Optionen abarbeiten,
+	jsr slist3	; zuerst: TSB-Optionen abarbeiten,
 	php		; (TSB? regelt zeroflag)
 	ldx helpvc2+1
-	plp		; dann: V2
+	plp		; oder V2?
 	beq ma
 
 	plp		; war TSB, nun:
@@ -698,12 +699,12 @@ sloop	sei
 	jsr basromaus
 	jsr nrm01		; do NRM
 +	jsr basromein
-	lda autoflag
+	lda autoflag	; AUTO active?
 	cmp #10
 	beq auto
-	jmp $a483		; sys Eingabewarteschleife
+	jmp $a483		; no, continue in sys Eingabewarteschleife
 
-; -----------------------------------------
+; ----------------------------------------- Main Part of AUTO
 ;
 auto	clc
 	lda autozi
@@ -753,7 +754,7 @@ befmobcol	jsr getx8n	; get sprite number
 	ldy $aa
 	txa
 	sta $d027,y
-	jmp endsmb	; (17)
+	jmp endsmb
 
 ; ----------------------------------------- Warmstart
 ;
@@ -1480,7 +1481,7 @@ textchr	!tx "chr$(13)",0
 ;
 version	!tx "ad23"	; Signature
 	!by $0d
-	!tx "2.40417"	; Version Number
+	!tx "2.40420"	; Version Number
 
 ; -----------------------------------------
 ;
@@ -1788,7 +1789,7 @@ sxyflp2	ldx #$90
 
 ; ----------------------------------------- Convert int to float
 ;
-scflp	ldx #$90
+scflp	ldx #$90		; !discard this?
 	sec
 	jmp sxflp
 
@@ -2054,19 +2055,19 @@ basromein	lda pport
 	ora #$01
 	bne +
 
-; -----------------------------------------
+; ----------------------------------------- Kernal ein
 ;
 kerromein	lda pport
 	ora #2
 	bne +
 
-; -----------------------------------------
+; ----------------------------------------- CharROM ein
 ;
 charen1	lda pport
 	ora #4
 	bne +
 
-; -----------------------------------------
+; ----------------------------------------- Kernal aus
 ;
 kerromaus	sei
 	lda pport
@@ -2074,7 +2075,7 @@ kerromaus	sei
 +	sta pport
 	rts
 
-; -----------------------------------------
+; ----------------------------------------- CharROM aus
 ;
 charen0	sei
 	lda pport
@@ -2093,16 +2094,16 @@ basromaus	lda pport
 	sta pport
 	rts
 
-; ----------------------------------------- CLOSE 1
+; ----------------------------------------- CLOSE file
 ;
 sclose	jsr $ffcc		; sys clrch
 	lda $b8
-	jmp $ffc3		; sys close 1
+	jmp $ffc3		; sys close last opened file
 
 ; ----------------------------------------- from SOPEN
 ;
 newopen	jsr $e219		; sys get parameters
-	lda drive		; set drive
+	lda drive		; set TSB drive
 	sta $ba
 	jmp $e1c1		; continue original routine
 
@@ -2170,24 +2171,24 @@ setonoff	jmp incbasbz
 
 ; ----------------------------------------- Get Parameters X and Y and more
 ;
-getxy	jsr sgetadrn	; get X
+getxy	jsr sgetadrn	; get X value
 getxy2	sty $09
 	sta $0a
 	sty ax
 	sta ax+1
 	sty ex
 	sta ex+1
-	jsr sgetbytc	; get Y
+	jsr sgetbytc	; get Y value
 	stx $a4
 	stx ay
 	stx ey
 	rts
 
-; -----------------------------------------
+; ----------------------------------------- Get Coordinates and Mode
 ;
-getxyxyf	jsr getxy		; get start X/Y
+getxyxyf	jsr getxy		; get X and Y (start coordinate)
 getxyf	jsr schkcom	; comma?
-gxyf0	jsr sgetadr	; get end X
+gxyf0	jsr sgetadr	; get end X (end coordinaate)
 	sta ex+1
 	sty ex
 gyf0	jsr sgetbytc	; get end Y
@@ -2245,7 +2246,7 @@ sgetari	lda #0
 	sta $0d
 	jsr chrget
 	bcs +
-	jmp $bcf3		; sys: digits from basic to float
+	jmp $bcf3		; digits, sys: from basic to float
 
 +	cmp #$24		; "$"?
 	beq gethex
@@ -2253,9 +2254,9 @@ sgetari	lda #0
 	beq getbin
 	cmp #$64		; sb token?
 	beq +
-	jmp $ae92		; no : sys: get arithmetical expression from basic
+	jmp $ae92		; no, sys: get arithmetical expression from basic
 
-+	jmp csgetari1	; yes: tsb
++	jmp csgetari1	; yes, tsb
 
 ; ----------------------------------------- func % (Prefix)
 ;
@@ -2476,9 +2477,9 @@ bin0	asl
 ; ----------------------------------------- Start of Func Chain
 ; -----------------------------------------
 ;
-csgetari1	jsr chrget	; get token number
+csgetari1	jsr chrget	; get token number to .y
 	tay
-	jsr chrget
+	jsr chrget	; advance to next char
 
 ; -----------------------------------------
 
@@ -2758,7 +2759,7 @@ jpushstr	lda #$ff		; create result string
 	sta $0d
 	jmp pushstr
 
-; ----------------------------------------- ari4 -> ari5
+; -----------------------------------------
 ;
 csgetari4	cpy #$57		; INST?
 	bne csgetari5
@@ -2818,8 +2819,8 @@ csgetari5	cpy #$53		; DIV?
 
 ; ----------------------------------------- func DIV
 ; 			original
-fndiv	jsr divinit
-	ldy idivdend
+fndiv	jsr divinit	; devide
+	ldy idivdend	; result
 	ldx idivdend+1
 	jmp sxyflp
 
@@ -2873,8 +2874,8 @@ csgetari6	cpy #$52		; MOD?
 
 ; ----------------------------------------- func MOD
 ; 			original
-fnmod	jsr divinit
-	ldy idivrest
+fnmod	jsr divinit	; devide
+	ldy idivrest	; result
 	ldx idivrest+1
 	jmp sxyflp
 
@@ -3127,7 +3128,7 @@ csgetarii	cpy #$7d		; DISPLAY?
 fndisplay	ldx video		; returns video address
 	jmp cga0
 
-; ----------------------------------------- func D!PEEK
+; -----------------------------------------
 ;
 csgetarij	cpy #$54		; Token von D!?
 	bne csgetarik
@@ -3179,13 +3180,15 @@ fnmempeek	jsr getpeek	; yes, PEEK in overall RAM
 ; -----------------------------------------
 ;
 csgetaril	cpy #$2c		; USE?
-	bne csgetariend
+	bne csgetariend	; !patch! possible JMP interari (at $ca00?)
+			; returm w/ JMP csgetariend
+	!by $ca
 
 ; ----------------------------------------- func USE
 ;
 	jsr dec7a
 	ldy $be		; get drive number
-	jmp cen0		; convert
+	bne cen0		; and convert (branch should never fail)
 
 ; -----------------------------------------
 ;
@@ -4255,7 +4258,7 @@ befold	jsr basromein	; basic ein
 	jsr $a655		; sys: CLR
 	jmp $a474   	; sys: Ready.
 
-; ----------------------------------------- Execute PLAY (2)
+; ----------------------------------------- Execute PLAY 2
 ;
 sirqplay	lda musicz4	; from sirq5
 	beq sip0
@@ -4949,22 +4952,22 @@ fillmt	sta movetab,y
 
 ; ----------------------------------------- Retrieve Parameters
 ;
-getrcwd	jsr sgetbytn	; get row
+getrcwd	jsr sgetbytn	; get ROW
 	cpx #25		; >24?
 	bcs err32		; yes, bad mode
 	stx zeileanf
 
-	jsr sgetbytc	; get column
+	jsr sgetbytc	; get COLUMN
 	cpx #40		; >39?
 	bcs err32		; yes, bad mode
 	stx spalteanf
 
-	jsr sgetbytc	; get width (num of columns)
+	jsr sgetbytc	; get WIDTH (num of columns)
 	txa
 	beq err32		; 0 is error
 	stx spaltenanz
 
-	jsr sgetbytc	; get height (num of rows)
+	jsr sgetbytc	; get HEIGHT (num of rows)
 	txa
 	beq err32		; 0 is error
 	stx zeilenanz
@@ -5610,7 +5613,7 @@ use9	lda #0
 usel9	sta helpvec
 -	ldx $61
 	lda linenum+1,x
-	cmp #$2f		; "/"?
+	cmp #$2f
 	bcc +
 	jsr genout
 	inc $61
@@ -8199,7 +8202,7 @@ hdy2	cmp #$22		; char is a quote?
 
 ; -----------------------------------------
 ;
-lineout	ldy #5		; patch to #6 (no line gaps anymore)
+lineout	ldy #5		; !patch to #6 (so no line gaps anymore)
 -	lda nline-1,y
 	jsr bsout
 	dey
@@ -8604,7 +8607,7 @@ befdisable
 ;
 befexit	jsr incbasbz
 	jsr chrgot
-	lda #$8b		; IF?
+	lda #$8b		; IF follows?
 	jsr schkzei	; (if not: SYNTAX ERROR)
 	jsr sfrmevl	; evaluate
 	lda $61		; true?
@@ -8677,7 +8680,7 @@ cgoto0	jsr sgetadr
 	jsr sgoto1
 	bne ++
 
-; -----------------------------------------
+; ----------------------------------------- part of RESUME
 ;
 res0	jsr chrget	; parameters?
 	beq res4		; no
@@ -8699,7 +8702,7 @@ res0	jsr chrget	; parameters?
 befproc	jsr flinend	; find end of line
 	beq ++		; end of command (uncond. branch)
 
-; -----------------------------------------
+; ----------------------------------------- part of RESUME
 ;
 res4	ldy #0		; RESUME w/o params
 	lda savecont	; proceed where break was
@@ -8799,7 +8802,7 @@ befretrace
 	sta $22
 	stx $23
 	sty $69
-	jmp rtc1
+	jmp rtc1		; out version
 
 ; ----------------------------------------- bef TRACE
 ;
@@ -8816,7 +8819,7 @@ befendloop
 	bcs +
 err27	ldx #$27		; error "end loop w/o loop"
 	!by $2c
-err2a	ldx #$2a		; error ": cmd inactive"
+err2a	ldx #$2a		; error "not yet active"
 	jmp ($0300)
 
 +	dey
@@ -8894,7 +8897,7 @@ chkonkey	lda okstring	; get on key ctrl string
 oky0	rts
 
 ; ----------------------------------------- bef SECURE
-;
+; !discard!
 befsecure	jsr chkonoff
 	lda #$41		; $41: search code for DISAPA
 	sta $22
@@ -8918,7 +8921,7 @@ befsecure	jsr chkonoff
 	sta ($20),y
 	bne -
 
-; ----------------------------------------- bef OFF
+; ----------------------------------------- bef (FLASH) OFF
 ;
 endflash	jsr dec7a
 befoff	ldx #0
@@ -9077,10 +9080,10 @@ through	ldy #2		; if end of line:
 	cpy #10		; is call from CALL (or EXEC)?
 	bne +
 
-err21	ldx #$21		; yes, PROC NOT FOUND ERROR
+err21	dec spexec	; yes, PROC NOT FOUND ERROR
+	dec spexec
+	ldx #$21
 	stx procnffl
-	dec spexec
-	dec spexec
 	jmp ($0300)
 
 +	cpy #11		; or is call from EXIT?
@@ -9471,7 +9474,7 @@ befoption	jsr chkonoff
 	jmp endsmb
 
 ; ----------------------------------------- bef LOCAL
-;
+; !discard?
 --	jsr incbasbz	; loop for next var
 	bne +
 ;
@@ -9754,7 +9757,7 @@ dit7	jsr bsout		; 2nd char unshifted, so float
 	bne dit5
 
 ; ----------------------------------------- bef GLOBAL
-;
+; !discard?
 befglobal	ldx #0
 --	lda localtab,x
 	sta $5f
@@ -9866,8 +9869,8 @@ proceed	jsr inc20
 ; -----------------------------------------
 ;
 rtc2	jsr basromein
-	lda $69
-	jsr $ab24
+	lda $69		; len
+	jsr $ab24		; sys: out string
 	jmp endsmb	; finish command
 
 ; -----------------------------------------
@@ -9911,8 +9914,8 @@ maddhg	jsr l20pl40	; go to bottom
 ; -----------------------------------------
 ;
 graph0	jsr basromein
-	jsr $7000		; sys get params for LOAD/SAVE
-	jsr $a660		; sys CLR
+	jsr $7000		; init HSG
+	jsr $a660		; return: sys CLR
 	jmp bef0
 
 ; -----------------------------------------
@@ -9925,12 +9928,12 @@ merge1	jsr basromein
 ;
 localtab	!fill 78		; 76 + 2 empty bytes
 
-; -----------------------------------------
+; ----------------------------------------- X! Area
 ; ca00 (temporarily used by command X!)
 
 	!fill 256		; free space
 
-; -----------------------------------------
+; ----------------------------------------- MAP Area
 ; cb00 (temporarily used by command MAP)
 
 	!fill 256		; free space
@@ -10518,7 +10521,7 @@ outdigits	jsr $b395		; sys int to float (hi .a, lo .y)
 
 ; -----------------------------------------
 ; gap
-	!by 0,0,0,0,0
+	!tx "!tsb!"
 
 ; -----------------------------------------
 
