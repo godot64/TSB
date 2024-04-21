@@ -1,0 +1,60 @@
+; -----------------------------------------
+;
+; Additional functions for TSB:
+; func X!FCHR() and func X!FCOL()
+;
+; Syntax:
+; c=x!fchr(zl,sp)
+; f=x!fcol(zl,sp)
+;
+; must be initialized by
+; poke $952b,$4c: d!poke $952c,startaddress
+;
+; this code is relocatible
+;
+; -----------------------------------------
+;
+
+	*=$ca00		; start address (but relocatible)
+
+fnxpos	bne +		; fn USE?
+	jmp $952e		; yes, return
++	cpy #$b2		; fn X!?
+	bne ++		; no, end ari chain
+
+	jsr $0073		; Bezeichner-Token holen
+	tay
+	cpy #5		; FCHR?
+	beq xfchr
+	cpy #6		; FCOL?
+	bne ++
+
+xfcol	lda #1		; init accordingly
+	!by $2c
+xfchr	lda #0
+	sta $a6
+	ldy #0
+	sty $c5e1
+	sty $c5e2
+	jsr $0073		; get next char
+	jsr $aefa		; check for (
+	lda #$60		; patch func AT to retrieve position expression
+	sta $9480
+	jsr $946c		; process fnat (get row ($b0) and column (.y))
+	lda $b0		; get result
+	sta $c5df		; set position data
+	sty $c5e0
+	lda #$20		; unpatch AT
+	sta $9480
+	jsr $8e5f		; set basic off
+	jsr $a0b1		; compute vector ($20/1) to position; returns .y=0
+	lda ($20),y	; get value at pos
+	ldx $a6
+	beq +
+	and #15
++	tay
+	jsr $8e3a		; set basic on
+	jsr $8cbf		; convert value (in .y) to float
+	jmp $0073		; advance to next char, continue PRG
+
+++	jmp $9535		; end getari chain
