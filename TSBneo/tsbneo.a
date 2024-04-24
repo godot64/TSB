@@ -462,21 +462,37 @@ dsign	cmp #$40		; "@" (of DESIGN)?
 	beq ma3
 
 data	cmp #$44		; "d" (of DATA)?
+	beq +
+rem	cmp #$52		; "r" (of REM)?
 	bne ziffer
-	pha		; save .a and .y
+
++	pha		; save .a and .y
+	asl
+	asl
+	sta helpvc2	; determiner
 	tya
-	pha
+	pha		; 7
+
 	ldx #$ff
 mt10	inx
 	iny
 	lda $01fb,y
-	cmp ata,x		; compare against "ata"
-	bne mt11		; not found, cont. scan
+	bit helpvc2	; which one?
+	bvs +
+	cmp ata,x		; $c74d, DATA, compare against "ata"
+	bne mt11
 	cpx #2
 	bne mt10
-	pla		; found: skip line
+	beq ++
++	cmp names+5,x	; $8af4, REM, compare against "em"
+	bne mt11
+	cpx #1
+	bne mt10		; 31 (38)
+
+++	pla
 	tay
 	pla
+
 ma3	lda #$3a		; search for ":"
 	bne ma4
 
@@ -1046,6 +1062,12 @@ sirq5	lda playflag
 	sta $ff
 	jmp $ea31		; sys IRQ
 
+; ----------------------------------------- Spare Space
+;
+spare	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+	!by 0,0,0,0,0,0,0,0
+
 ; -----------------------------------------
 ;
 ; Section 2: Tables and Lists
@@ -1241,19 +1263,19 @@ tabbef	!tx "hireS"	; 1
 ; ----------------------------------------- Table of Error Messages
 ;
 tsbf0	!tx "bad modE"		; 32 / $20
-tsbf1	!tx "proc not founD"	; 33 / $21
+tsbf1	!tx "no proC"		; 33 / $21
 tsbf2	!tx "insert too largE"	; 34 / $22
 tsbf3	!tx "string too largE"	; 35 / $23
-tsbf4	!tx "not binary chaR"	; 36 / $24
-tsbf5	!tx "not hex chaR"		; 37 / $25
-tsbf6	!tx "end proc without exeC"	; 38 / $26
-tsbf7	!tx "end loop without "	; 39 / $27
+tsbf4	!tx "bin chaR"		; 36 / $24
+tsbf5	!tx "hex chaR"		; 37 / $25
+tsbf6	!tx "end proc w/o exeC"	; 38 / $26
+tsbf7	!tx "end loop w/o "		; 39 / $27
 tsbf8	!tx "looP"		; 40 / $28
-tsbf9	!tx "until without repeaT"	; 41 / $29
+tsbf9	!tx "until w/o repeaT"	; 41 / $29
 tsbfa	!tx "not yet activE"	; 42 / $2a
 tsbfb	!tx "too few lineS"		; 43 / $2b
-tsbfc	!tx "bad char for a moB"	; 44 / $2c
-tsbfd	!tx "array not founD"	; 45 / $2d
+tsbfc	!tx "bad chaR"		; 44 / $2c
+tsbfd	!tx "no arraY"		; 45 / $2d
 
 ; ----------------------------------------- Table of Command Addresses
 ;
@@ -1481,7 +1503,7 @@ textchr	!tx "chr$(13)",0
 ;
 version	!tx "ad23"	; Signature
 	!by $0d
-	!tx "2.40420"	; Version Number
+	!tx "2.40424"	; Version Number
 
 ; -----------------------------------------
 ;
@@ -2498,7 +2520,7 @@ fndup	jsr $aefa		; sys "("?
 	jsr sgetbytc	; get copy factor
 	jsr $aef7		; sys ")"?
 	ldx $65		; factor
-	beq err0e
+	beq +
 	stx dwert
 
 	ldy #0
@@ -2536,7 +2558,7 @@ fndup	jsr $aefa		; sys "("?
 	dex		; count # of copies
 	bne -
 
-	lda #$ff		; publish new string
++	lda #$ff		; publish new string
 	sta $0d
 	jmp pushstr
 
@@ -2569,6 +2591,10 @@ fnexor	jsr getexor	; check "(", get first value
 
 ; -----------------------------------------
 
+	!by 0,0,0,0,0
+
+; -----------------------------------------
+
 fnc2	cpy #$51		; JOY?
 	bne fnc3
 
@@ -2582,8 +2608,8 @@ fnjoy	ldy #$00		; set $dc00
 	beq +		; .y=0
 
 	jsr $aefa		; yes, "("?
-	jsr sgetbyt1	; value to .x
-	jsr schkklz	; ")"?
+	jsr $b79e		; get value to .x
+	jsr $aef7		; ")"?
 	txa
 	and #1		; delimit to 0/1
 	tay
@@ -2602,10 +2628,7 @@ fnjoy	ldy #$00		; set $dc00
 	cpx #8
 	bne -
 
-	lda #0		; not in tab, so $00
-	sta joywert
-	beq ++
-
+	ldx #0		; not in tab, so $00
 +	stx joywert	; we have a joy value
 
 ++	lda $20		; now isolate fire
@@ -2617,8 +2640,7 @@ fnjoy	ldy #$00		; set $dc00
 
 +	ldy joywert	; convert to float
 	beq fpl0		; beq -- ($f0 $e1) if JOY should wait
-	bne fpl0		; $8CCB
-
+	bne fpl0
 
 ; -----------------------------------------
 
@@ -3885,14 +3907,14 @@ sforelse	jsr schelse	; search for single ELSE (after IF..THEN DO wasn't successf
 schdo	lda #$22
 	sta $22
 	ldy #$ff
--	iny		; get next byte
+-	iny
 	lda (progz),y
 	beq sfo0		; found end of line?
 	cmp #$64		; no, sb token?
-	bne -		; no
+	bne -		; no, next
 
-	iny		; yes
-	lda (progz),y	; is token of DO?
+	iny
+	lda (progz),y	; yes, is token of DO?
 	cmp $22
 	bne -
 
@@ -3909,8 +3931,8 @@ schelse	lda #$47
 	cmp #$64		; no, sb token?
 	bne -		; no, next
 
-	iny		; yes
-	lda (progz),y	; is token of DO?
+	iny
+	lda (progz),y	; yes, is token of DO?
 	cmp #$22
 	beq +
 	cmp #$47		; is token of ELSE?
