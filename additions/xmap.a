@@ -1,0 +1,100 @@
+; -----------------------------------------
+;
+; Additional functions for Omega's Demon-Block game:
+; func X!MAP() and func X!FCOL()
+;
+; Syntax:
+; c=x!map(zl,sp)	; returns number of tile at (row,column), 0 if no tile
+; f=x!fcol(zl,sp)	; returns color at (row,column)
+;
+; must be initialized by
+; poke $952b,$4c: d!poke $952c,$ca82
+;
+; this code is relocatible
+;
+; -----------------------------------------
+;
+
+	*=$ca82		; start address
+
+; -----------------------------------------
+; data
+
+	movemode		= $a6
+	helpvec		= $b0
+
+	chrget		= $0073
+	sxyflp3		= $8cbf
+	basromein		= $8e3a
+	basromaus		= $8e5f
+	fnat		= $946c
+	fnat1		= $9480
+	fnuse		= $952e
+	csgetariend	= $9535
+	movez		= $a0b1
+	checkpz		= $aef7
+	checkpa		= $aefa
+	zeileanf		= $c5df
+	spalteanf		= $c5e0
+	spaltenanz	= $c5e1
+	zeilenanz		= $c5e2
+
+; -----------------------------------------
+
+fnxpos	bne +		; fn USE?
+	jmp fnuse		; yes, return
++	cpy #$b2		; fn X!? ($b2 is token of X!)
+	bne ++		; no, end ari chain
+
+	jsr chrget	; Bezeichner-Token holen
+	tay
+	cpy #$b1		; MAP? ($B1 is token of MAP)
+	beq xfchr
+	cpy #6		; FCOL? (6 is token of FCOL)
+	bne ++
+
+xfcol	lda #1		; init accordingly
+	!by $2c
+xfchr	lda #0
+	sta movemode
+	ldy #0
+	sty spaltenanz
+	sty zeilenanz
+	jsr chrget	; get next char
+	jsr checkpa	; check for "(" (syntax error if not)
+	lda #$60		; patch func AT to retrieve position expression
+	sta fnat1
+	jsr fnat		; process fnat: get row (in helpvec) and column (in .y)
+	lda helpvec	; get result
+	sta zeileanf	; set position data (*2)
+	asl zeileanf
+	sty spalteanf
+	asl spalteanf
+	lda #$20		; unpatch func AT
+	sta fnat1
+	jsr checkpz	; check for ")"
+	jsr basromaus	; set basic off
+	jsr movez		; compute vector to position (in $20/1); returns .y=0
+	lda ($20),y	; read value at position
+
+	ldx movemode	; determine mode
+	beq +
+	and #15		; limit value if color mode
+	jmp out
+
++	sec
+	sbc #64		; minus 64
+	bcs +
+	lda #0
+	beq out
++	lsr		; div 4
+	lsr
+	tay
+	iny		; plus 1
+	bne +
+
+out	tay
++	jsr basromein	; set basic on
+	jmp sxyflp3	; convert value (in .y) to float
+
+++	jmp csgetariend	; end getari chain
