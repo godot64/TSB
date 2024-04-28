@@ -1156,7 +1156,7 @@ tabbef	!tx "hireS"	; 1
 	!tx "rightB"
 	!tx "rightW"
 	!tx "multI"	; 25
-	!tx "colouR"
+	!tx "coloR"
 	!tx "mmoB"
 	!tx "bflasH"
 	!tx "mob seT"
@@ -1165,14 +1165,14 @@ tabbef	!tx "hireS"	; 1
 	!tx "repeaT"
 	!tx "plaY"	; 33
 	!tx "dO"
-	!tx "centrE"
+	!tx "centeR"
 	!tx "envelopE"
 	!tx "cgotO"
 	!tx "wavE"
 	!tx "fetcH"
 	!tx "at",$a8
 	!tx "untiL"	; 41
-	!by $be		; *
+	!by ">",$be	; *
 	!by $be		; +
 	!tx "usE"
 	!by $be		; -
@@ -1304,7 +1304,7 @@ vecplace	!wo befplace-1	;  16 place    (changed from 86e2)
 	!wo movebef-1	;  23 rightb
 	!wo movebef-1	;  24 rightw
 	!wo befmulti-1	;  25 multi
-	!wo befcolour-1	;  26 colour
+	!wo befcolour-1	;  26 color
 	!wo befmmob-1	;  27 mmob
 	!wo befbflash-1	;  28 bflash
 	!wo befmobset-1	;  29 mob set
@@ -1313,7 +1313,7 @@ vecplace	!wo befplace-1	;  16 place    (changed from 86e2)
 	!wo befrepeat-1	;  32 repeat
 	!wo befplay-1	;  33 play
 	!wo befdo-1	;  34 do, done, do null
-	!wo befcentre-1	;  35 centre
+	!wo befcentre-1	;  35 center
 	!wo befenvelope-1	;  36 envelope
 	!wo befcgoto-1	;  37 cgoto
 	!wo befwave-1	;  38 wave
@@ -1503,7 +1503,7 @@ textchr	!tx "chr$(13)",0
 ;
 version	!tx "ad23"	; Signature
 	!by $0d
-	!tx "2.40424"	; Version Number
+	!tx "2.40428"	; Version Number
 
 ; -----------------------------------------
 ;
@@ -4178,32 +4178,31 @@ nrm03	lda #$3b		; CSET 2: bits for hires mode
 	sta gmemflag
 	rts
 
-; ----------------------------------------- bef COLOUR
+; ----------------------------------------- bef COLOR
 ;
-befcolour	ldx #0		; 0: black
-	jsr chrget	; anything following?
-	beq colc0		; no, set paper and border to blk
+befcolour	jsr chrget
+	cmp #$2c
+	beq ++		; yes, set pen
 
-	cmp #$2c		; comma?
-	beq colc1		; yes, only ink
+	jsr sgetbyt1	; 1: border
+	jsr getpars
++	beq +
+	jsr sgetbytc	; 2: background
+	iny
+	jsr getpars
+	beq +
+++	jsr sgetbytc	; 3: pen
+	cpx #16
+	bcs +
+	stx aktfarb
 
-	jsr sgetbyt1	; get param1 (in .x)
-	stx helpvec
-	jsr chrgot	; no more?
-	beq +		; yes, only paper
-
-	jsr sgetbytc	; get param2 (in .x)
-	lda helpvec
-	!by $24
-colc0	txa
-	sta $d020		; border
-+	stx $d021		; paper
-	jsr chrgot	; no more?
-	beq +		; yes, only border and paper
-
-colc1	jsr sgetbytc	; get param3
-	stx $0286		; ink
 +	jmp endsmb
+
+getpars	cpx #16
+	bcs +
+	txa
+	sta $d020,y	; 1: border, 2: background
++	jmp chrgot
 
 ; -----------------------------------------
 ;
@@ -8409,7 +8408,7 @@ befbflash	jsr chkonoff	; get first parameter
 	stx bflashjn
 	jmp endsmb
 
-; ----------------------------------------- bef CENTRE
+; ----------------------------------------- bef CENTER
 ;
 befcentre	jsr gcentpar
 	sec
@@ -8438,7 +8437,7 @@ befcentre	jsr gcentpar
 rtc1	jsr incbasbz
 	bne -		; uncond. branch
 
-; ----------------------------------------- Part of CENTRE
+; ----------------------------------------- Part of CENTER
 ;
 gcentpar	jsr frominsrt	; get string to be centered
 	stx helpvec	; address
@@ -9583,7 +9582,7 @@ proctable	!fill 256		; table area for proc
 	!by $44,$55,$4d,$50,$0d,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00	; 5:  DUMP+cr
 	!by $50,$4c,$41,$43,$45,$30,$9d,$00,$00,$00,$00,$00,$00,$00,$00,$00	; 6:  PLACE0
 	!by $45,$52,$52,$4f,$52,$0d,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00	; 7:  ERROR+cr
-	!by $43,$4f,$4c,$4f,$55,$52,$31,$31,$2c,$31,$32,$2c,$30,$0d,$00,$00	; 8:  COLOUR11,12,0+cr
+	!by $43,$4f,$4c,$4f,$52,$31,$31,$2c,$31,$32,$2c,$30,$0d,$00,$00,$00	; 8:  COLOR11,12,0+cr
 
 	!by $44,$49,$53,$50,$4c,$41,$59,$0d,$00,$00,$00,$00,$00,$00,$00,$00	; 9:  DISPLAY+cr
 	!by $44,$49,$52,$22,$24,$22,$0d,$00,$00,$00,$00,$00,$00,$00,$00,$00	; 10: DIR"$"+cr
