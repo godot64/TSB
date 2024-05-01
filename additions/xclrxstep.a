@@ -1,0 +1,336 @@
+; -----------------------------------------
+;
+; TSB Extension commands:
+;
+; X!CLR (token 649c)
+;   Purpose:
+;   check a playing field of 12x12 tile positions
+;   with different 2x2 tiles in it for identical
+;   neighbours, and finally erase these tiles
+;
+; X!STEP (token 64a9)
+;   Purpose:
+;   let all tiles fall down one step
+;
+; command vector: $897c ($bfff)
+;
+; -----------------------------------------
+;
+; 1.00, 23.02.2024, first release, still a SYS-command
+; 1.01, 24.02.2024, changed to the real command X!CLR, added X!STEP
+; 1.02, 25.02.2024, xclr now creating 144 bytes table instead of clearing away
+;                   xclr now reporting number of tiles found (0=all cleared!)
+; 1.03, 27.02.2024, bugfix in xstep, bugfix in xclr
+;
+; -----------------------------------------
+
+	*= $c000
+
+; -----------------------------------------
+
+
+	progz	= $7a
+
+	hold	= $20	; hold last row address
+	marker	= $b0
+	left	= $b2
+	upper	= $b4
+	content	= $a6
+	rows	= $a8	; number of rows (12)
+	amount	= $a9	; subtraction offset
+
+	tile	= $aa	; tile to check against
+	col	= $ab	; color of a tile (x!step)
+	onerow	= $ac	; counter for one row
+	tabindex	= $ad	; index into steptab (0..143)
+
+	vram	= $cc00	; TSB MEM screen
+	scanstart	= vram+982
+	stepstart	= vram+902
+	colors	= 3072	; offset to color ram
+
+	chrget	= $0073
+	chrgot	= $0079
+	dropped	= $0369
+	onboard	= dropped+1
+	steptable	= onboard+1
+	incbasbz	= $8e2a	; increment basic pointer
+	bef0	= $9564	; finish command with no parameters (like these 2)
+	err0b	= $a3b5	; syntax error
+
+; ----------------------------------------- Entry
+
+determine	jsr chrget	; get next byte
+	cmp #$9c		; token of CLR?
+	beq befxclr
+	cmp #$a9		; or token of STEP?
+	bne synterr	; no: syntax error
+          jmp befxstep
+
+; -----------------------------------------
+
+synterr	jmp err0b
+
+; ----------------------------------------- bef X!CLR
+
+befxclr	lda #<scanstart	; set address of lower right corner
+	sta hold		; of playing field in row storage
+	lda #>scanstart
+	sta hold+1
+	jsr clrtab	; clear steptable
+
+	ldx #144
+	stx tabindex	; stores marked tiles in steptable
+	ldx #0		; .x counts tiles in a row (12)
+	stx rows
+	stx onerow
+
+rowloop	jsr setvecs	; compute start position
+	jsr subtract
+
+loop	ldy #0		; now find a tile (bottom up)
+	dec tabindex	; (1st time: dec to 143)
+	lda (content),y
+	sta tile
+	cmp #32		; no tile?
+	beq ++
+	cmp #100		; a wall?
+	beq ++
+	cmp #96		; a glass tile?
+	beq ++
+
+	lda (left),y	; no, test left neighbour
+	cmp tile
+	bne +
+
+	ldx tabindex
+	sta steptable,x
+	dex
+	sta steptable,x
+
++	lda (upper),y	; then upper neighbour
+	cmp tile
+	bne ++
+
+	ldx tabindex
+	sta steptable,x
+	txa
+	sec
+	sbc #12
+	tax
+	lda tile
+	sta steptable,x
+
+++	inc onerow	; count tiles in a row
+	ldx onerow
+	cpx #12
+	bcs +
+
+	lda #2
+	sta amount	; then advance to next tile
+	jsr subtract
+	bne loop
+
++	ldx #0		; then advance to next row
+	stx onerow
+	inc rows
+	lda rows
+	cmp #11
+	bcc rowloop
+
+	dey		; .y=$ff/.x=0
+-	iny		; get position of tile
+	lda steptable,y
+	beq -
+	cpy #144
+	bcs +
+	tya
+	sta steptable,x	; and store (discarding old entries)
+	inx
+	lda #$ff		; set end marker
+	sta steptable,x
+	bmi -
+
++	lda #$ff
+	sta steptable,x
+	jmp bef0		; finished
+
+; -----------------------------------------
+
+setvecs	lda #80
+	sta amount	; each new row:
+	sec		; compute start vectors from HOLD
+	lda hold
+	sta content
+	sta marker
+	sbc amount
+	sta hold
+	lda hold+1
+	sta content+1
+	sta marker+1
+	sbc #0
+	sta hold+1
+	clc
+	lda marker+1
+	adc #>colors
+	sta marker+1
+
++	rts
+
+; -----------------------------------------
+
+subtract	sec
+	lda content	; proceed to next tile: current position
+	sbc amount
+	sta content
+	lda content+1
+	sbc #0
+	sta content+1
+
+	sec
+	lda content	; left neighbour
+	sbc #2
+	sta left
+	lda content+1
+	sbc #0
+	sta left+1
+
+	sec
+	lda content	; upper neighbour
+	sbc #80
+	sta upper
+	lda content+1
+	sbc #0
+	sta upper+1
+
+	sec
+	lda marker	; marker (color ram vector)
+	sbc amount
+	sta marker
+	lda marker+1
+	sbc #0
+	sta marker+1
+	rts
+
+; -----------------------------------------
+
+clrtab	ldy #144
+	lda #0		; clear steptable
+-	sta steptable-1,y
+	dey
+	bne -
+	rts
+
+; -----------------------------------------
+
+tiletab	!by $40,$44,$48,$4c,$50,$54,$58,$5c,$60
+
+; ----------------------------------------- bef X!STEP
+
+befxstep	lda #<scanstart	; set address of lower right corner
+	sta hold		; of playing field in row storage
+	lda #>scanstart
+	sta hold+1
+
+	ldx #0
+	stx rows		; rows counts rows (11)
+	stx onboard	; reset counter
+	stx dropped	; reset flag for dropped tile(s)
+
+rowloop2	stx onerow	; onerow counts tiles in a row (12)
+	jsr setvecs	; compute start position (lower right corner)
+--	jsr subtract
+
+letfall	ldy #0
+	ldx #$ff
+	lda (content),y	; determine which tile
+	cmp #32		; space?
+	beq ++
+	cmp #100		; wall?
+	beq ++
+-	inx
+	cpx #9
+	bcs ++
+	cmp tiletab,x
+	bne -
+
+	cpx #8		; glass?
+	beq +
+	inc onboard	; no, count
+	lda rows
+	beq ++
++	jsr stepdown	; found, now check for fall
+
+++	inc onerow	; all tiles in a row?
+	lda onerow
+	cmp #12
+	bcs +
+
+	lda #2
+	sta amount	; no, advance to next tile
+	ldx #0
+	beq --
+
++	inc rows
+	lda rows
+	cmp #11
+	bcc rowloop2
+
+	jmp bef0		; yes, finished
+
+; -----------------------------------------
+
+stepdown	ldy #80		; get char below tile
+	lda (content),y
+	cmp #32		; space?
+	bne +		; no, leave
+	ldy #0
+	lda (marker),y	; yes, store color of tile
+	sta col
+	inc dropped	; report that tile(s) dropped
+
+	ldy #40		; move one tile down
+	lda (content),y	; lower line
+	tax
+	iny
+	lda (content),y
+	ldy #121
+	sta (content),y
+	txa
+	dey
+	sta (content),y
+	ldy #0		; upper line
+	lda (content),y
+	tax
+	iny
+	lda (content),y
+	ldy #81
+	sta (content),y
+	txa
+	dey
+	sta (content),y
+
+	lda col		; now colors, upper line
+	sta (marker),y
+	iny
+	sta (marker),y
+	ldy #120
+	sta (marker),y	; lower line
+	iny
+	sta (marker),y
+
+	ldy #40		; clear origin
+	lda #32
+	sta (content),y
+	iny
+	sta (content),y
+	ldy #1
+	sta (content),y
+	dey
+	sta (content),y	; .y=0
+
++	rts
+
+; -----------------------------------------
+
+	!eof
