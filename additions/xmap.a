@@ -12,9 +12,11 @@
 ;
 ; this code is relocatible
 ;
+; v1.00 2024-04-22	: first release
+; v1.01 2024-05-02	: bugfix, no values outside screen allowed anymore
+;
 ; -----------------------------------------
 ;
-
 	*=$ca82		; start address
 
 ; -----------------------------------------
@@ -24,6 +26,7 @@
 	helpvec		= $b0
 
 	chrget		= $0073
+	swarm		= $83b1
 	sxyflp3		= $8cbf
 	basromein		= $8e3a
 	basromaus		= $8e5f
@@ -65,13 +68,20 @@ xfchr	lda #0
 	lda #$60		; patch func AT to retrieve position expression
 	sta fnat1
 	jsr fnat		; process fnat: get row (in helpvec) and column (in .y)
-	lda helpvec	; get result
-	sta zeileanf	; set position data (*2)
-	asl zeileanf
-	sty spalteanf
-	asl spalteanf
 	lda #$20		; unpatch func AT
 	sta fnat1
+
+	lda helpvec	; get result: row
+	cmp #12
+	bcs bad
+	sta zeileanf	; set position data (*2)
+	asl zeileanf
+	tya		; get result: column
+	cmp #20
+	bcs bad
+	asl
+	sta spalteanf	; set position data (*2)
+
 	jsr checkpz	; check for ")"
 	jsr basromaus	; set basic off
 	jsr movez		; compute vector to position (in $20/1); returns .y=0
@@ -80,7 +90,7 @@ xfchr	lda #0
 	ldx movemode	; determine mode
 	beq +
 	and #15		; limit value if color mode
-	jmp out
+	bpl out
 
 +	sec
 	sbc #64		; minus 64
@@ -98,3 +108,5 @@ out	tay
 	jmp sxyflp3	; convert value (in .y) to float
 
 ++	jmp csgetariend	; end getari chain
+
+bad	jmp swarm		; bad mode error
