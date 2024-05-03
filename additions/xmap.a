@@ -14,10 +14,12 @@
 ;
 ; v1.00 2024-04-22	: first release
 ; v1.01 2024-05-02	: bugfix, no values outside screen allowed anymore
+; v1.02 2024-05-02	: another bugfix, rejecting too big values
+; v1.03 2024-05-03	: reading parameters as floats
 ;
 ; -----------------------------------------
 ;
-	*=$ca82		; start address
+	*=$ca00		; start address
 
 ; -----------------------------------------
 ; data
@@ -27,14 +29,15 @@
 
 	chrget		= $0073
 	swarm		= $83b1
+	schkcom		= $8b89
 	sxyflp3		= $8cbf
 	basromein		= $8e3a
 	basromaus		= $8e5f
-	fnat		= $946c
-	fnat1		= $9480
 	fnuse		= $952e
 	csgetariend	= $9535
 	movez		= $a0b1
+	frmnum		= $ad8a
+	facint		= $b1aa
 	checkpz		= $aef7
 	checkpa		= $aefa
 	zeileanf		= $c5df
@@ -54,7 +57,8 @@ fnxpos	bne +		; fn USE?
 	cpy #$b1		; MAP? ($B1 is token of MAP)
 	beq xfchr
 	cpy #6		; FCOL? (6 is token of FCOL)
-	bne ++
+	beq xfcol
+++	jmp csgetariend	; no, end getari chain
 
 xfcol	lda #1		; init accordingly
 	!by $2c
@@ -65,20 +69,21 @@ xfchr	lda #0
 	sty zeilenanz
 	jsr chrget	; get next char
 	jsr checkpa	; check for "(" (syntax error if not)
-	lda #$60		; patch func AT to retrieve position expression
-	sta fnat1
-	jsr fnat		; process fnat: get row (in helpvec) and column (in .y)
-	lda #$20		; unpatch func AT
-	sta fnat1
 
+	jsr frmnum	; ! row (.x)
+	jsr facint
+	sty helpvec
+	jsr schkcom
+	jsr frmnum	; ! column (.y)
+	jsr facint
 	lda helpvec	; get result: row
 	cmp #12
-	bcs bad
+	bcs null
+	asl
 	sta zeileanf	; set position data (*2)
-	asl zeileanf
 	tya		; get result: column
 	cmp #20
-	bcs bad
+	bcs null
 	asl
 	sta spalteanf	; set position data (*2)
 
@@ -91,6 +96,10 @@ xfchr	lda #0
 	beq +
 	and #15		; limit value if color mode
 	bpl out
+
+null	jsr checkpz	; check for ")"
+	lda #0
+	beq out
 
 +	sec
 	sbc #64		; minus 64
@@ -107,6 +116,3 @@ out	tay
 +	jsr basromein	; set basic on
 	jmp sxyflp3	; convert value (in .y) to float
 
-++	jmp csgetariend	; end getari chain
-
-bad	jmp swarm		; bad mode error
