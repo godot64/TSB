@@ -1503,7 +1503,7 @@ textchr	!tx "chr$(13)",0
 ;
 version	!tx "ad23"	; Signature
 	!by $0d
-	!tx "2.40428"	; Version Number
+	!tx "2.40508"	; Version Number
 
 ; -----------------------------------------
 ;
@@ -2591,10 +2591,6 @@ fnexor	jsr getexor	; check "(", get first value
 
 ; -----------------------------------------
 
-	!by 0,0,0,0,0
-
-; -----------------------------------------
-
 fnc2	cpy #$51		; JOY?
 	bne fnc3
 
@@ -2683,6 +2679,8 @@ fnplace	jsr getstrgs	; check "(", get 2 strings
 	lda $9d		; direct mode?
 	bne err15		; yes, error
 
+	ldy strlen2
+	beq ++
 	tay		; search str1 in str2
 	sty plpos		; position to 0
 -	lda ($a7),y	; found 1st char?
@@ -2693,7 +2691,7 @@ fnplace	jsr getstrgs	; check "(", get 2 strings
 	bne -
 	inc plpos		; yes, position found, create value
 	ldy plpos
-	lda #0
+++	lda #0
 --	sta $0d
 fpl0	jmp sxyflp3
 
@@ -2718,7 +2716,7 @@ csgetari3	cpy #$5b		; INSERT?
 ;
 fninsert	jsr getstrgs	; check "(", get 2 strings
 	jsr getbytc	; get position ($c51f)
-	dex		; +3 bytes
+	dex		; 0 is illegal
 	bmi iqerr
 	stx helpvec+1
 	jsr $aef7		; sys ")"?
@@ -2790,7 +2788,7 @@ csgetari4	cpy #$57		; INST?
 ;
 fninst	jsr getstrgs	; check "(", get 2 strings
 	jsr getbytc	; get position ($c51f)
-	dex
+	dex		; 0 is illegal
 	bmi iqerr
 	stx helpvec+1				; new
 	jsr $aef7		; sys ")"?
@@ -2802,7 +2800,7 @@ fninst	jsr getstrgs	; check "(", get 2 strings
 +	clc
 	lda strlen1	; newlen + pos > oldlen?
 	beq +
-	adc helpvec+1				; new
+	adc helpvec+1	; new
 	cmp strlen2
 	bcc +
 	beq ++
