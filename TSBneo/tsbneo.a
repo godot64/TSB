@@ -218,7 +218,8 @@
 	krx		= $c644	; $cb48	Kreis: Radius X
 	kry		= $c645	; $cb49	Kreis: Radius Y
 	keyflag		= $c646	; 	Flag: F-Tasten aktiv (Wert 10)
-				; ! unused (3 bytes)
+	sepline		= $c647	; 	Flag&Value: separator length
+				; ! unused (2 bytes)
 	wavetab		= $c64a	; 	Teil von WAVE
 	keytab		= $c64d	; 	F-Tasten-Belegung (bis $c74c)
 ; 			  $c74d	; 	Text: "ata" (string to compare w/ keyword DATA)
@@ -560,10 +561,6 @@ mt13	inx
 	iny
 tonext	jmp next
 
-; ------------------------------------------------------------
-
-	!by 0,0,0,0,0
-
 ; ----------------------------------------- Detokenizer Entry Point
 ;
 slist	php		; start of LIST
@@ -668,6 +665,7 @@ ml3	ldy helpvc2
 	bpl +
 	eor #$8f		; umwandeln und auf 0..127 begrenzen
 +	tax		; Token als zähler
+	sta helpvc2+2	; Token merken (für Trennlinie)
 	ldy #0
 	cpx #1		; ist HIRES?
 	beq ml7		; ja, skip Suche
@@ -688,11 +686,26 @@ ml7	lda ($20),y	; dann richtiges befehlswort ausgeben
 ml8	and #$7f		; geshiftetes zeichen ausgeben
 	jsr bsout
 	jsr rvsoff	; und rvs off (falls OPTION aktiv ist)
+	jsr writesep	; evtl. Trennlinie ziehen
 
 	ldy helpvc2	; flags setzen, weiter im ROM
 	iny
 	ldx #1
 lr1	rts
+
+; ----------------------------------------- Part of OPTION
+
+optin	beq +		; ja, ON: Flag setzen
+	cmp #$69		; nein, OFF?
+	beq +		; ja, Flag setzen
+	txa
+	beq ++
+	cpx #40
+	bcs +++
+++	stx sepline	; Flag setzen (Anzahl Ausgabezeichen: 1..39)
+	bne +++
++	stx optflag	; OPTION ON: Wert 10
++++	jmp endsmb	; 26
 
 ; ----------------------------------------- Eingabewarteschleife
 ;
@@ -1061,12 +1074,6 @@ sirq5	lda playflag
 	pla
 	sta $ff
 	jmp $ea31		; sys IRQ
-
-; ----------------------------------------- Spare Space
-;
-spare	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
-	!by 0,0,0,0,0,0,0,0
 
 ; -----------------------------------------
 ;
@@ -1503,7 +1510,7 @@ textchr	!tx "chr$(13)",0
 ;
 version	!tx "ad23"	; Signature
 	!by $0d
-	!tx "2.40508"	; Version Number
+	!tx "2.40513"	; Version Number
 
 ; -----------------------------------------
 ;
@@ -9298,7 +9305,7 @@ bl01	jmp endsmb
 
 ; -----------------------------------------
 ;
-	!by 0,0,0
+	!by 0,0,0,0
 
 ; ----------------------------------------- bef D!POKE
 ;
@@ -9489,8 +9496,8 @@ dom0	jmp delend
 ; ----------------------------------------- bef OPTION
 ;
 befoption	jsr chkonoff
-	stx optflag
-	jmp endsmb
+	cmp #$91		; ON?
+	jmp optin
 
 ; ----------------------------------------- bef LOCAL
 ; !discard?
@@ -9522,7 +9529,7 @@ beflocal	jsr setoff	; set .x to 0
 	lda #$ff
 	sta ($5f),y
 
-	cpx #80		; buffer filled? (max 20 entries)
+	cpx #52		; buffer filled? (max 13 entries)
 	bcs lcf0		; yes, finish LOCALTAB
 
 	jsr chrgot	; anything following?
@@ -9943,9 +9950,24 @@ merge1	jsr basromein
 	jsr $e1d4		; sys get params for LOAD/SAVE
 	jmp basromaus
 
+; ----------------------------------------- Part of OPTION
+;
+writesep	ldx sepline	; Trennzeile ausgeben?
+	beq +		; nein, eh nicht
+	lda helpvc2+2	; was END PROC?
+	cmp #52
+	bne +
+	lda #$0d		; yes, write separator line
+	!by $2c
+-	lda #$2d
+	jsr bsout
+	dex
+	bpl -
++	rts
+
 ; ----------------------------------------- Part of bef LOCAL
 ;
-localtab	!fill 78		; 76 + 2 empty bytes
+localtab	!fill 55		; 52 + 3 empty bytes
 
 ; ----------------------------------------- X! Area
 ; ca00 (temporarily used by command X!)
