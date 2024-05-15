@@ -1510,7 +1510,7 @@ textchr	!tx "chr$(13)",0
 ;
 version	!tx "ad23"	; Signature
 	!by $0d
-	!tx "2.40513"	; Version Number
+	!tx "2.40515"	; Version Number
 
 ; -----------------------------------------
 ;
@@ -3848,7 +3848,7 @@ dodo	lda #1
 do9	ldy #0
 	sty doflag
 	sty dolevel
-	jmp ($0308)	; execbef
+	jmp execbef	; execute
 
 ; -----------------------------------------
 ;
