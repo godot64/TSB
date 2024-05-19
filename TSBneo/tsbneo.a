@@ -219,7 +219,8 @@
 	kry		= $c645	; $cb49	Kreis: Radius Y
 	keyflag		= $c646	; 	Flag: F-Tasten aktiv (Wert 10)
 	sepline		= $c647	; 	Flag&Value: separator length
-				; ! unused (2 bytes)
+				; ! unused (1 bytes)
+	temporary		= $c649	; 	for temporary use
 	wavetab		= $c64a	; 	Teil von WAVE
 	keytab		= $c64d	; 	F-Tasten-Belegung (bis $c74c)
 ; 			  $c74d	; 	Text: "ata" (string to compare w/ keyword DATA)
@@ -1510,7 +1511,7 @@ textchr	!tx "chr$(13)",0
 ;
 version	!tx "ad23"	; Signature
 	!by $0d
-	!tx "2.40515"	; Version Number
+	!tx "2.40517"	; Version Number
 
 ; -----------------------------------------
 ;
@@ -5698,22 +5699,25 @@ usel0	txa
 genout	ldy $44
 gno0	sta outstring,y
 	inc $44
--	rts
+	rts
 
 ; ----------------------------------------- Part of SCRSV/SCRLD
 ;
 chkstate	jsr $ffcf
 	ldx status
-	beq -
-	jsr scrrest	; bei Fehler: restore SCRLD, returns .x=4
-	jmp warmstart	; 4: "file not found"
+	beq +
+	pla
+	pla
+	jmp ss5
+
+	!by 0
 
 ; -----------------------------------------
 ;
 sintro	jsr intro
 	stx $b5		; store hibyte
 	ldx $b8		; file#
-	rts
++	rts
 
 ; ----------------------------------------- bef SCRLD
 ; (patch by Hans Haberl), recoded by Peter Hagemann (sa=5)
@@ -5772,7 +5776,13 @@ ss5	jsr sclose	; close
 ; ----------------------------------------- RESTORE for SCRLD/SCRSV
 
 scrsvrst	jsr scrrest	; RESTORE
-	bne leave1
+leave1	pla
+	pla
+	pla
+	pla
+	pla
+	pla
+	jmp bef0
 
 ; -----------------------------------------
 ;
@@ -5822,7 +5832,7 @@ scrsvplus	jsr chrget	; DEF follows?
 
 ; ----------------------------------------- DEF after SCRLD/SV
 ; by P. Hagemann
-defscrsv	jsr sgetbytn
+scrsvdef	jsr sgetbytn
 	stx helpvec	; Hibyte Ziel nach helpvec
 	jsr sgetbytc	; Anzahl Pages in helpvec+1
 	stx helpvec+1
@@ -5852,11 +5862,7 @@ defscrsv	jsr sgetbytn
 	sta skipshi
 
 leave2	jsr dec7a
-leave1	pla
-	pla
-	pla
-	pla
-	jmp bef0
+	jmp leave1
 
 ; ----------------------------------------- Part of SCRSV/SCRLD
 ; by Peter Hagemann
@@ -5905,10 +5911,6 @@ scrrest	ldx #$e0		; bitmap start at $e000
 	stx vramhi+1	; vram back to $0400
 	stx nvrbl+1	; 4 pages
 	rts
-
-; -----------------------------------------
-
-	!by 0,0,0
 
 ; -----------------------------------------
 ;
@@ -6573,17 +6575,23 @@ usedesflg	inx
 ; ----------------------------------------- bef GRAPHICS
 ;
 befgraphics
-	ldx #<namehsg	; load High Speed Graphics
-	ldy #>namehsg
+
+!if uniprom {		; if for Uniprom CRT:
+	ldx #16
+	ldy #$70
+	jsr $7f89		; load "tsb.hsg" from there
+} else {
+	ldx #<namehsg	; else load "tsb.hsg" from disk
 	jsr loadext
-	bcs +
+	bcs +		; leave if fail
+}
 	jmp graph0
 
 +	jmp iffail1
 
 ; -----------------------------------------
 ; gap
-	!by 0,0,0,0,0
+	!by 0,0,0,0,0,0,0
 
 ; ----------------------------------------- bef HIRES
 ;
@@ -9564,7 +9572,19 @@ outasc	ldx #0
 ; ----------------------------------------- Graphics colors when in graphics mode
 ; -----------------------------------------
 ; c000
-	!fill 1000,$ad	; graphics or text colors
+; this is for implementing REU access for NRM after MEM, init with SYS $c000:
+
+	!by $ee,$49,$c6,$20,$3c,$c0,$ce,$49,$c6,$20,$3f,$c0,$a2,$07,$bd,$73
+	!by $c0,$9d,$01,$df,$ca,$10,$f7,$a2,$1c,$bd,$56,$c0,$9d,$c9,$02,$ca
+	!by $10,$f7,$a9,$c9,$a2,$02,$8d,$a2,$95,$8e,$a3,$95,$20,$b8,$8b,$aa
+	!by $a0,$80,$86,$37,$84,$38,$20,$8c,$fd,$4c,$81,$80,$a2,$00,$2c,$a2
+	!by $01,$86,$b0,$a2,$06,$bd,$7b,$c0,$9d,$02,$df,$ca,$10,$f7,$a9,$90
+	!by $05,$b0,$8d,$01,$df,$60,$ad,$49,$c6,$d0,$03,$4c,$2f,$84,$a2,$07
+	!by $bd,$de,$02,$9d,$01,$df,$ca,$10,$f7,$18,$60,$91,$00,$cc,$00,$00
+	!by $07,$00,$04,$90,$00,$cc,$00,$00,$07,$00,$04,$49,$c6,$ff,$03,$07
+	!by $01,$00
+
+	!fill 1000-130,$ad	; graphics or text colors
 	!fill 24		; gap
 
 ; -----------------------------------------
