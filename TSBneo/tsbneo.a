@@ -1511,7 +1511,7 @@ textchr	!tx "chr$(13)",0
 ;
 version	!tx "ad23"	; Signature
 	!by $0d
-	!tx "2.40517"	; Version Number
+	!tx "2.40529"	; Version Number
 
 ; -----------------------------------------
 ;
@@ -2329,9 +2329,9 @@ ishex	cmp #"g"		; no, beyond "f"?
 +	clc		; ok (is hexdigit)
 ++	rts
 ; 8cae
-err25	pla
+err25	ldx #$25		; error "not hex char"
+ss6	pla
 	pla
-	ldx #$25		; error "not hex char"
 	jmp ($0300)
 
 ; -----------------------------------------
@@ -5686,9 +5686,7 @@ usel6	ldx linenum	; get first char
 	bne usel0		; no, take this char
 	tax		; yes, set 43 (="+")
 usel0	txa
-	inc $44
-	sta outstring,y	; and store
-	rts
+	jmp gno0	; and store
 
 +	cmp #$2d		; "-"?
 	beq usel0		; yes, store
@@ -5697,8 +5695,8 @@ usel0	txa
 ; -----------------------------------------
 ;
 genout	ldy $44
-gno0	sta outstring,y
-	inc $44
+gno0	inc $44
+	sta outstring,y
 	rts
 
 ; ----------------------------------------- Part of SCRSV/SCRLD
@@ -5706,11 +5704,9 @@ gno0	sta outstring,y
 chkstate	jsr $ffcf
 	ldx status
 	beq +
-	pla
-	pla
-	jmp ss5
-
-	!by 0
+	jsr sclose
+	jsr scrrest	; bei Fehler: restore SCRLD, returns .x=4
+	jmp ss6		; 4: "file not found"
 
 ; -----------------------------------------
 ;
