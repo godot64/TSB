@@ -336,7 +336,7 @@ into	lda #8		; set drive 8 and LOAD/SAVE vectors
 	lda $2b		; get start of basic program
 	ldy $2c
 	jsr $a408		; sys free memory
-	jsr $e422		; sys out start message of sb
+	jsr sidrescue	; out start message of sb, rescue MUSIC
 	ldx #$fb
 	txs
 
@@ -1031,16 +1031,12 @@ sirq4	lda $cc
 	lda #0		; # mal 16
 	sta $ff
 	dec $fe
-	asl $fe
+	ldy #3
+-	asl $fe
 	rol $ff
-	asl $fe
-	rol $ff
-	asl $fe
-	rol $ff
-	asl $fe
-	rol $ff
-	clc
-	lda $fe
+	dey
+	bpl -
+	lda $fe		; carry is off
 	adc #<keytab	; plus $c64d
 	sta $fe
 	lda $ff
@@ -1075,6 +1071,12 @@ sirq5	lda playflag
 	pla
 	sta $ff
 	jmp $ea31		; sys IRQ
+
+; -----------------------------------------
+
+sidrescue	lda #$d4
+	sta mregadr+1
+	jmp $e422		; sys out start message of sb
 
 ; -----------------------------------------
 ;
@@ -1511,7 +1513,7 @@ textchr	!tx "chr$(13)",0
 ;
 version	!tx "ad23"	; Signature
 	!by $0d
-	!tx "2.40529"	; Version Number
+	!tx "2.40610"	; Version Number
 
 ; -----------------------------------------
 ;
@@ -9570,17 +9572,17 @@ outasc	ldx #0
 ; c000
 ; this is for implementing REU access for NRM after MEM, init with SYS $c000:
 
-	!by $ee,$49,$c6,$20,$3c,$c0,$ce,$49,$c6,$20,$3f,$c0,$a2,$07,$bd,$73
-	!by $c0,$9d,$01,$df,$ca,$10,$f7,$a2,$1c,$bd,$56,$c0,$9d,$c9,$02,$ca
-	!by $10,$f7,$a9,$c9,$a2,$02,$8d,$a2,$95,$8e,$a3,$95,$20,$b8,$8b,$aa
-	!by $a0,$80,$86,$37,$84,$38,$20,$8c,$fd,$4c,$81,$80,$a2,$00,$2c,$a2
-	!by $01,$86,$b0,$a2,$06,$bd,$7b,$c0,$9d,$02,$df,$ca,$10,$f7,$a9,$90
-	!by $05,$b0,$8d,$01,$df,$60,$ad,$49,$c6,$d0,$03,$4c,$2f,$84,$a2,$07
-	!by $bd,$de,$02,$9d,$01,$df,$ca,$10,$f7,$18,$60,$91,$00,$cc,$00,$00
-	!by $07,$00,$04,$90,$00,$cc,$00,$00,$07,$00,$04,$49,$c6,$ff,$03,$07
-	!by $01,$00
+	!by $ee,$49,$c6,$20,$41,$c0,$ce,$49,$c6,$20,$44,$c0,$a2,$07,$bd,$78
+	!by $c0,$9d,$01,$df,$ca,$10,$f7,$a2,$1c,$bd,$5b,$c0,$9d,$c9,$02,$ca
+	!by $10,$f7,$ad,$49,$c6,$f0,$0a,$a9,$c9,$a2,$02,$8d,$a2,$95,$8e,$a3
+	!by $95,$20,$b8,$8b,$aa,$a0,$80,$86,$37,$84,$38,$20,$8c,$fd,$4c,$81
+	!by $80,$a2,$00,$2c,$a2,$01,$86,$b0,$a2,$06,$bd,$80,$c0,$9d,$02,$df
+	!by $ca,$10,$f7,$a9,$90,$05,$b0,$8d,$01,$df,$60,$ad,$49,$c6,$d0,$03
+	!by $4c,$2f,$84,$a2,$07,$bd,$de,$02,$9d,$01,$df,$ca,$10,$f7,$18,$60
+	!by $91,$00,$cc,$00,$00,$07,$00,$04,$90,$00,$cc,$00,$00,$07,$00,$04
+	!by $49,$c6,$ff,$03,$07,$01,$00
 
-	!fill 1000-130,$ad	; graphics or text colors
+	!fill 1000-135,$ad	; graphics or text colors
 	!fill 24		; gap
 
 ; -----------------------------------------
