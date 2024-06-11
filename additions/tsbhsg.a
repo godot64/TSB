@@ -1,0 +1,1613 @@
+
+; -----------------------------------------
+; created with 6502bench SourceGen v1.7.5
+; -----------------------------------------
+
+pport	= $01
+int	= $14
+basic_end	= $37
+progz	= $7a
+startx	= $a4
+starty	= $a6
+helpvec	= $b0
+width	= $b2
+zielx	= $b4
+ziely	= $ad
+
+chrget	= $0073
+chrgot	= $0079
+basinbuf	= $0200
+errvect	= $0300	; error vector
+irqvec	= $0314	; irq vector
+brkvec	= $0316	; break vector
+endsmb	= $9567	; end simons basic command routine
+over2tsb	= $80eb	; tsb interpreter
+bsout	= $ffd2	;($0326/ichrout) output vector, chrout
+
+; -----------------------------------------
+
+	*=$7000
+	!ct pet
+
+; -----------------------------------------
+
+tsbhsg	jsr setinterpr
+	jsr cleargfx
+	lda #$10		; colors (white on black)
+	jsr clearcols
+	ldx #<tsbhsg	; set memtop to $7000
+	ldy #>tsbhsg
+	stx basic_end
+	sty basic_end+1
+	lda #$80		; "set pixels" = default mode
+	sta mode
+	lda progz+1	; direct mode?
+	cmp #$02
+	beq +
+	rts
+
++	ldy #0		; yes, credits
+-	lda credit,y
+	beq +
+	jsr bsout
+	iny
+	bne -
++	rts
+
+; ----------------------------------------- cmd GFX ON (H)
+
+c_gfxon	jsr shortcmd	; get screen (dummy)
+	jsr manageirq
+	lda $d011
+	and #$20
+	bne +
+	lda $d018
+	sta vald018
++	lda $dd00
+	and #$fc		; vicbank 3 ($c000..$ffff)
+-	ldy #$3b		; gfx on
+	ldx #$0b		; self mod (03/0b)
+
+--	sta $dd00		; vicbank
+	sty $d011		; gfx mode
+	stx $d018		; chars
+	rts
+
+; ----------------------------------------- cmd NRM (N)
+
+c_nrm	jsr manageirq	; IRQ off
+	lda $dd00		; text screen on
+	ora #$03
+	ldx vald018	; get $d018 value
+	ldy #$1b
+	bne --		; restore
+
+; ----------------------------------------- cmd HIRES (E)
+
+c_hires	jsr shortcmd	; getbytc: which screen (0/1) - dummy
+
+cleargfx	ldx #$e0		; $e000,$e800
+	ldy #$e8
+	stx ch0+2
+	sty ch1+2
+	ldx #$f0		; $f000,$f800
+	ldy #$f8
+	stx ch2+2
+	sty ch3+2
+	ldx #$08		; 8 mal
+	ldy #$00
+	tya
+ch0	sta $e800,y
+ch1	sta $f000,y
+ch2	sta $f800,y
+ch3	sta $0000,y
+	iny
+	bne ch0
+	inc ch0+2
+	inc ch1+2
+	inc ch2+2
+	inc ch3+2
+	dex
+	bne ch0
+	jmp sete000
+
+; ----------------------------------------- cmd MOD (C)
+
+c_mod	jsr getbytc	; - dummy (Screen)
+	jsr shortcmd
+	bpl clearcols
+	txa
+clearcols	ldx #$c0		; getbytc: color (at $c000)
+	ldy #$00
+	sty $c1
+	stx $c2
+	ldx #$04		; 4 pages hires colors ($10)
+	ldy #$00
+-	sta ($c1),y
+	iny
+	bne -
+	inc $c2
+	dex
+	bne -
+	beq sete000	; reset vector c1 to $e000
+
+; ----------------------------------------- cmd Screen (M)
+
+c_screen	jsr shortcmd	; getbyte (screen: 0/1) - unused
+sete000	ldx #$e0		; tsb: only screen 1! ($e000)
+	ldy #$00
+	sty $c1
+	stx $c2
+	rts
+
+; ----------------------------------------- Short Command?
+
+shortcmd	jsr chrgot
+	bne getbytc
+	lda #$ff
+	rts
+
+; ----------------------------------------- GETBYTC
+
+getbytc	jsr $aefd		; chkcom / getbyt
+	jsr $b79e
+	txa
+	rts
+
+; ----------------------------------------- GETXY1
+
+getxy1	jsr getcoords	; get values
+setxy1	stx starty	; Y
+	sty startx	; X
+	sta startx+1
+	rts
+
+; ----------------------------------------- GETXY2
+
+getxy2	jsr getcoords	; get values
+	stx ziely		; Y
+	sty zielx		; X
+	sta zielx+1
+	rts
+
+; ----------------------------------------- GETADR/GETBYT
+
+getcoords	jsr $aefd		; Komma?
+	jsr $b7eb		; getadr (nach $14/5) und getbyt (nach .x)
+	cpx #$c8		; .x >200?
+	bcs ++		; yes, error
+	ldy int
+	lda int+1		; address >=320?
+	beq +
+	cpy #$40
+	bcs ++		; yes, error
++	rts
+
+++	jmp $b248		; illegal quantity error
+
+; -----------------------------------------
+
+manageirq	bit irqon
+	bpl +
+
+	sei
+	lda tsbirq	; get tsb irq
+	sta irqvec	; restore it
+	lda tsbirq+1
+	sta irqvec+1
+	lda #$00
+	sta $d01a
+	sta irqon		; hsg irq is off now
+	cli
++	rts
+
+; ----------------------------------------- cmd PLOT (P)
+
+c_plot	jsr getxy1	; get X and Y coords
+	jsr saveregs
+	jsr getbytc	; get pixel mode
+	beq +
+	lda #$80		; 0=erase - <>0=set
++	sta mode
+
+compute1	lda startx+1	; compute target pixel position
+	sta zielx+1
+	lda startx
+	and #$f8
+	sta zielx
+	lda starty
+	and #$07
+	clc
+	adc zielx
+	sta zielx
+	lda starty
+	and #$f8
+	lsr
+	lsr
+	lsr
+	tax
+	lda gfxrowlo,x
+	clc
+	adc zielx
+	sta zielx
+	lda gfxrowhi,x
+	adc zielx+1
+	adc $c2
+	sta zielx+1
+	lda startx
+	and #$07
+	tax
+	lda bits,x
+	sta ziely
+
+	sei		; pixel it:
+	lda pport
+	pha
+	lda #$35
+	sta pport
+	ldy #$00
+	bit mode
+	bpl +
+
+	lda ziely		; set
+	ora (zielx),y
+	bne ++
+
++	lda ziely		; erase
+	eor #$ff
+	and (zielx),y
+++	sta (zielx),y
+	pla
+	sta pport
+	cli
+	rts
+
+; ----------------------------------------- Data
+
+bits	!byte $80,$40,$20,$10,$08,$04,$02,$01
+
+gfxrowlo	!byte $00,$40,$80,$c0,$00,$40,$80,$c0
+	!byte $00,$40,$80,$c0,$00,$40,$80,$c0
+	!byte $00,$40,$80,$c0,$00,$40,$80,$c0
+	!byte $00
+gfxrowhi	!byte $00,$01,$02,$03,$05,$06,$07,$08
+	!byte $0a,$0b,$0c,$0d,$0f,$10,$11,$12
+	!byte $14,$15,$16,$17,$19,$1a,$1b,$1c
+	!byte $1e
+
+; ----------------------------------------- cmd LINE (L)
+
+c_line	jsr getxy1	; start
+lineto	jsr getxy2	; destination
+	jsr saveregs
+	jsr getbytc	; get pixel mode
+	beq +
+	lda #$80		; 0=erase - <>0=set
++	sta mode
+
+inline	lda startx+1
+	cmp zielx+1
+	beq +
+	bcs ++
+
+-	sec
+	lda zielx
+	sbc startx
+	sta width
+	lda zielx+1
+	sbc startx+1
+	sta width+1
+	ldx #<addsub8r
+	ldy #>addsub8r
+	stx detour2+1
+	sty detour2+2
+	bne +++
+
++	lda startx
+	cmp zielx
+	bcc -
+
+++	sec
+	lda startx
+	sbc zielx
+	sta width
+	lda startx+1
+	sbc zielx+1
+	sta width+1
+	ldx #<addsub8l
+	ldy #>addsub8l
+	stx detour2+1
+	sty detour2+2
+
++++	lda starty
+	cmp ziely
+	bcs +
+	sec
+	lda ziely
+	sbc starty
+	sta $fe
+	ldx #<plus319
+	ldy #>plus319
+	stx detour1+1
+	sty detour1+2
+	bne ++
+
++	sec
+	lda starty
+	sbc ziely
+	sta $fe
+	ldx #<minus319
+	ldy #>minus319
+	stx detour1+1
+	sty detour1+2
+
+++	lda width+1
+	bne +
+	lda width
+	cmp $fe
+	bcc ++
++	lda width+1
+	sta $a8
+	lsr
+	sta helpvec+1
+	lda width
+	sta $a7
+	ror
+	sta helpvec
+	jmp compute2
+
+++	ldy width
+	lda $fe
+	sta $a7
+	sta width
+	lsr
+	sta helpvec
+	sty $fe
+	lda #$00
+	sta $a8
+	sta helpvec+1
+	ldx detour2+1
+	ldy detour1+1
+	stx detour1+1
+	sty detour2+1
+	ldx detour2+2
+	ldy detour1+2
+	stx detour1+2
+	sty detour2+2
+
+compute2	lsr $a8		; compute pixel position
+	ror $a7
+	lda zielx+1
+	sta $aa
+	lda zielx
+	and #$f8
+	sta $a9
+	lda ziely
+	and #$07
+	clc
+	adc $a9
+	sta $a9
+	lda ziely
+	and #$f8
+	lsr
+	lsr
+	lsr
+	tax
+	lda gfxrowlo,x
+	clc
+	adc $a9
+	sta $a9
+	lda gfxrowhi,x
+	adc $aa
+	adc $c2
+	sta $aa
+	lda zielx
+	and #$07
+	tax
+	lda bits,x
+	sta $ab
+
+	sei		; pixel it:
+	lda pport
+	pha
+	lda #$35
+	sta pport
+	ldy #$00
+	bit mode
+	bpl +
+
+	lda $ab		; set
+	ora ($a9),y
+	sta ($a9),y
+	jmp ++
+
++	lda $ab		; erase
+	eor #$ff
+	and ($a9),y
+	sta ($a9),y
+++	pla
+	sta pport
+	cli
+
+	jsr compute1	; compute target pixel position
+	sei
+	lda pport
+	pha
+	lda #$35
+	sta pport
+	ldy #$00
+	ldx $a7
+	jmp +++		; and loop for LINE
+
+; ----------------------------------------- LINE loop
+
+-	clc
+	lda helpvec
+	adc $fe
+	sta helpvec
+	lda helpvec+1
+	adc #$00
+	sta helpvec+1
+	cmp width+1
+	beq +
+	bcc detour2
+
+detour1	jsr plus319	; self mod
+	sec
+	lda helpvec
+	sbc width
+	sta helpvec
+	lda helpvec+1
+	sbc width+1
+	sta helpvec+1
+	jmp detour2
+
++	lda helpvec
+	cmp width
+	bcs detour1
+
+detour2	jsr addsub8l
+	bit mode
+	bmi +
+
+	lda ziely		; erase
+	eor #$ff
+	and (zielx),y
+	sta (zielx),y
+	lda $ab
+	eor #$ff
+	and ($a9),y
+	jmp ++
+
++	lda ziely		; set
+	ora (zielx),y
+	sta (zielx),y
+	lda $ab
+	ora ($a9),y
+++	sta ($a9),y
+	dex
+
++++	bne -
+	pla
+	sta pport
+	cli
+	rts
+
+; ----------------------------------------- Shift Bit right
+
+addsub8r	lda ziely		; counts 8 passes
+	cmp #$01
+	beq +
+	lsr
+	sta ziely
+	bne ++
+
++	lda #$80		; then:
+	sta ziely
+	clc		; plus 8
+	lda zielx
+	adc #$08
+	sta zielx
+	lda zielx+1
+	adc #$00
+	sta zielx+1
+
+++	lda $ab		; counts 8 passes
+	cmp #$80
+	beq +
+	asl
+	sta $ab
+	rts
+
++	lda #$01		; then:
+	sta $ab
+	sec		; minus 8
+	lda $a9
+	sbc #$08
+	sta $a9
+	lda $aa
+	sbc #$00
+	sta $aa
+	rts
+
+; ----------------------------------------- Shift Bit left
+
+addsub8l	lda ziely
+	cmp #$80
+	beq +
+	asl
+	sta ziely
+	bne ++
+
++	lda #$01
+	sta ziely
+	sec		; minus 8
+	lda zielx
+	sbc #$08
+	sta zielx
+	lda zielx+1
+	sbc #$00
+	sta zielx+1
+
+++	lda $ab
+	cmp #$01
+	beq +
+	lsr
+	sta $ab
+	rts
+
++	lda #$80
+	sta $ab
+
+	clc		; plus 8
+	lda $a9
+	adc #$08
+	sta $a9
+	lda $aa
+	adc #$00
+	sta $aa
+	rts
+
+; -----------------------------------------
+
+plus319	lda zielx
+	and #$07
+	cmp #$07
+	beq +
+	inc zielx
+	jmp ++
+
++	lda zielx		; plus 319
+	clc
+	adc #$39
+	sta zielx
+	lda zielx+1
+	adc #$01
+	sta zielx+1
+++	lda $a9
+	and #$07
+	beq +
+	dec $a9
+	rts
+
+; -----------------------------------------
+
++	lda $a9		; sub 319
+	sec
+	sbc #$39
+	sta $a9
+	lda $aa
+	sbc #$01
+	sta $aa
+	rts
+
+; -----------------------------------------
+
+minus319	lda zielx
+	and #$07
+	beq +
+	dec zielx		; minus 1
+	jmp ++
+
++	lda zielx		; sub 319
+	sec
+	sbc #$39
+	sta zielx
+	lda zielx+1
+	sbc #$01
+	sta zielx+1
+++	lda $a9
+	and #$07
+	cmp #$07
+	beq +
+	inc $a9		; plus 1
+	rts
+
+; -----------------------------------------
+
++	lda $a9		; add 319
+	clc
+	adc #$39
+	sta $a9
+	lda $aa
+	adc #$01
+	sta $aa
+	rts
+
+; -----------------------------------------
+
+saveregs	sta holdx1	; .a, .x und .y für $e000 merken
+	stx holdx1+1
+	sty holdy1
+	rts
+
+; -----------------------------------------
+
+loadregs	lda holdx1	; .a, .x und .y für $e000 holen
+	ldx holdx1+1
+	ldy holdy1
+	jmp setxy1	; setxy
+
+; ----------------------------------------- cmd DRAW TO (D)
+
+c_draw	jsr loadregs	; set destination
+	jmp lineto	; continue w/ LINE
+
+; ----------------------------------------- cmd SET GFX CURSOR (S)
+
+c_set	jsr getxy2
+	jmp saveregs
+
+; -----------------------------------------
+
+holdx1	!wo $0064		; X1
+holdy1	!by $a0		; Y1
+vald018	!by $15
+
+; ----------------------------------------- cmd Evaluate VAR (V)
+
+c_eval	tsx
+	stx stack
+	ldx errvect	; save error vector
+	ldy errvect+1
+	stx storebv
+	sty storebv+1
+	ldx #<clrfac	; set vector to clrfac routine
+	ldy #>clrfac
+	stx errvect
+	sty errvect+1
+	jsr $aefd		; chkcom
+	jsr $b08b		; search target var (numeral)
+	sta varadr
+	sty varadr+1
+	jsr $ad8d		; chknum
+	jsr $aefd		; chkcom, search string var w/ expression
+	jsr $ad9e		; frmevl
+	jsr $ad8f		; chkstr
+	lda progz		; set basic pointer to string contents
+	ldy progz+1
+	sta storepz
+	sty storepz+1
+	ldy #$00		; found?
+	lda ($64),y
+	tax
+	beq ++		; no, skip
+
+	iny		; yes, copy to $200
+	lda ($64),y
+	sta $22
+	iny
+	lda ($64),y
+	sta $23
+	txa
+	tay
+	lda #$00
+	beq +
+
+-	lda ($22),y
++	sta basinbuf,y
+	dey
+	bne -
+	lda ($22),y
+	sta basinbuf,y
+	sty progz
+	lda #>basinbuf
+	sta progz+1
+	jsr $a579		; tokenize string contents
+	lda #<basinbuf
+	ldx #>basinbuf
+	sta progz
+	stx progz+1
+	jsr $ad9e		; frmevl; evaluate string contents
+
+--	lda storepz
+	ldy storepz+1
+	sta progz
+	sty progz+1
+	lda varadr
+	ldy varadr+1
+	sta $49		; var for for..next
+	sty $4a
+++	lda storebv	; (restore error vector)
+	ldy storebv+1
+	sta errvect
+	sty errvect+1
+	jmp $bbd0		; fac2var, write result to var
+
+clrfac	stx errnum	; save error number (normally $80)
+	lda #$00		; clear FAC
+	ldx #$06
+-	sta $60,x
+	dex
+	bne -
+	ldx stack
+	txs
+	bne --
+
+; -----------------------------------------
+
+stack	!by $00		 ; Content: stackpointer
+storebv	!wo $00
+varadr	!wo $00
+storepz	!wo $00
+
+; ----------------------------------------- cmd SPLIT screen (IS/I0/I1)
+
+c_split	cmp #$53		; "S"?
+	beq +
+	cmp #$30		; "0"?
+	beq ++
+	cmp #$31		; "1"?
+	beq +++
+	jmp $af08		; no, syntax error
+
++	jsr chrget	; get next char (split lines)
+	jsr getraster	; get line for graphics on
+	sta gfxon
+	jsr getraster	; get line for text on
+	sta txton
+	rts
+
+getraster	jsr $aefd		; Komma?
+	jsr $b79e		; getbyt (ab hier Grafik/Text)
+	txa
+	clc
+	adc #$31		; 49 addieren (Rasterlinie ansteuern)
+	rts
+
+; ----------------------------------------- I0
+
+++	jsr chrget	; skip next char
+	jsr manageirq	; restore IRQ
+	lda std011+1
+	sta $d011
+	lda std018+1
+	sta $d018
+	lda stdd00+1
+	sta $dd00
+	rts
+
+; ----------------------------------------- I1
+
++++	jsr chrget	; skip next char
+	lda $d011		; graphics on?
+	and #$20
+	beq +		; no, leave
+
+	sei		; yes
+	lda $d011
+	and #$7f
+	sta std011+1
+	sta $d011
+	lda $d018
+	sta std018+1
+	lda $dd00
+	sta stdd00+1
+	lda #$81		; IRQ Maske setzen
+	sta $d01a
+	lda gfxon		; Rasterlinie setzen
+	sta $d012
+	lda irqvec	; get tsb irq
+	sta tsbirq
+	lda irqvec+1
+	sta tsbirq+1
+	lda #<hsgirq	; and set hsg irq
+	sta irqvec
+	lda #>hsgirq
+	sta irqvec+1
+	lda #$01
+	sta toggle
+	lda #$80		; hsg irq is on now
+	sta irqon
+	cli
+
++	rts
+
+; -----------------------------------------
+
+hsgirq	lda $d019		; IRQ ausgelöst?
+	sta $d019
+	bmi +
+	lda $dc0d		; nein, ICR löschen
+	cli
+	jmp (tsbirq)	; normaler IRQ
+
++	ldx toggle	; ja, Text/Grafik wieder an, je nach Toggle
+	beq +
+	ldx #$00
+	beq ++
++	ldx #$01
+++	stx toggle
+	lda std011,x
+	sta $d011
+	lda std018,x
+	sta $d018
+	lda stdd00,x
+	sta $dd00
+	lda gfxon,x
+	sta $d012
+	cli
+	jmp (tsbirq)
+
+; ----------------------------------------- VIC data
+
+std011	!byte $1b,$3b	; $d011
+std018	!byte $17,$0b	; $d018
+stdd00	!byte $97,$94	; $dd00
+gfxon	!byte $00		; line: graphics on
+txton	!byte $00		; line: text on
+toggle	!byte $00
+irqon	!byte $00
+tsbirq	!wo 0
+
+; -----------------------------------------
+
+setinterpr
+	lda $d018		; save textmode
+	sta vald018	; to self mod
+	lda #<interpr	; set Interpreter (orig. at $7671)
+	sta $0308
+	lda #>interpr
+	sta $0309
+	rts
+
+; ----------------------------------------- Interpreter
+
+interpr	jsr chrget	; fetch next char
+	php
+	cmp #$5c		; pound?
+	beq +		; yes, hsg command
+	plp
+	jmp over2tsb	; no, go to TSB interpreter
+
+; ----------------------------------------- HSG interpreter
+
++	plp
+	jsr chrget	; fetch char after pound
+	ldx #$0f
+-	cmp commands-1,x	; compare against list
+	beq +
+	dex
+	bne -
+	jmp $af08		; not in list: syntax error
+
++	txa		; execute hsg command
+	asl
+	tax
+	lda cmdvecs-2,x
+	sta cmd+1
+	inx
+	lda cmdvecs-2,x
+	sta cmd+2
+	jsr chrget
+cmd	jsr cmd		; self mod!
+	jsr chrgot
+	jmp endsmb
+
+; -----------------------------------------
+
+commands	!tx "qinmhvcekbrsdpl"	; hsg command chars (15)
+
+; -----------------------------------------
+
+cmdvecs	!wo c_combine	; q (combine)
+	!wo c_split	; i (is split, i0/1 split on/off)
+	!wo c_nrm		; n (normal screen = NRM)
+	!wo c_screen	; m (choose screen)
+	!wo c_gfxon	; h (hires on = CSET 2)
+	!wo c_eval	; v (evaluate string)
+	!wo c_mod		; c (colorize = MOD)
+	!wo c_hires	; e (erase = HIRES)
+	!wo c_circle	; k (kreis = CIRCLE)
+	!wo c_block	; b (block = BLOCK)
+	!wo c_rec		; r (rectangle = REC)
+	!wo c_set		; s (set cursor)
+	!wo c_draw	; d (draw = DRAW TO)
+	!wo c_plot	; p (plot = PLOT)
+	!wo c_line	; l (line = LINE)
+
+; -----------------------------------------
+
+credit	!tx $93,$0d," ** high-speed-grafik  (w) mar. 1986 **",$0d,$0d
+	!tx " **  by w. lohwasser - tsb vs by ad  **",$0d,$0d
+	!by $00
+
+; -----------------------------------------
+
+getxyxy	jsr getxy1	; startadresse
+	stx ystart	; Y1
+	sty xstart	; X1
+	sta xstart+1
+	jsr getxy2	; endadresse
+	stx yende		; Y2
+	sty xende		; X2
+	sta xende+1
+	jmp saveregs
+
+; ----------------------------------------- cmd REC (R)
+
+c_rec	jsr getxyxy	; fetch start and end coords
+	lda ystart	; y1
+	sta ziely
+	jsr getbytc	; get pixel mode
+	beq +
+	lda #$80		; 0=erase - <>0=set
++	sta mode
+	jsr inline	; obere Kante
+
+	ldx yende		; y2
+	ldy xstart	; x1
+	lda xstart+1
+	stx ziely
+	sty zielx
+	sta zielx+1
+	jsr inline	; linke Kante
+
+	ldx yende
+	ldy xende
+	lda xende+1
+	stx starty
+	sty startx
+	sta startx+1
+	ldy xstart
+	lda xstart+1
+	stx ziely
+	sty zielx
+	sta zielx+1
+	jsr inline	; untere Kante
+
+	ldx ystart
+	ldy xende
+	lda xende+1
+	stx ziely
+	sty zielx
+	sta zielx+1
+	jmp inline	; rechte Kante
+
+; -----------------------------------------
+
+ystart	!by $2c		; y1
+xstart	!wo $01		; x1
+yende	!by $2d		; y2
+xende	!wo $2d		; x2
+
+storehv2	!byte $36,$01
+
+; ----------------------------------------- cmd BLOCK (B)
+
+c_block	jsr getxy1	; upper left coords
+	jsr getxy2	; lower right coords
+	jsr saveregs
+	jsr getbytc	; get pixel mode
+	beq +
+	lda #$80		; 0=erase - <>0=set
++	sta mode
+
+	lda ziely
+	cmp starty
+	bcs +
+	ldx starty
+	stx ziely
+	sta starty
+	txa
++	sec
+	sbc starty
+	sta $ac
+	lda startx+1
+	cmp zielx+1
+	bcc +
+	bne ++
+	lda startx
+	cmp zielx
+	bcc +
+++	ldx startx
+	ldy zielx
+	sty startx
+	stx zielx
+	ldx startx+1
+	ldy zielx+1
+	sty startx+1
+	stx zielx+1
++	sec
+	lda zielx
+	sta storehv2
+	sbc startx
+	sta ystart
+	lda zielx+1
+	sta storehv2+1
+	sbc startx+1
+	sta xstart
+	ldx #<addsub8r
+	ldy #>addsub8r
+	stx detour2+1
+	sty detour2+2
+	inc $ac
+	lda starty
+	sta ziely
+-	lda #$01
+	sta width+1
+	lda #$00
+	sta helpvec
+	sta $fe
+	sta width
+	sta helpvec+1
+	lda ystart
+	sta $a7
+	lda xstart
+	sta $a8
+	lda storehv2
+	sta zielx
+	lda storehv2+1
+	sta zielx+1
+	jsr compute2
+	inc starty
+	lda starty
+	sta ziely
+	dec $ac
+	bne -
+	rts
+
+; ----------------------------------------- cmd CIRCLE (K)
+
+c_circle	jsr getxy1	; Mittelpunkt
+	stx ycenter	; MY
+	sty xcenter	; MX
+	sta xcenter+1
+	jsr saveregs
+	jsr getbytc	; x-radius
+	sta xradius
+	jsr getbytc	; y-radius
+	sta yradius
+	jsr getbytc	; get pixel mode
+	beq +
+	lda #$80		; 0=erase - <>0=set
++	sta mode
+
+	clc
+	lda startx
+	adc xradius
+	sta rightl1
+	sta rightl2
+	lda startx+1
+	adc #$00
+	sta righth1
+	sta righth2
+
+	sec
+	lda startx
+	sbc xradius
+	sta leftl1
+	sta leftl2
+	lda startx+1
+	sbc #$00
+	sta lefth1
+	sta lefth2
+
+	lda starty
+	sta topr1
+	sta topr2
+	sta topl1
+	sta topl2
+	lda #$08
+	sta L7AA0
+	lda #$00
+	sta L7A8F
+	sta L7A58
+	sta L7A59
+	sta L7A5A
+	sta L7A5B
+
+L789F	lda xradius
+	sta L7A95
+	ldx L7AA0
+	lda L7A6B,x
+	sta L7A92
+	lda L7A73,x
+	sta L7A93
+	jsr L7A0A
+
+	clc
+	lda xcenter
+	adc L7A98
+	sta L7A5C
+	sta L7A5D
+	lda xcenter+1
+	adc #$00
+	sta L7A60
+	sta L7A61
+
+	sec
+	lda xcenter
+	sbc L7A98
+	sta L7A5E
+	sta L7A5F
+	lda xcenter+1
+	sbc #$00
+	sta L7A62
+	sta L7A63
+	lda yradius
+	sta L7A95
+	lda L7A7B,x
+	sta L7A92
+	lda L7A83,x
+	sta L7A93
+	jsr L7A0A
+
+	clc
+	lda ycenter
+	adc L7A98
+	sta L7A64
+	sta L7A67
+	lda L7A8F
+	adc #$00
+	sta L7A68
+	sta L7A6B
+
+	sec
+	lda ycenter
+	sbc L7A98
+	sta L7A65
+	sta L7A66
+	lda L7A8F
+	sbc #$00
+	sta L7A69
+	sta L7A6A
+
+	lda #$04
+	sta L7AA1
+-	ldx L7AA1
+	lda L7A4B,x
+	sta startx
+	lda leftl2,x
+	sta startx+1
+	lda lefth2,x
+	sta starty
+	lda topl2,x
+	sta L7A9D
+	lda L7A5B,x
+	sta zielx
+	lda L7A5F,x
+	sta zielx+1
+	lda L7A63,x
+	sta ziely
+	lda L7A67,x
+	sta L7A9E
+	jsr L7AA3
+	dec L7AA1
+	bne -
+
+	ldx #$10
+-	lda L7A5B,x
+	sta L7A4B,x
+	dex
+	bne -
+	dec L7AA0
+	beq +
+	jmp L789F
+
++	jsr L79D4
+	lda L7A58
+	sta L7A9E
+	lda topr1
+	ldx rightl1
+	ldy righth1
+	jsr L79CA
+
+	jsr L79D4
+	lda L7A5B
+	sta L7A9E
+	lda topl2
+	ldx leftl2
+	ldy lefth2
+	jsr L79CA
+
+	jsr L79EF
+	lda L7A59
+	sta L7A9E
+	lda topr2
+	ldx rightl2
+	ldy righth2
+	jsr L79CA
+
+	jsr L79EF
+	lda L7A5A
+	sta L7A9E
+	lda topl1
+	ldx leftl1
+	ldy lefth1
+
+L79CA	sta ziely
+	stx zielx
+	sty zielx+1
+	jmp L7AA3
+
+L79D4	ldx xcenter
+	ldy xcenter+1
+	stx startx
+	sty startx+1
+	clc
+	lda ycenter
+	adc yradius
+	sta starty
+	lda #$00
+	adc #$00
+	sta L7A9D
+	rts
+
+L79EF	ldx xcenter
+	ldy xcenter+1
+	stx startx
+	sty startx+1
+	sec
+	lda ycenter
+	sbc yradius
+	sta starty
+	lda #$00
+	sbc #$00
+	sta L7A9D
+	rts
+
+L7A0A	lda #$00
+	sta L7A96
+	sta L7A97
+	sta L7A98
+	sta L7A94
+-	lda L7A95
+	beq ++
+	lsr L7A95
+	bcc +
+	clc
+	lda L7A96
+	adc L7A92
+	sta L7A96
+	lda L7A97
+	adc L7A93
+	sta L7A97
+	lda L7A98
+	adc L7A94
+	sta L7A98
++	asl L7A92
+	rol L7A93
+	rol L7A94
+	jmp -
+
+++	rts
+
+L7A4B	!byte $00
+rightl1	!byte $af
+rightl2	!byte $af
+leftl1	!byte $91
+leftl2	!byte $91
+righth1	!byte $00
+righth2	!byte $00
+lefth1	!byte $00
+lefth2	!byte $00
+topr1	!byte $bc
+topr2	!byte $0c
+topl1	!byte $0c
+topl2	!byte $bc
+L7A58	!byte $00
+L7A59	!byte $00
+L7A5A	!byte $00
+L7A5B	!byte $00
+L7A5C	!byte $af
+L7A5D	!byte $af
+L7A5E	!byte $91
+L7A5F	!byte $91
+L7A60	!byte $00
+L7A61	!byte $00
+L7A62	!byte $00
+L7A63	!byte $00
+L7A64	!byte $bc
+L7A65	!byte $0c
+L7A66	!byte $0c
+L7A67	!byte $bc
+L7A68	!byte $00
+L7A69	!byte $00
+L7A6A	!byte $00
+L7A6B	!byte $00
+	!byte $74
+	!byte $8f
+	!byte $00
+	!byte $8d
+	!byte $1b
+	!byte $b3
+	!byte $90
+L7A73	!text $1c,$2c,"w"
+	!byte $80
+	!byte $a4
+	!byte $c4
+	!byte $dd
+	!byte $f0
+L7A7B	!byte $fc
+	!byte $1c
+	!byte $90
+	!byte $b3
+	!byte $1b
+	!byte $8d
+	!byte $00
+	!byte $8f
+L7A83	!byte $74
+	!byte $fc
+	!byte $f0
+	!byte $dd
+	!byte $c4
+	!byte $a4
+	!byte $80
+	!byte $57
+	!byte $2c
+
+xcenter	!wo $00a0
+ycenter	!byte $64
+L7A8F	!byte $00
+xradius	!byte $5a
+yradius	!byte $5a
+L7A92	!byte $00
+L7A93	!byte $0e
+L7A94	!byte $7e
+L7A95	!byte $00
+L7A96	!byte $d8
+L7A97	!byte $a1
+L7A98	!byte $58
+L7A99	!byte $99
+L7A9A	!byte $00
+L7A9B	!byte $00
+L7A9C	!byte $00
+L7A9D	!byte $00
+L7A9E	!byte $00
+L7A9F	!byte $00
+L7AA0	!byte $00
+L7AA1	!byte $00
+mode	!byte $e0		; 1. screen ($e0 oder $40) - unused!
+			; $x1000000 = $e000
+			; $x0000000 = $4000
+
+			; 2. Modus (Set oder Erase)
+			; $1x000000 = set
+			; $0x000000 = erase
+
+L7AA3	lda #$00
+	sta L7A9F
+	ldx startx
+	ldy startx+1
+	jsr L7BFB
+	bcc +
+-	lda L7A9F
+	ora #$80
+	sta L7A9F
+	bne ++
+
++	ldx starty
+	ldy L7A9D
+	jsr L7C09
+	bcs -
+++	ldx zielx
+	ldy zielx+1
+	jsr L7BFB
+	bcc +
+-	lda L7A9F
+	ora #$40
+	sta L7A9F
+	bne +
+
++	ldx ziely
+	ldy L7A9E
+	jsr L7C09
+	bcs -
++	lda L7A9F
+	bne +
+	jmp inline
+
++	cmp #$c0
+	bne +
+	rts
+
++	lda L7A9F
+	cmp #$40
+	beq +
+	ldx startx
+	ldy zielx
+	stx zielx
+	sty startx
+	ldx starty
+	ldy ziely
+	stx ziely
+	sty starty
+	ldx startx+1
+	ldy zielx+1
+	stx zielx+1
+	sty startx+1
+	ldx L7A9D
+	ldy L7A9E
+	stx L7A9E
+	sty L7A9D
+
++	lda startx
+	pha
+	lda startx+1
+	pha
+	lda starty
+	pha
+L7B23	clc
+	lda startx
+	adc zielx
+	sta L7A99
+	lda startx+1
+	adc zielx+1
+	clc
+	bpl +
+	sec
++	ror
+	sta L7A9A
+	ror L7A99
+	bcc +
+	lda L7A9A
+	bpl +
+	clc
+	lda L7A99
+	adc #$01
+	sta L7A99
+	lda L7A9A
+	adc #$00
+	sta L7A9A
++	clc
+	lda starty
+	adc ziely
+	sta L7A9B
+	lda L7A9D
+	adc L7A9E
+	clc
+	bpl +
+	sec
++	ror
+	sta L7A9C
+	ror L7A9B
+	bcc +
+	lda L7A9C
+	bpl +
+	clc
+	lda L7A9B
+	adc #$01
+	sta L7A9B
+	lda L7A9C
+	adc #$00
+	sta L7A9C
++	ldx L7A99
+	ldy L7A9A
+	jsr L7BFB
+	bcs ++
+	ldx L7A9B
+	ldy L7A9C
+	jsr L7C09
+	bcs ++
+	lda L7A9B
+	beq +
+	cmp #$c7
+	beq +
+	lda L7A9A
+	ora L7A99
+	beq +
+	lda L7A9A
+	cmp #$01
+	bne +++
+	lda L7A99
+	cmp #$3f
+	bne +++
++	jsr L7BE5
+	pla
+	sta starty
+	pla
+	sta startx+1
+	pla
+	sta startx
+	jmp inline
+
+++	jsr L7BE5
+	jmp L7B23
+
++++	ldx L7A99
+	ldy L7A9A
+	stx startx
+	sty startx+1
+	ldx L7A9B
+	ldy L7A9C
+	stx starty
+	sty L7A9D
+	jmp L7B23
+
+L7BE5	ldx L7A99
+	ldy L7A9A
+	stx zielx
+	sty zielx+1
+	ldx L7A9B
+	ldy L7A9C
+	stx ziely
+	sty L7A9E
+	rts
+
+L7BFB	clc
+	tya
+	beq +
+	cmp #$01
+	bne +
+	txa
+	cmp #$40
++	rts
+
+-
++	sec
+	rts
+
+L7C09	clc
+	tya
+	bne -
+	txa
+	cmp #$c8
+	rts
+
+; ----------------------------------------- cmd COMBINE (Q)
+; combine screen 1 and screen 2: a = AND, O = OR
+
+c_combine	cmp #$41		; "a"?
+	bne +
+	lda #$31		; yes, set AND (..),y
+	bne ++
+
++	cmp #$4f		; "o"?
+	beq +
+	jmp $af08		; no, syntax error
+
++	lda #$11		; set ORA (..),y
+++	sta L7C48
+	jsr chrget	; skip next char
+	lda #$00		; set screen addresses $4000 and $e000
+	sta $57
+	sta $5a
+	lda #$40		; to $57/8 and $5a/b
+	sta $58
+	lda #$e0
+	sta $5b
+
+	sei
+	lda pport		; kernal off
+	pha
+	lda #$35
+	sta pport
+	ldy #$00		; 32 pages
+	ldx #$20
+-	lda (startx),y
+L7C48	and (zielx),y	; self mod
+	sta ($c1),y
+	iny
+	bne -
+	inc startx+1
+	inc zielx+1
+	inc $c2
+	dex
+	bne -
+	pla
+	sta pport
+	cli
+	jmp sete000
+
+errnum	!by 0
