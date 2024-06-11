@@ -175,15 +175,15 @@ getxy2	jsr getcoords	; get values
 getcoords	jsr $aefd		; Komma?
 	jsr $b7eb		; getadr (nach $14/5) und getbyt (nach .x)
 	cpx #$c8		; .x >200?
-	bcs ++		; yes, error
+	bcs illegal	; yes, error
 	ldy int
 	lda int+1		; address >=320?
 	beq +
 	cpy #$40
-	bcs ++		; yes, error
+	bcs illegal	; yes, error
 +	rts
 
-++	jmp $b248		; illegal quantity error
+illegal	jmp $b248		; illegal quantity error
 
 ; -----------------------------------------
 
@@ -771,9 +771,19 @@ c_split	cmp #$53		; "S"?
 getraster	jsr $aefd		; Komma?
 	jsr $b79e		; getbyt (ab hier Grafik/Text)
 	txa
+	asl		; Textzeile anwählen (Syntax also geändert!!!)
+	asl		; (Split ab/bis Zeile 0..25)
+	asl
 	clc
-	adc #$31		; 49 addieren (Rasterlinie ansteuern)
+	adc #$2f; -8	; Das -8 ist, wenn man den Wertebereich 1-25 nutzen
+          		; will. Ohne -8 dann 0-24, je nachdem wie man den
+			; Parameter auslegt. Soll *ab* der Zeile oder soll
+			; *nach* der Zeile umgeschaltet werden?
+	cmp #248		; größer als 25?
+	bcs error		; dann Fehler
 	rts
+
+error	jmp illegal
 
 ; ----------------------------------------- I0
 
@@ -832,22 +842,38 @@ hsgirq	lda $d019		; IRQ ausgelöst?
 	cli
 	jmp (tsbirq)	; normaler IRQ
 
-+	ldx toggle	; ja, Text/Grafik wieder an, je nach Toggle
++	ldx $d012		; sync:
+-	cpx $d012 	; Hier warten auf die nächste Rasterzeile, damit
+	beq -		; die folgende Schleife nicht ganz so
+			; unkontrolliert springt.
+	ldx #27		; Schleifenzähler - Damit wird praktisch
+-	dex		; 25*5+4 Taktzyklen gewartet
+	bne -
+
+	ldx toggle	; Text/Grafik wieder an, je nach Toggle
 	beq +
 	ldx #$00
 	beq ++
 +	ldx #$01
 ++	stx toggle
-	lda std011,x
-	sta $d011
-	lda std018,x
-	sta $d018
-	lda stdd00,x
-	sta $dd00
 	lda gfxon,x
+	pha
+	ldy std011,x
+	lda std018,x
+	pha
+	lda stdd00,x
+	tax
+	pla
+	sty $d011
+	sta $d018
+	stx $dd00
+	pla
 	sta $d012
-	cli
-	jmp (tsbirq)
+	jmp $ea81
+
+; Ein Rücksprung in den tsbirq ist nicht nötig, zumal der ja die variable ti
+; alle 1/60 erhöht und somit hier nochmals alle 1/50 (pal) oder 1/60 (ntsc)
+; ti+1 macht. 
 
 ; ----------------------------------------- VIC data
 
@@ -1070,8 +1096,8 @@ c_block	jsr getxy1	; upper left coords
 ; ----------------------------------------- cmd CIRCLE (K)
 
 c_circle	jsr getxy1	; Mittelpunkt
-	stx ycenter	; MY
-	sty xcenter	; MX
+	stx ycenter	; MY (starty)
+	sty xcenter	; MX (startx)
 	sta xcenter+1
 	jsr saveregs
 	jsr getbytc	; x-radius
@@ -1084,7 +1110,7 @@ c_circle	jsr getxy1	; Mittelpunkt
 +	sta mode
 
 	clc
-	lda startx
+	lda startx	; Anfangspunkte (1+2) rechts
 	adc xradius
 	sta rightl1
 	sta rightl2
@@ -1094,7 +1120,7 @@ c_circle	jsr getxy1	; Mittelpunkt
 	sta righth2
 
 	sec
-	lda startx
+	lda startx	; und links
 	sbc xradius
 	sta leftl1
 	sta leftl2
@@ -1103,23 +1129,23 @@ c_circle	jsr getxy1	; Mittelpunkt
 	sta lefth1
 	sta lefth2
 
-	lda starty
+	lda starty	; Anfangspunkte (1+2) oben
 	sta topr1
-	sta topr2
 	sta topl1
+	sta topr2
 	sta topl2
 	lda #$08
-	sta L7AA0
+	sta count8
 	lda #$00
 	sta L7A8F
-	sta L7A58
-	sta L7A59
-	sta L7A5A
-	sta L7A5B
+	sta bottomr1	; und unten
+	sta bottoml1
+	sta bottomr2
+	sta bottoml2
 
 L789F	lda xradius
-	sta L7A95
-	ldx L7AA0
+	sta radius
+	ldx count8
 	lda L7A6B,x
 	sta L7A92
 	lda L7A73,x
@@ -1146,7 +1172,7 @@ L789F	lda xradius
 	sta L7A62
 	sta L7A63
 	lda yradius
-	sta L7A95
+	sta radius
 	lda L7A7B,x
 	sta L7A92
 	lda L7A83,x
@@ -1176,7 +1202,7 @@ L789F	lda xradius
 	lda #$04
 	sta L7AA1
 -	ldx L7AA1
-	lda L7A4B,x
+	lda rightl1-1,x
 	sta startx
 	lda leftl2,x
 	sta startx+1
@@ -1184,7 +1210,7 @@ L789F	lda xradius
 	sta starty
 	lda topl2,x
 	sta L7A9D
-	lda L7A5B,x
+	lda bottoml2,x
 	sta zielx
 	lda L7A5F,x
 	sta zielx+1
@@ -1197,16 +1223,16 @@ L789F	lda xradius
 	bne -
 
 	ldx #$10
--	lda L7A5B,x
-	sta L7A4B,x
+-	lda bottoml2,x
+	sta rightl1-1,x
 	dex
 	bne -
-	dec L7AA0
+	dec count8
 	beq +
 	jmp L789F
 
 +	jsr L79D4
-	lda L7A58
+	lda bottomr1
 	sta L7A9E
 	lda topr1
 	ldx rightl1
@@ -1214,7 +1240,7 @@ L789F	lda xradius
 	jsr L79CA
 
 	jsr L79D4
-	lda L7A5B
+	lda bottoml2
 	sta L7A9E
 	lda topl2
 	ldx leftl2
@@ -1222,17 +1248,17 @@ L789F	lda xradius
 	jsr L79CA
 
 	jsr L79EF
-	lda L7A59
+	lda bottoml1
 	sta L7A9E
-	lda topr2
+	lda topl1
 	ldx rightl2
 	ldy righth2
 	jsr L79CA
 
 	jsr L79EF
-	lda L7A5A
+	lda bottomr2
 	sta L7A9E
-	lda topl1
+	lda topr2
 	ldx leftl1
 	ldy lefth1
 
@@ -1272,9 +1298,9 @@ L7A0A	lda #$00
 	sta L7A97
 	sta L7A98
 	sta L7A94
--	lda L7A95
+-	lda radius
 	beq ++
-	lsr L7A95
+	lsr radius
 	bcc +
 	clc
 	lda L7A96
@@ -1293,8 +1319,7 @@ L7A0A	lda #$00
 
 ++	rts
 
-L7A4B	!byte $00
-rightl1	!byte $af
+rightl1	!byte $af		; 8 directions
 rightl2	!byte $af
 leftl1	!byte $91
 leftl2	!byte $91
@@ -1303,14 +1328,15 @@ righth2	!byte $00
 lefth1	!byte $00
 lefth2	!byte $00
 topr1	!byte $bc
-topr2	!byte $0c
 topl1	!byte $0c
+topr2	!byte $0c
 topl2	!byte $bc
-L7A58	!byte $00
-L7A59	!byte $00
-L7A5A	!byte $00
-L7A5B	!byte $00
-L7A5C	!byte $af
+bottomr1	!byte $00
+bottoml1	!byte $00
+bottomr2	!byte $00
+bottoml2	!byte $00
+
+L7A5C	!byte $af		; second set
 L7A5D	!byte $af
 L7A5E	!byte $91
 L7A5F	!byte $91
@@ -1325,36 +1351,12 @@ L7A67	!byte $bc
 L7A68	!byte $00
 L7A69	!byte $00
 L7A6A	!byte $00
-L7A6B	!byte $00
-	!byte $74
-	!byte $8f
-	!byte $00
-	!byte $8d
-	!byte $1b
-	!byte $b3
-	!byte $90
-L7A73	!text $1c,$2c,"w"
-	!byte $80
-	!byte $a4
-	!byte $c4
-	!byte $dd
-	!byte $f0
-L7A7B	!byte $fc
-	!byte $1c
-	!byte $90
-	!byte $b3
-	!byte $1b
-	!byte $8d
-	!byte $00
-	!byte $8f
-L7A83	!byte $74
-	!byte $fc
-	!byte $f0
-	!byte $dd
-	!byte $c4
-	!byte $a4
-	!byte $80
-	!byte $57
+
+L7A6B	!byte $00,$74,$8f,$00,$8d,$1b,$b3,$90
+L7A73	!byte $1c,$2c,$57,$80,$a4,$c4,$dd,$f0
+
+L7A7B	!byte $fc,$1c,$90,$b3,$1b,$8d,$00,$8f
+L7A83	!byte $74,$fc,$f0,$dd,$c4,$a4,$80,$57
 	!byte $2c
 
 xcenter	!wo $00a0
@@ -1365,7 +1367,7 @@ yradius	!byte $5a
 L7A92	!byte $00
 L7A93	!byte $0e
 L7A94	!byte $7e
-L7A95	!byte $00
+radius	!byte $00
 L7A96	!byte $d8
 L7A97	!byte $a1
 L7A98	!byte $58
@@ -1376,8 +1378,9 @@ L7A9C	!byte $00
 L7A9D	!byte $00
 L7A9E	!byte $00
 L7A9F	!byte $00
-L7AA0	!byte $00
+count8	!byte $00
 L7AA1	!byte $00
+
 mode	!byte $e0		; 1. screen ($e0 oder $40) - unused!
 			; $x1000000 = $e000
 			; $x0000000 = $4000
