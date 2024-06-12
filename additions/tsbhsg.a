@@ -1,12 +1,20 @@
 
 ; -----------------------------------------
-; created with 6502bench SourceGen v1.7.5
+;
+; TSB-HSG 1.02
+;
+; High-Speed-Grafik by W. Lohwasser, 1986
+; 64'er Sonderheft 6/86
+;
+; TSB Version by A. Dettke, 2024
+;
 ; -----------------------------------------
 
 pport	= $01
 int	= $14
 basic_end	= $37
 progz	= $7a
+
 startx	= $a4
 starty	= $a6
 helpvec	= $b0
@@ -26,7 +34,7 @@ bsout	= $ffd2	;($0326/ichrout) output vector, chrout
 
 ; -----------------------------------------
 
-	*=$7000
+	*=$7400
 	!ct pet
 
 ; -----------------------------------------
@@ -1143,7 +1151,7 @@ c_circle	jsr getxy1	; Mittelpunkt
 	sta bottomr2
 	sta bottoml2
 
-L789F	lda xradius
+krloop	lda xradius
 	sta radius
 	ldx count8
 	lda L7A6B,x
@@ -1200,8 +1208,8 @@ L789F	lda xradius
 	sta L7A6A
 
 	lda #$04
-	sta L7AA1
--	ldx L7AA1
+	sta count4
+-	ldx count4
 	lda rightl1-1,x
 	sta startx
 	lda leftl2,x
@@ -1219,7 +1227,7 @@ L789F	lda xradius
 	lda L7A67,x
 	sta L7A9E
 	jsr L7AA3
-	dec L7AA1
+	dec count4
 	bne -
 
 	ldx #$10
@@ -1229,7 +1237,7 @@ L789F	lda xradius
 	bne -
 	dec count8
 	beq +
-	jmp L789F
+	jmp krloop
 
 +	jsr L79D4
 	lda bottomr1
@@ -1371,15 +1379,17 @@ radius	!byte $00
 L7A96	!byte $d8
 L7A97	!byte $a1
 L7A98	!byte $58
+
 L7A99	!byte $99
 L7A9A	!byte $00
 L7A9B	!byte $00
 L7A9C	!byte $00
 L7A9D	!byte $00
 L7A9E	!byte $00
+
 L7A9F	!byte $00
 count8	!byte $00
-L7AA1	!byte $00
+count4	!byte $00
 
 mode	!byte $e0		; 1. screen ($e0 oder $40) - unused!
 			; $x1000000 = $e000
@@ -1411,13 +1421,13 @@ L7AA3	lda #$00
 -	lda L7A9F
 	ora #$40
 	sta L7A9F
-	bne +
+	bne ++
 
 +	ldx ziely
 	ldy L7A9E
 	jsr L7C09
 	bcs -
-+	lda L7A9F
+++	lda L7A9F
 	bne +
 	jmp inline
 
@@ -1428,7 +1438,7 @@ L7AA3	lda #$00
 +	lda L7A9F
 	cmp #$40
 	beq +
-	ldx startx
+	ldx startx	; exchange all
 	ldy zielx
 	stx zielx
 	sty startx
