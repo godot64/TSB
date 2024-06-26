@@ -495,7 +495,7 @@ mt10	inx
 	tay
 	pla
 
-ma3	lda #$3a		; search for ":"
+ma3	lda #$ff		; then skip to line end (dummy  value)
 	bne ma4
 
 mt11	pla		; restore .a and .y
@@ -1513,7 +1513,7 @@ textchr	!tx "chr$(13)",0
 ;
 version	!tx "ad23"	; Signature
 	!by $0d
-	!tx "2.40610"	; Version Number
+	!tx "2.40626"	; Version Number
 
 ; -----------------------------------------
 ;
@@ -8929,7 +8929,7 @@ chkonkey	lda okstring	; get on key ctrl string
 oky0	rts
 
 ; ----------------------------------------- bef SECURE
-; !discard!
+; !discard! 46 Bytes
 befsecure	jsr chkonoff
 	lda #$41		; $41: search code for DISAPA
 	sta $22
@@ -8941,17 +8941,18 @@ befsecure	jsr chkonoff
 	adc #$ff
 	sta $21
 	ldy #0
-	jsr suchcode1	; part of EXEC
--	lda $20
+	jsr suchcode1
+
+-	lda $20		; code found:
 	bne +
 	dec $21
 +	dec $20
-	lda #0
+	lda #0		; insert $00 where $64 of DISAPA is
 	sta ($20),y
-	jsr simtok
-	lda #$3a		; ":"
+	jsr simtok	; (continue search until end of PRG)
+	lda #$3a		; insert ":" where $41 of DISPAPA is
 	sta ($20),y
-	bne -
+	bne -		; continue
 
 ; ----------------------------------------- bef (FLASH) OFF
 ;
@@ -9958,7 +9959,7 @@ maddhg	jsr l20pl40	; go to bottom
 ; -----------------------------------------
 ;
 graph0	jsr basromein
-	jsr $7000		; init HSG
+	jsr $7400		; init HSG
 	jsr $a660		; return: sys CLR
 	jmp bef0
 
