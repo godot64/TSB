@@ -495,8 +495,8 @@ mt10	inx
 	tay
 	pla
 
-ma3	lda #$ff		; then skip to line end (dummy  value)
-	bne ma4
+ma3	lda #0		; then skip to line end (0=dummy  value)
+	beq ma4
 
 mt11	pla		; restore .a and .y
 	tay
@@ -1513,7 +1513,7 @@ textchr	!tx "chr$(13)",0
 ;
 version	!tx "ad23"	; Signature
 	!by $0d
-	!tx "2.40626"	; Version Number
+	!tx "2.40728"	; Version Number
 
 ; -----------------------------------------
 ;
@@ -2506,9 +2506,19 @@ bin0	asl
 	beq mkstrng	; uncond. branch
 
 ; -----------------------------------------
+
+getinput	jsr basromein
+	jsr crtstring	; new string (part of DUP)
+	jmp basromaus
+
+; -----------------------------------------
+
+	!by 0
+
+; -----------------------------------------
 ; ----------------------------------------- Start of Func Chain
 ; -----------------------------------------
-;
+
 csgetari1	jsr chrget	; get token number to .y
 	tay
 	jsr chrget	; advance to next char
@@ -2528,13 +2538,12 @@ fndup	jsr $aefa		; sys "("?
 	stx str1
 
 	jsr sgetbytc	; get copy factor
-	jsr $aef7		; sys ")"?
+	jsr $aef7		; sys ")"? (returns .y=0)
 	ldx $65		; factor
 	beq +
 	stx dwert
 
-	ldy #0
-	sty pos1
+	sty pos1		; .y=0
 --	ldy #0		; multiply len
 -	inc pos1
 	beq jerr17	; if more than 255: error
@@ -2544,8 +2553,8 @@ fndup	jsr $aefa		; sys "("?
 	dex
 	bne --
 
-	lda pos1		; get new len
-	jsr neustr	; create string (adr in $62)
+crtstring	lda pos1		; get new len
+	jsr neustr	; create string (then adr in $62/3)
 	lda str1+1	; get address of string to copy
 	sta $21
 	lda str1
@@ -2568,9 +2577,7 @@ fndup	jsr $aefa		; sys "("?
 	dex		; count # of copies
 	bne -
 
-+	lda #$ff		; publish new string
-	sta $0d
-	jmp pushstr
++	jmp pushstr	; publish new string
 
 ; -----------------------------------------
 ;
@@ -2747,7 +2754,7 @@ err17	ldx #$17		; error "string too long"
 	jmp ($0300)
 iqerr	jmp err0e		; error "illegal quantity"
 
-+	jsr neustr	; neuen String einrichten (62/3, len: 61)
++	jsr neustr	; neuen String einrichten (dann an: 62/3, len: 61)
 			; hier:
 
 	ldy #0		; Zähler auf Null
@@ -2755,7 +2762,7 @@ iqerr	jmp err0e		; error "illegal quantity"
 	beq +
 -	cpy helpvec+1	; Position erreicht?
 	bcs ++
-	lda ($a9),y	; nein, übertragen
+	lda ($a9),y	; nein, übertragen nach neustr
 	sta ($62),y
 	iny
 +	cpy strlen2	; Länge erreicht?
@@ -2779,15 +2786,13 @@ iqerr	jmp err0e		; error "illegal quantity"
 -	lda ($a9),y	; sonst: Rest übertragen
 	inc helpvc2
 	ldy helpvec
-	sta ($62),y
+	sta ($62),y	; nach neustr
 	inc helpvec
 	ldy helpvc2
 +	cpy strlen2
 	bcc -
 
-jpushstr	lda #$ff		; create result string
-	sta $0d
-	jmp pushstr
+jpushstr	jmp pushstr	; create result string
 
 ; -----------------------------------------
 ;
@@ -5143,62 +5148,60 @@ mkrow	ldy helpvec	; one row
 ;
 beffetch	jsr get1ststr	; get ctrl string and its len
 	sta fetchlen	; store len of ctrl string
-	jsr chkfchlen	; get (and check) len
-	stx fetchanz	; get len (max 88)
-	jsr schkcom
-	jsr stestdirm	; check for direct mode
+	jsr chkfchlen	; get (and check) max len
+	stx fetchanz	; store max len (max 88)
+	jsr schkcom	; comma?
+	sty helpvec+1	; init force-flag
+	jsr sgetvar	; get target string (at a9/aa, no len needed)
+	sta $a9
+	sty $aa
+	jsr chrgot
+	beq +
+	jsr sgetbytc
+	stx helpvec+1
++	jsr stestdirm	; check for direct mode
 	jsr crsrout	; show cursor
-	lda #$2c		; prepare INPUT
-	sta $01ff
 
 ; -----------------------------------------
 ;
 fetchit	jsr fgetkey	; gather input chars
-	lda $13		; current io device
-	beq +		; is 0? (keyboard)
+	lda basinbuf	; anything typed?
+	beq +
 
-	jsr $ffb7		; no, sys read floppy status
-	and #2		; timeout?
-	beq +		; no, proceed
-;
-	jsr sclrch	; yes, clear io
--	jsr srem		; advance to next basic command
---	jmp endsmb	; end of fetch
-
-; -----------------------------------------
-;
-+	lda basinbuf	; anything typed?
-	bne +
-	lda $13		; no, io device is
-	bne fetchit	;   not keyboard
-	beq -		;   keyboard
-
-+	jsr sinput1	; yes, perform kernal input
-;
-	ldx helpvec+1	; was comma in string?
-	beq --
-	ldy #1		; yes, reconstruct comma
-	lda ($49),y
-	sta helpvec
+	ldy #2		; yes, set src address of input ($0200)
+	sty str1+1
+	dey
+	sty dwert		; must be 1
+	dey
+	sty str1
+	lda helpvec	; get len
+	sta pos1
+	sta pos
+	jsr getinput	; create string (part of DUP), returns .y=$ff
+	iny		; .y=0, now apply result to FETCH string
+	ldx $17		; index in string stack
+-	lda $00,x
+	sta ($a9),y
+	inx
 	iny
-	lda ($49),y
-	sta helpvec+1
-	txa
-	tay
-	lda #$2c
-	sta (helpvec),y
-
-	bne --		; finish fetch
+	cpy #3
+	bne -
+	ldx #$19		; reset string stack
+	stx $16
++	jmp endsmb	; finish fetch
 
 ; -----------------------------------------
 ;
-jfoa	jmp foutall	; yes, perform input
+jfoa	lda helpvec
+	bne +
+	lda helpvec+1
+	bne floop
++	jmp foutall	; yes, perform input
 
 ; -----------------------------------------
 ;
 fgetkey	ldx #0		; .x=0: start length of input
 	stx helpvec	; store
-	stx helpvec+1	; store comma flag
 ;
 floop	jsr $ffe4		; sys get key
 	sta joywert	; merken
@@ -5263,12 +5266,6 @@ ftcont	lda joywert	; no, reget char
 ; -----------------------------------------
 ;
 fchrisin	jsr bsout		; sys out
-	cmp #$3a		; colon?
-	beq +
-	cmp #$2c		; comma?
-	bne ++
-	stx helpvec+1	; yes, store position
-+	lda #$2e		; hide comma as period
 ++	sta basinbuf,x	; store in buffer
 	inx		; count chars
 	stx helpvec
