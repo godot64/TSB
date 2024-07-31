@@ -1513,7 +1513,7 @@ textchr	!tx "chr$(13)",0
 ;
 version	!tx "ad23"	; Signature
 	!by $0d
-	!tx "2.40728"	; Version Number
+	!tx "2.40731"	; Version Number
 
 ; -----------------------------------------
 ;
@@ -5192,14 +5192,6 @@ fetchit	jsr fgetkey	; gather input chars
 
 ; -----------------------------------------
 ;
-jfoa	lda helpvec
-	bne +
-	lda helpvec+1
-	bne floop
-+	jmp foutall	; yes, perform input
-
-; -----------------------------------------
-;
 fgetkey	ldx #0		; .x=0: start length of input
 	stx helpvec	; store
 ;
@@ -5218,19 +5210,22 @@ floop	jsr $ffe4		; sys get key
 fdelete	ldx helpvec	; no input yet?
 	beq floop		; yes, loop
 
-	ldx #6
-	jsr crsrdel
-	dec helpvec
+	dec helpvec	; len-1
+	cpx fetchanz	; invisible cursor?
+	beq +
+	ldx #6		; no
+	!by $2c
++	ldx #4		; yes
+	jsr crsrdel	; crsr out one position left
 	bpl floop
 
 ; -----------------------------------------
 ;
-fquote	lda $d4		; no, quote mode?
+fquote	ldx $d4		; no, quote mode?
 	bne fcheck
 
 	ldx #0		; no, check special chars
--	lda fetchtab,x
-	cmp joywert
+-	cmp fetchtab,x
 	beq floop		; found one, so skip it
 	inx
 	cpx #27
@@ -5238,8 +5233,7 @@ fquote	lda $d4		; no, quote mode?
 
 ; ----------------------------------------- check input char
 ;
-fcheck	ldy #0
-	lda joywert	; get current char
+fcheck	ldy #0		; current char in .a
 chkloop	ldx helpvec	; get current len
 	cmp ($20),y	; is char in ctrl string?
 	beq fchrisin	; yes, store
@@ -5250,9 +5244,9 @@ fspecials	tax
 	lda ($20),y	; no, check ctrl string:
 	cmp #$13		; home? (a..z)
 	beq fchkaz
-	cmp #$11		; crsr dwn? (a..z,A..Z)
+	cmp #$11		; crsr dwn? (space..0..9..?)
 	beq fchkdig
-	cmp #$1d		; crsr rgt? (space..0..9..?)
+	cmp #$1d		; crsr rgt? (a..z,A..Z)
 	beq fchkazup
 
 ; -----------------------------------------
@@ -5287,27 +5281,31 @@ fend	cmp #$14		; del?
 
 ; -----------------------------------------
 ;
-foutall	jsr leerzch	; sys out space (switch crsr off)
+jfoa	lda helpvec	; anything typed in?
+	bne foutall
+	lda helpvec+1	; no, force active?
+	bne ftc0
 
+foutall	jsr leerzch	; sys out space (switch crsr off)
 foutcr	ldx helpvec
 	jmp spuf0cr	; out all
 
 ; ----------------------------------------- Checks
 ;
 fchkdig	cpx #$20		; below space?
-	bcc notinit
+	bcc notinit	; 		digits etc.
 	cpx #$41		; beyond a?
 	bcs notinit
 	bcc legal		; no, legal
 ;
 fchkazup	cpx #$c1		; below A?
-	bcc fchkaz
+	bcc fchkaz	;  		upper and...
 	cpx #$db		; beyond Z?
 	bcs notinit
 	bcc legal		; no, legal
 
 fchkaz	cpx #$41		; below a?
-	bcc notinit
+	bcc notinit	; 		...lower
 	cpx #$5b		; beyond z?
 	bcs notinit
 ;
@@ -5325,7 +5323,7 @@ crsrdel	lda $d4
 	sta int
 	lda #0		; crsr off
 	sta $d4
-	jsr showcrsr
+	jsr showcrsr	; fetch crsr out
 	pla
 	sta $d4
 back2call	rts
@@ -5341,10 +5339,14 @@ showcrsr	lda fcursor,x
 	eor #$80		; 12 <-> 92
 	!by $24		; neutralizes TYA
 +	tya
-	jsr bsout
+	jsr bsout		; out
 	dex
 	bpl showcrsr
 	rts
+
+; -----------------------------------------
+
+	!by 0
 
 ; ----------------------------------------- bef DISK
 ;
