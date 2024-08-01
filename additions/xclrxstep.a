@@ -21,6 +21,8 @@
 ; 1.02, 25.02.2024, xclr now creating 144 bytes table instead of clearing away
 ;                   xclr now reporting number of tiles found (0=all cleared!)
 ; 1.03, 27.02.2024, bugfix in xstep, bugfix in xclr
+; 1.04, 01.08.2024, bugfix: topmost row wasn't under control
+;                   added: decoration tiles
 ;
 ; -----------------------------------------
 
@@ -58,7 +60,9 @@
 	bef0	= $9564	; finish command with no parameters (like these 2)
 	err0b	= $a3b5	; syntax error
 
+; -----------------------------------------
 ; ----------------------------------------- Entry
+; -----------------------------------------
 
 determine	jsr chrget	; get next byte
 	cmp #$9c		; token of CLR?
@@ -71,7 +75,9 @@ determine	jsr chrget	; get next byte
 
 synterr	jmp err0b
 
+; -----------------------------------------
 ; ----------------------------------------- bef X!CLR
+; -----------------------------------------
 
 befxclr	lda #<scanstart	; set address of lower right corner
 	sta hold		; of playing field in row storage
@@ -94,10 +100,12 @@ loop	ldy #0		; now find a tile (bottom up)
 	sta tile
 	cmp #32		; no tile?
 	beq ++
-	cmp #100		; a wall?
-	beq ++
 	cmp #96		; a glass tile?
 	beq ++
+	cmp #100		; a wall?
+	beq ++
+	cmp #152
+	bcs ++		; or more?
 
 	lda (left),y	; no, test left neighbour
 	cmp tile
@@ -121,7 +129,7 @@ loop	ldy #0		; now find a tile (bottom up)
 	lda tile
 	sta steptable,x
 
-++	inc onerow	; count tiles in a row
+++	inc onerow	; count tiles in a row (12)
 	ldx onerow
 	cpx #12
 	bcs +
@@ -131,11 +139,11 @@ loop	ldy #0		; now find a tile (bottom up)
 	jsr subtract
 	bne loop
 
-+	ldx #0		; then advance to next row
++	ldx #0		; then advance to next row (of 12)
 	stx onerow
 	inc rows
 	lda rows
-	cmp #11
+	cmp #12
 	bcc rowloop
 
 	dey		; .y=$ff/.x=0
@@ -225,7 +233,9 @@ clrtab	ldy #144
 
 tiletab	!by $40,$44,$48,$4c,$50,$54,$58,$5c,$60
 
+; -----------------------------------------
 ; ----------------------------------------- bef X!STEP
+; -----------------------------------------
 
 befxstep	lda #<scanstart	; set address of lower right corner
 	sta hold		; of playing field in row storage
@@ -248,6 +258,9 @@ letfall	ldy #0
 	beq ++
 	cmp #100		; wall?
 	beq ++
+	cmp #152		; (or more?)
+	bcs ++
+
 -	inx
 	cpx #9
 	bcs ++
@@ -273,7 +286,7 @@ letfall	ldy #0
 
 +	inc rows
 	lda rows
-	cmp #11
+	cmp #12
 	bcc rowloop2
 
 	jmp bef0		; yes, finished
