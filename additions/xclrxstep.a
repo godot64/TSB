@@ -1,4 +1,4 @@
-; -----------------------------------------
+﻿; -----------------------------------------
 ;
 ; TSB Extension commands:
 ;
@@ -23,6 +23,7 @@
 ; 1.03, 27.02.2024, bugfix in xstep, bugfix in xclr
 ; 1.04, 01.08.2024, bugfix: topmost row wasn't under control
 ;                   added: decoration tiles
+; 1.05, 03.08.2024, bugfix in xstep, could init .x to bad value
 ;
 ; -----------------------------------------
 
@@ -274,15 +275,15 @@ letfall	ldy #0
 	beq ++
 +	jsr stepdown	; found, now check for fall
 
-++	inc onerow	; all tiles in a row?
+++	ldx #0
+	inc onerow	; all tiles in a row?
 	lda onerow
 	cmp #12
 	bcs +
 
 	lda #2
 	sta amount	; no, advance to next tile
-	ldx #0
-	beq --
+	bne --
 
 +	inc rows
 	lda rows
