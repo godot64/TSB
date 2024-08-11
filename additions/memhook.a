@@ -1,6 +1,6 @@
 ; -----------------------------------------
 ;
-; TSB MEMHOOK 1.00
+; TSB MEMHOOK 1.01
 ;
 ; originally "REUINIT" by P. Hagemann,
 ; recoded to "MEMHOOK" for TSBneo by A. Dettke
@@ -19,7 +19,7 @@
 ; -----------------------------------------
 
 	helpvec	= $b0
-	xreu	= $02c9	; the resident mem-hook
+	xreu	= $0140	; the resident mem-hook
 	into	= $8081	; reset TSB
 	loadext	= $842f	; load extension
 	tsbcols	= $8bb8	; set tsb colors
@@ -45,12 +45,15 @@ instxreu	ldx #(cctab-xreucode-1)
 	dex
 	bpl -
 
-	lda #<xreu	; patch TSB/allnrm for REU use
+	lda reuflag	; REU present?
+	beq +		; if no, don't patch
+
+	lda #<xreu	; yes, patch TSB/allnrm for REU use
 	ldx #>xreu
 	sta patchan
 	stx patchan+1
 
-	jsr tsbcols	; set TSB colors
++	jsr tsbcols	; then set TSB colors
 	tax		; set $8000 as memtop
 	ldy #$80
 	stx $37
