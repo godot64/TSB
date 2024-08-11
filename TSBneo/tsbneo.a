@@ -5855,7 +5855,7 @@ scrsvdef	jsr sgetbytn
 	sta skipcr	; BIT: Colorram übergehen => nur Videoram
 	dex		; Modus 1: mit Startadresse
 	beq leave2	; Sonst (Modus >= 2)
-	sta skipslo	; BIT: ohne Startadresse
+	sta skipslo	; BIT: ohne Startadresse anhängen
 	sta skipshi
 
 leave2	jsr dec7a
@@ -9573,12 +9573,12 @@ outasc	ldx #0
 ; this is for implementing REU access for NRM after MEM, init with SYS $c000:
 
 	!by $ee,$49,$c6,$20,$41,$c0,$ce,$49,$c6,$20,$44,$c0,$a2,$07,$bd,$78
-	!by $c0,$9d,$01,$df,$ca,$10,$f7,$a2,$1c,$bd,$5b,$c0,$9d,$c9,$02,$ca
-	!by $10,$f7,$ad,$49,$c6,$f0,$0a,$a9,$c9,$a2,$02,$8d,$a2,$95,$8e,$a3
+	!by $c0,$9d,$01,$df,$ca,$10,$f7,$a2,$1c,$bd,$5b,$c0,$9d,$40,$01,$ca
+	!by $10,$f7,$ad,$49,$c6,$f0,$0a,$a9,$40,$a2,$01,$8d,$a2,$95,$8e,$a3
 	!by $95,$20,$b8,$8b,$aa,$a0,$80,$86,$37,$84,$38,$20,$8c,$fd,$4c,$81
 	!by $80,$a2,$00,$2c,$a2,$01,$86,$b0,$a2,$06,$bd,$80,$c0,$9d,$02,$df
 	!by $ca,$10,$f7,$a9,$90,$05,$b0,$8d,$01,$df,$60,$ad,$49,$c6,$d0,$03
-	!by $4c,$2f,$84,$a2,$07,$bd,$de,$02,$9d,$01,$df,$ca,$10,$f7,$18,$60
+	!by $4c,$2f,$84,$a2,$07,$bd,$55,$01,$9d,$01,$df,$ca,$10,$f7,$18,$60
 	!by $91,$00,$cc,$00,$00,$07,$00,$04,$90,$00,$cc,$00,$00,$07,$00,$04
 	!by $49,$c6,$ff,$03,$07,$01,$00
 
