@@ -1513,7 +1513,7 @@ textchr	!tx "chr$(13)",0
 ;
 version	!tx "ad23"	; Signature
 	!by $0d
-	!tx "2.40731"	; Version Number
+	!tx "2.40816"	; Version Number
 
 ; -----------------------------------------
 ;
@@ -8488,10 +8488,6 @@ befbckgnds
 	stx $d024
 	jmp endsmb
 
-; ------------------------------------------------------------
-
-	!by 0,0,0
-
 ; ----------------------------------------- bef PAUSE
 ;
 befpause	jsr chrget
@@ -8514,7 +8510,7 @@ befpause	jsr chrget
 	sta zaeirq
 -	jsr $ffe4		; sys getin keyboard
 ; 			; patch here:
-	!by $d0,$0b	; (TSB: bne +)
+	!by $d0,$0b	; (TSB reads: bne +)
 			; to $24,$0b:
 			; (SB:  bit $0b)
 	cmp #$0d		; return?
@@ -8524,6 +8520,10 @@ befpause	jsr chrget
 	bne -
 
 +	jmp endsmb
+
+; ------------------------------------------------------------
+
+j2err17	jmp err17		; "string too long"
 
 ; ----------------------------------------- bef KEY
 ;
@@ -8563,21 +8563,23 @@ befkey	jsr keyget	; check for KEYGET (doesn't return if successful)
 	jsr sgetstr	; get string
 	sta $a9
 	stx $a8
-	ldy #0
--	lda ($a8),y	; and store
-	cmp #$5f		; left arrow?
-	bne +
+	lda #0
+	ldy $69		; get len
+	cpy #16		; is 16?
+	beq +		; yes, don't terminate
+	bcs j2err17	; is more: error
+-	sta ($aa),y	; terminate string on 1st pass
++	dey		; count chars down to 0
+	bmi --		; finished: end command
+	lda ($a8),y	; get char
+	cmp #$5f		; is left arrow?
+	bne -		; no, store it
 	lda #$0d		; yes, replace by cr
-+	sta ($aa),y
-	cpy $69
-	beq +
-	iny
-	cpy #16		; max 16 chars
-	bcc -
-	beq --
-+	lda #0
-	sta ($aa),y
-	beq --
++	bne -
+
+; -----------------------------------------
+
+	!by 0,0,0,0
 
 ; -----------------------------------------
 ;
