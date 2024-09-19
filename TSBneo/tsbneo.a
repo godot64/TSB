@@ -221,7 +221,7 @@
 	sepline		= $c647	; 	Flag&Value: separator length
 				; ! unused (1 bytes)
 	temporary		= $c649	; 	for temporary use
-	wavetab		= $c64a	; 	Teil von WAVE
+	wavetab		= $c64a	; 	Teil von WAVE (3 bytes)
 	keytab		= $c64d	; 	F-Tasten-Belegung (bis $c74c)
 ; 			  $c74d	; 	Text: "ata" (string to compare w/ keyword DATA)
 
@@ -1430,13 +1430,13 @@ tabjoy	!by $6e,$66,$67,$65,$6d,$69,$6b,$6a
 ;
 mregs	!by $00,$07,$0e,$15,$15
 ;
-nottab	!by $43,$c3,$44,$c4,$45,$46,$c6,$47
-	!by $c7,$41,$c1,$42,$5a,$ac,$b1,$bb
-	!by $a5,$b0,$bf,$bc
+nottab	!by $43,$c3,$44,$c4,$45,$46,$c6,$47	; cCdDefFg
+	!by $c7,$41,$c1,$42,$5a,$ac,$b1,$a5	; GaAbzC=dC=eC=g
+	!by $b0,$bf,$bc,$58			; C=aC=bC=cx
 ;
 frqtabl	!by $16,$27,$39,$4b,$5f,$74,$8a,$a1
-	!by $ba,$d4,$f0,$0e,$00,$27,$4b,$5f
-	!by $8a,$ba,$f0,$0e
+	!by $ba,$d4,$f0,$0e,$00,$27,$4b,$8a
+	!by $ba,$f0,$0e,$00
 
 ; ----------------------------------------- Tables of Bitmasks
 ;
@@ -1513,7 +1513,7 @@ textchr	!tx "chr$(13)",0
 ;
 version	!tx "ad23"	; Signature
 	!by $0d
-	!tx "2.40816"	; Version Number
+	!tx "2.40919"	; Version Number
 
 ; -----------------------------------------
 ;
@@ -4294,19 +4294,17 @@ befold	jsr basromein	; basic ein
 
 ; ----------------------------------------- Execute PLAY 2
 ;
-sirqplay	lda musicz4	; from sirq5
-	beq sip0
-	dec musicz2
-	lda musicz2
-	beq sip1
+sirqplay	lda musicz4	; from sirq5: get tempo counter
+	beq sip0		; finished? then next note
+	dec musicz2	; decrease duration counter of note
+	beq sip1		; if finished: dec tempo count and duration count
 	rts
 
-sip1	dec musicz4
-	lda musicz4
-	beq sip0
-	lda musicz3
-	sta musicz2
-	rts
+sip1	dec musicz4	; tempo counter finished?
+	beq sip0		; yes, get next note
+	lda musicz3	; get stored duration counter of current note
+	sta musicz2	; restore duration counter
+	rts		; leave play (back to irq)
 
 sip0	lda musicadr	; get adr of music string
 	sta $fc
@@ -4316,11 +4314,12 @@ sip0	lda musicadr	; get adr of music string
 	cpy musiclen	; at end of string?
 	bcs playend	; yes, end PLAY
 
-	lda ($fc),y
+	lda ($fc),y	; no, get duration code (F-keys)
 	cmp #$8d		; beyond f8? (code for longest note)
-	bcs sip9		; yes
+	bcs sip9		; yes, no duration code, check code
 	cmp #$85		; below f1? (code for shortest note)
-	bcc sip9		; yes
+	bcc sip9		; yes, no duration code, check code
+
 	sbc #$84		; code valid, set individ. note duration
 	sta musicz2
 	sta musicz3
@@ -4328,31 +4327,32 @@ sip0	lda musicadr	; get adr of music string
 	sta musicz4
 	bne sip4		; uncond. branch
 ;
-sip2	sty musicz5	; store pointer into string
+sip2	sty musicz5	; check note code: store pointer into string
 	jsr notesuch	; search note, result in .a and .x
-	ldy #1
+	ldy #1		; (if invalid/no note: .a and .x are 0)
 	sta ($fe),y
 	txa
 	dey
 	sta ($fe),y
-	jsr stimmein	; play on
-	ldy musicz5	; re-get pointer
+	jsr stimmein	; play note
+	ldy musicz5	; re-get string pointer
 
 sip4	cpy musiclen	; at end of music string?
-	bcs playend	; yes
-	iny		; no, advance
+	bcs playend	; yes, end of play
+	iny		; no, advance in string, leave to irq
 	bne +
 ;
-playend	ldy #0		; clear play flag
+playend	ldy #0		; clear play flag, so play finished
 	sty playflag
 +	sty musicz1
 	rts
 
 sip9	cmp #$93		; clr (code for select voice)?
-	bne sip2		; no, note?
+	bne sip2		; no, check for a note code
+
 	iny		; yes, get voice number
 	lda ($fc),y
-	ldx #$00
+	ldx #$00		; clear tempo
 	stx musicz4
 	cmp #$34		; beyond voice 3?
 	bcs sip5
@@ -4401,7 +4401,7 @@ sip6	cmp #$43		; code "c": clear waveform
 	lda #0
 	beq --
 
-sip7	cmp #$52		; code "r": repeat music
+sip7	cmp #$52		; code "r": repeat music string
 	bne -
 	ldy #0
 	sty musicz1
@@ -4410,24 +4410,27 @@ sip7	cmp #$52		; code "r": repeat music
 
 ; -----------------------------------------
 ;
-notesuch	ldy #$13		; search in 20 notes
+notesuch	ldy #19		; search in 20 notes
 -	cmp nottab,y
 	beq sip8
 	dey
 	bpl -
-	lda #0		; not found
+-	lda #0		; not found, set freq to 0
+	sta musicz4	; and tempo to 0 (skip note)
 	tax
 	beq svmregadr
 ;
-sip8	lda frqtabl,y	; found, set frequency
+sip8	cpy #19		; 19=0 (x: stakkato)
+	beq -
+	lda frqtabl,y	; found note, set frequency
 	sta mfreq
 	tya		; hi byte:
 	ldy #0
-	cmp #12		; 12=0
-	beq +++
-	cmp #19		; 19=2
+	cmp #18		; 18=2 (C=c)
 	beq +
-	cmp #11		; 11=2
+	cmp #12		; 12=0 (z)
+	beq +++
+	cmp #11		; 11=2 (b)
 	bne ++
 +	iny
 ++	iny		; all others=1
@@ -4459,14 +4462,17 @@ stimmein	ldy #6		; index to SID register 6
 	sta ($fe),y	; write to register
 	dey		; register 5
 	lda adtab,x	; get attack/decay values from buffer
-	sta ($fe),y
+	sta ($fe),y	; write to register
 	dey		; register 4
 	lda wavetab,x	; set waveform data
 	and #$fe		; clear key bit
-	sta ($fe),y
 	ora #1		; and set it (activate voice)
 	sta ($fe),y
 	rts
+
+; -----------------------------------------
+
+	!by 0
 
 ; -----------------------------------------
 ;
@@ -8333,8 +8339,8 @@ befwave	jsr sgetbytn	; get voice number
 	stx $aa
 	jsr getpanel
 	jsr bincon	; get switch panel value
-bwv0	ldx $aa		; get voice number
-	jsr setsid	; set $20/1 to SID voice base address
+bwv0	ldx $aa		; re-get voice number
+	jsr setsid	; set $20/1 as SID voice base address
 	ldy #4
 	lda $a8		; set waveform/sync to SID...
 	sta ($20),y
