@@ -1,7 +1,7 @@
 
 ; -----------------------------------------
 ;
-; TSB-HSG 1.02
+; TSB-HSG 1.03
 ;
 ; High-Speed-Grafik by W. Lohwasser, 1986
 ; 64'er Sonderheft 6/86
@@ -43,7 +43,7 @@ tsbhsg	jsr setinterpr
 	jsr cleargfx
 	lda #$10		; colors (white on black)
 	jsr clearcols
-	ldx #<tsbhsg	; set memtop to $7000
+	ldx #<tsbhsg	; set memtop to $7400
 	ldy #>tsbhsg
 	stx basic_end
 	sty basic_end+1
@@ -944,7 +944,7 @@ commands	!tx "qinmhvcekbrsdpl"	; hsg command chars (15)
 
 ; -----------------------------------------
 
-cmdvecs	!wo c_combine	; q (combine)
+cmdvecs	!wo c_combine	; q (combine: qa oder qo)
 	!wo c_split	; i (is split, i0/1 split on/off)
 	!wo c_nrm		; n (normal screen = NRM)
 	!wo c_screen	; m (choose screen)
@@ -1592,11 +1592,11 @@ c_combine	cmp #$41		; "a"?
 
 +	lda #$11		; set ORA (..),y
 ++	sta L7C48
-	jsr chrget	; skip next char
+	jsr chrget	; proceed to next char in line (":" or $00)
 	lda #$00		; set screen addresses $4000 and $e000
 	sta $57
 	sta $5a
-	lda #$40		; to $57/8 and $5a/b
+	lda #$40		; $4000 to $57/8 and $e000 to $5a/b
 	sta $58
 	lda #$e0
 	sta $5b
@@ -1608,13 +1608,13 @@ c_combine	cmp #$41		; "a"?
 	sta pport
 	ldy #$00		; 32 pages
 	ldx #$20
--	lda (startx),y
-L7C48	and (zielx),y	; self mod
-	sta ($c1),y
+-	lda ($57),y
+L7C48	and ($5a),y	; self mod
+	sta ($5a),y
 	iny
 	bne -
-	inc startx+1
-	inc zielx+1
+	inc $58
+	inc $5b
 	inc $c2
 	dex
 	bne -
