@@ -11,6 +11,7 @@
 ; ----------------------------------------- TSB neo
 
 	*=$8000
+
 	!ct pet
 
 ; -----------------------------------------
@@ -1513,7 +1514,7 @@ textchr	!tx "chr$(13)",0
 ;
 version	!tx "ad23"	; Signature
 	!by $0d
-	!tx "2.40919"	; Version Number
+	!tx "2.41024"	; Version Number
 
 ; -----------------------------------------
 ;
@@ -2999,41 +3000,56 @@ fnpeny	ldy lpy		; lightpen y (do first: PENX!)
 penabfr	lda $d019
 	and #8		; wait for strobe
 	beq penabfr
+	pha
 	lda $d013		; get lp x
 	sta lpx
 	lda $d014		; get lp y
 	sta lpy
-	lda $d019		; clear strobe
+	pla		; clear strobe
 	and #$f7
 	sta $d019
 	rts
 
-; -----------------------------------------
+; ----------------------------------------- func DISPLAY
 ;
-csgetarid	cpy #$61		; GRAPHICS?
-	bne csgetarie
+fndisplay	ldx video		; returns video address
+	!by $2c
+
+; ----------------------------------------- func SOUND
+;
+fnsound	ldx #$d4		; =$d400
+	!by $2c
 
 ; ----------------------------------------- func GRAPHICS
 ;
 fngraphics
 	ldx #$d0		; =$d000
 cga0	ldy #$00
-	jmp sxyflp
+	jmp sxyflp	; convert to float
+
+; -----------------------------------------
+
+	!by 0
 
 ; -----------------------------------------
 ;
-csgetarie	cpy #$60		; SOUND?
-	bne csgetarif
-
-; ----------------------------------------- func SOUND
-;
-fnsound	ldx #$d4		; =$d400
-	bne cga0
+csgetarid	cpy #$7d		; DISPLAY?
+	beq fndisplay
 
 ; -----------------------------------------
 ;
-csgetarif	cpy #$67		; NRM?
-	bne csgetarig
+	cpy #$61		; GRAPHICS?
+	beq fngraphics
+
+; -----------------------------------------
+;
+	cpy #$60		; SOUND?
+	beq fnsound
+
+; -----------------------------------------
+;
+	cpy #$67		; NRM?
+	bne csgetarie
 
 ; ----------------------------------------- func NRM
 ;
@@ -3041,6 +3057,7 @@ fnnrm	jsr getint	; sys check "("
 	jsr sgetstr1
 	lda #0
 	sta $0d
+	sta helpvec	; init hi of 16 digit binary
 	ldx progz
 	ldy progz+1
 	stx $71
@@ -3049,23 +3066,24 @@ fnnrm	jsr getint	; sys check "("
 	ldy $23
 	stx progz
 	sty progz+1
-	jsr fromnrm	; patch 11.01.20
+	jsr fromnrm	; 11.01.20
 ;
 	ldx #0
 	ldy $69		; .y= len
-	cpy #8		; 8/9 (or 16/17) must be binary
+	cpy #8		; 8/9 (or 16/17) digits must be binary
 	bcc ++
 
-	cmp #$25		; >8: leading "%"?
+	cmp #$25		; >8: has a leading "%"?
 	bne +		; no
 	jsr chrget	; yes, skip
-+	jsr bincon
++	jsr bincon	; get 8 digit value
 	ldy $69
-	cpy #16		; 16/17?
+	cpy #16		; 16/17 digits?
 	bcc +
-	ldx $a8		; yes
-	jsr bincon
-+	jmp nrm0
+	ldx $a8		; yes, get 8 digit value and
+	stx helpvec	; save it as hi
+	jsr bincon	; get 8 digit value (lo)
++	jmp nrm0		; proceed below
 
 ; -----------------------------------------
 ;
@@ -3074,29 +3092,30 @@ fnnrm	jsr getint	; sys check "("
 	jsr chrget	; yes, skip "$"
 +	jsr hcon0		; and convert
 ;
-nrm0	lda $69
+nrm0	lda $69		; was 8 (or more) digits?
 	cmp #8
 	bcc +
-	ldy $a8
-	jsr sxyflp
+	ldy $a8		; no, get binary lo
+	ldx helpvec	; and hi
+	jsr sxyflp	; convert to float
 +	jsr $b7e2		; sys get back progz
-	jmp intback	; ")"?
+	jmp intback	; check for ")", finished
 
 ; -----------------------------------------
 ;
-csgetarig	cpy #$28		; AT?
-	bne csgetarih
+csgetarie	cpy #$28		; AT?
+	bne csgetarif
 
 ; ----------------------------------------- func AT
 ;
 fnat	jsr sgetbyt1	; ! row (.x)
 	cpx #25		; check limits (40/25)
-	bcs +
+	bcs towm2
 	stx helpvec
 
 	jsr sgetbytc	; ! column (.y)
 	cpx #40
-	bcs +
+	bcs towm2
 	txa
 	tay
 	ldx helpvec	; .c=0: set cursor
@@ -3106,12 +3125,10 @@ fnat	jsr sgetbyt1	; ! row (.x)
 	jsr dec7a
 	jmp sgetari	; cont (8c8d)
 
-+	jmp swarm
-
 ; -----------------------------------------
 ;
-csgetarih	cpy #$7c		; CHECK?
-	bne csgetarii	; no
+csgetarif	cpy #$7c		; CHECK?
+	bne csgetarig	; no
 
 ; ----------------------------------------- func CHECK
 ;
@@ -3147,26 +3164,10 @@ fncheck	jsr $aefa		; sys "("?
 +	dey		; wenn ja  : return 0
 ++	jmp sxyflp3	; wenn nein: return 1
 
-wdetect	lda detecterg
-	and mbittabs,x	; beteiligt?
-	beq +		; nein
-	inc helpvc2
-+	rts		; 70
-
 ; -----------------------------------------
 ;
-csgetarii	cpy #$7d		; DISPLAY?
-	bne csgetarij
-
-; ----------------------------------------- func DISPLAY
-;
-fndisplay	ldx video		; returns video address
-	jmp cga0
-
-; -----------------------------------------
-;
-csgetarij	cpy #$54		; Token von D!?
-	bne csgetarik
+csgetarig	cpy #$54		; Token von D!?
+	bne csgetarih
 
 ; ----------------------------------------- func D!PEEK
 ;
@@ -3184,7 +3185,7 @@ getpeek	ldy #0
 	lda #$c2		; PEEK following?
 	cmp (progz),y
 	beq +
-	jmp swarm		; no, bad mode error
+towm2	jmp swarm		; no, bad mode error
 
 +	jsr incbasbz	; yes, advance:
 	jsr getint	; sys: "("?, returns .y=0
@@ -3192,9 +3193,17 @@ getpeek	ldy #0
 	jmp $aef7		; check ")"
 
 ; -----------------------------------------
+
+wdetect	lda detecterg
+	and mbittabs,x	; beteiligt?
+	beq +		; nein
+	inc helpvc2
++	rts		; 70
+
+; -----------------------------------------
 ;
-csgetarik	cpy #$7a		; Token von MEM?
-	bne csgetaril	; MEMPEEK?
+csgetarih	cpy #$7a		; Token von MEM?
+	bne csgetarij	; MEMPEEK?
 
 ; ----------------------------------------- func MEMPEEK
 ;
@@ -3214,10 +3223,10 @@ fnmempeek	jsr getpeek	; yes, PEEK in overall RAM
 
 ; -----------------------------------------
 ;
-csgetaril	cpy #$2c		; USE?
+csgetarij	cpy #$2c		; USE?
 	bne csgetariend	; !patch! possible JMP interari (at $ca00?)
 			; returm w/ JMP csgetariend
-	!by $ca
+	!by $ca		; $ca: byte mandatory!
 
 ; ----------------------------------------- func USE
 ;
