@@ -1,6 +1,6 @@
 ; -----------------------------------------
 ;
-; TSB MEMHOOK 1.01
+; TSB MEMHOOK 1.02
 ;
 ; originally "REUINIT" by P. Hagemann,
 ; recoded to "MEMHOOK" for TSBneo by A. Dettke
@@ -54,7 +54,7 @@ instxreu	ldx #(cctab-xreucode-1)
 	stx patchan+1
 
 +	jsr tsbcols	; then set TSB colors
-	tax		; set $8000 as memtop
+	ldx #0		; set $8000 as memtop
 	ldy #$80
 	stx $37
 	sty $38
@@ -78,7 +78,7 @@ loop	lda reutab,x
 	rts
 
 ; ----------------------------------------- resident MEMHOOK
-; part of sprite 11 area
+; part of STACK area
 xreucode
 !pseudopc xreu {
 	lda reuflag	; REU activated?
