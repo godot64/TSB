@@ -31,6 +31,7 @@
 	chrget	= $0073
 	chrgot	= $0079
 	linenum	= $0100
+	insertbuf	= $0140
 	autozi	= $01fe
 	basinbuf	= $0200
 	keybuf	= $0277
@@ -1514,7 +1515,7 @@ textchr	!tx "chr$(13)",0
 ;
 version	!tx "ad23"	; Signature
 	!by $0d
-	!tx "2.41024"	; Version Number
+	!tx "2.50113"	; Version Number
 
 ; -----------------------------------------
 ;
@@ -5097,7 +5098,7 @@ befinsert	jsr get1ststr	; get string and len
 ++	dec $c7		; rvs?
 	bmi +
 	ora #$80		; yes, make reverted
-+	sta $02c0,x	; store converted box chars
++	sta insertbuf,x	; store converted box chars
 	lda helpvec+1	; restore RVS flag
 	sta $c7
 	inx
@@ -5136,13 +5137,13 @@ mkbox	jsr mkrow
 	jmp mkline	; bottom row
 ;
 mkrow	ldy helpvec	; one row
-	lda $02c0,y
+	lda insertbuf,y
 	tax
 	dey
-	lda $02c0,y
+	lda insertbuf,y
 	pha
 	dey
-	lda $02c0,y
+	lda insertbuf,y
 	dey
 	sty helpvec
 	ldy spaltenanz
@@ -5170,9 +5171,9 @@ beffetch	jsr get1ststr	; get ctrl string and its len
 	jsr sgetvar	; get target string (at a9/aa, no len needed)
 	sta $a9
 	sty $aa
-	jsr chrgot
+	jsr chrgot	; is there a force parameter?
 	beq +
-	jsr sgetbytc
+	jsr sgetbytc	; yes, get and set
 	stx helpvec+1
 +	jsr stestdirm	; check for direct mode
 	jsr crsrout	; show cursor
@@ -6589,8 +6590,8 @@ usedesflg	inx
 befgraphics
 
 !if uniprom {		; if for Uniprom CRT:
-	ldx #16
-	ldy #$70
+	ldx #12
+	ldy #$74
 	jsr $7f89		; load "tsb.hsg" from there
 } else {
 	ldx #<namehsg	; else load "tsb.hsg" from disk
