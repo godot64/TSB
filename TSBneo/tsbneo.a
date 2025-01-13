@@ -31,7 +31,7 @@
 	chrget	= $0073
 	chrgot	= $0079
 	linenum	= $0100
-	insertbuf	= $0140
+	insertbuf	= $0137
 	autozi	= $01fe
 	basinbuf	= $0200
 	keybuf	= $0277
