@@ -2,9 +2,12 @@
 ;
 ; Tuned Simons' Basic Neo
 ;
-; by Arndt Dettke, 2023
+; by Arndt Dettke, 2025
 ;
 ; based on Simons' Basic by David Simons, 1984
+;
+; at $c000: "memhook.inc" to retrieve tsb.mem from REU
+; at $c9c9: "MD_memhook.inc" for Magic Desk CRT version
 ;
 ; -----------------------------------------
 
@@ -16,7 +19,7 @@
 
 ; -----------------------------------------
 ;
-	uniprom	= 0
+	cartridge	= 0	; set to 1 to assemble CRT version
 
 	pport	= $01
 	int	= $14
@@ -32,6 +35,7 @@
 	chrgot	= $0079
 	linenum	= $0100
 	insertbuf	= $0137
+	xreu	= $0140	; the resident mem-hook
 	autozi	= $01fe
 	basinbuf	= $0200
 	keybuf	= $0277
@@ -222,7 +226,7 @@
 	keyflag		= $c646	; 	Flag: F-Tasten aktiv (Wert 10)
 	sepline		= $c647	; 	Flag&Value: separator length
 				; ! unused (1 bytes)
-	temporary		= $c649	; 	for temporary use
+	reuflag		= $c649	; 	flag for REU
 	wavetab		= $c64a	; 	Teil von WAVE (3 bytes)
 	keytab		= $c64d	; 	F-Tasten-Belegung (bis $c74c)
 ; 			  $c74d	; 	Text: "ata" (string to compare w/ keyword DATA)
@@ -1184,7 +1188,7 @@ tabbef	!tx "hireS"	; 1
 	!tx "fetcH"
 	!tx "at",$a8
 	!tx "untiL"	; 41
-	!by ">",$be	; *
+	!by $be		; *
 	!by $be		; +
 	!tx "usE"
 	!by $be		; -
@@ -1205,8 +1209,13 @@ tabbef	!tx "hireS"	; 1
 	!tx "clS"		; <
 	!tx "x",$a1	; = (x!)
 	!tx "maP"		; >
+!if cartridge {
 	!by $be		; ?
+	!tx "monitoR"
+	} else {
+	!by ">",$be
 	!tx "securE"
+}
 	!tx "mobcoL"	; 65
 	!tx "circlE"
 	!tx "on erroR"
@@ -1336,7 +1345,11 @@ vecplace	!wo befplace-1	;  16 place    (changed from 86e2)
 	!wo swarm-1	;     (+)
 	!wo befuse-1	;  44 use
 	!wo swarm-1	;     (-)
+!if cartridge {
+	!wo swarm-1
+	} else {
 	!wo befglobal-1	;  46 global
+}
 	!wo swarm-1	;     (/)
 	!wo befreset-1	;  48 reset
 	!wo befproc-1	;  49 proc
@@ -1354,12 +1367,20 @@ vecplace	!wo befplace-1	;  16 place    (changed from 86e2)
 	!wo err2a-1	;  61 x!  (=)
 vecmap	!wo err2a-1	;  62 map (>)
 	!wo swarm-1	;     	(?)
+!if cartridge {
+	!wo befmonitor-1	;  64 monitor
+	} else {
 	!wo befsecure-1	;  64 secure
+}
 	!wo befmobcol-1	;  65 mobcol (formerly: disapa)
 	!wo befcircle-1	;  66 circle
 	!wo befonerror-1	;  67 on error
 	!wo befnoerr-1	;  68 no error
+!if cartridge {
+	!wo swarm-1
+	} else {
 	!wo beflocal-1	;  69 local
+}
 	!wo befrcomp-1	;  70 rcomp
 	!wo befelse-1	;  71 else
 	!wo befretrace-1	;  72 retrace
@@ -1515,7 +1536,7 @@ textchr	!tx "chr$(13)",0
 ;
 version	!tx "ad23"	; Signature
 	!by $0d
-	!tx "2.50113"	; Version Number
+	!tx "2.50123"	; Version Number
 
 ; -----------------------------------------
 ;
@@ -3314,13 +3335,13 @@ allnrm	lda vecrenum	; vector of bef RENUMBER
 	cmp #$4c
 	beq nrm3		; yes, go to "tsb.ext" (!changes!)
 ;
-!if uniprom {		; if for Uniprom CRT:
+!if cartridge {		; if for Magic Desk CRT:
 	ldx #4
 	ldy #$cc
-	jsr $7f80		; load "tsb.mem" from there
+	jsr mdcart	; load "tsb.mem" from there
 } else {
 	ldx #<nammem	; else load "tsb.mem" from disk
-	jsr loadext
+patchan	jsr loadext
 	bcs iffail	; leave if fail
 }
 
@@ -3379,15 +3400,15 @@ scd5	pla		; otherwise: just finish command
 	pla		; (also: SECURE)
 	jmp endsmb
 
-
 ; ----------------------------------------- bef INST
 ;
+-	jmp iffail1	; leave if fail
+
 befinst	ldx #<nameext	; load "tsb.ext"
 	jsr loadext
-	bcc +
-	jmp iffail1	; leave if fail
+	bcs -
 
-+	jsr basromaus
+	jsr basromaus
 	ldy #0
 	jsr extension	; cc00: init DOS Wedge
 
@@ -6589,10 +6610,10 @@ usedesflg	inx
 ;
 befgraphics
 
-!if uniprom {		; if for Uniprom CRT:
+!if cartridge {		; if for CRT:
 	ldx #12
 	ldy #$74
-	jsr $7f89		; load "tsb.hsg" from there
+	jsr mdcart+3	; load "tsb.hsg" from there
 } else {
 	ldx #<namehsg	; else load "tsb.hsg" from disk
 	jsr loadext
@@ -8945,13 +8966,26 @@ chkonkey	lda okstring	; get on key ctrl string
 	clc		; yes: .c=0
 oky0	rts
 
-; ----------------------------------------- bef SECURE
-; !discard! 46 Bytes
+; ----------------------------------------- bef SECURE (disk TSB)
+; ----------------------------------------- bef MONITOR (crt TSB)
+; !discard SECURE! gain 46 Bytes
+
+!if cartridge {		; if on a cartridge:
+
+befmonitor
+	ldx #16		; take 16 pages
+	ldy #$70		; get destination $7000
+	jsr mdcart+6	; transfer
+	jmp $7000		; start TSB.MON
+
+	} else {		; otherwise:
+
 befsecure	jsr chkonoff
 	lda #$41		; $41: search code for DISAPA
 	sta $22
 	clc
 	lda $2b
+}
 	adc #$ff
 	sta $20
 	lda $2c
@@ -9587,21 +9621,15 @@ outasc	ldx #0
 ; ----------------------------------------- Screen colors when MEM active/
 ; ----------------------------------------- Graphics colors when in graphics mode
 ; -----------------------------------------
-; c000
+
+; c000: memhook
 ; this is for implementing REU access for NRM after MEM, init with SYS $c000:
+; memhook.inc must reside in the same directory as tsbneo.a!
 
-	!by $ee,$49,$c6,$20,$41,$c0,$ce,$49,$c6,$20,$44,$c0,$a2,$07,$bd,$78
-	!by $c0,$9d,$01,$df,$ca,$10,$f7,$a2,$1c,$bd,$5b,$c0,$9d,$40,$01,$ca
-	!by $10,$f7,$ad,$49,$c6,$f0,$0a,$a9,$40,$a2,$01,$8d,$a2,$95,$8e,$a3
-	!by $95,$20,$b8,$8b,$aa,$a0,$80,$86,$37,$84,$38,$20,$8c,$fd,$4c,$81
-	!by $80,$a2,$00,$2c,$a2,$01,$86,$b0,$a2,$06,$bd,$80,$c0,$9d,$02,$df
-	!by $ca,$10,$f7,$a9,$90,$05,$b0,$8d,$01,$df,$60,$ad,$49,$c6,$d0,$03
-	!by $4c,$2f,$84,$a2,$07,$bd,$55,$01,$9d,$01,$df,$ca,$10,$f7,$18,$60
-	!by $91,$00,$cc,$00,$00,$07,$00,$04,$90,$00,$cc,$00,$00,$07,$00,$04
-	!by $49,$c6,$ff,$03,$07,$01,$00
+	!src "memhook.inc"
 
-	!fill 1000-135,$ad	; graphics or text colors
-	!fill 24		; gap
+	!fill $c3e8-$c100,$ad	; fill rest with graphics- or text-colors
+	!fill 24		; mind the gap
 
 ; -----------------------------------------
 ; c400
@@ -9609,11 +9637,11 @@ proctable	!fill 256		; table area for proc
 
 ; -----------------------------------------
 ; c500
-	!fill 256		; sb variables
+	!fill 256		; tsb variables
 
 ; -----------------------------------------
 ; c600
-	!fill 77		; sb variables
+	!fill 77		; tsb variables
 
 ; c64d (keytab):
 	!by $50,$41,$47,$45,$32,$33,$0d,$00,$00,$00,$00,$00,$00,$00,$00,$00	; 1:  PAGE23+cr
@@ -9633,7 +9661,7 @@ proctable	!fill 256		; table area for proc
 	!by $53,$43,$52,$4c,$44,$20,$31,$2c,$38,$2c,$33,$2c,$22,$00,$00,$00	; 14: SCRLD,$1,8,3,"
 	!by $43,$53,$45,$54,$20,$32,$3a,$00,$00,$00,$00,$00,$00,$00,$00,$00	; 15: CSET,$2:
 	!by $44,$4f,$20,$4e,$55,$4c,$4c,$0d,$00,$32,$00,$00,$00,$00,$00,$00	; 16: DO NULL+cr
-; c74d
+; c74d (D-ATA)
 ata	!by $41,$54,$41
 
 ; ----------------------------------------- Part of PLACE (for Arrays)
@@ -10003,7 +10031,13 @@ writesep	ldx sepline	; Trennzeile ausgeben?
 
 ; ----------------------------------------- Part of bef LOCAL
 ;
-localtab	!fill 55		; 52 + 3 empty bytes
+localtab
+mdcart
+!if cartridge {
+	!src "MD_memhook.inc"
+	} else {
+	!fill 55		; 52 + 3 empty bytes
+}
 
 ; ----------------------------------------- X! Area
 ; ca00 (temporarily used by command X!)
@@ -10597,7 +10631,7 @@ outdigits	jsr $b395		; sys int to float (hi .a, lo .y)
 	jmp $ab1e		; sys string out
 
 ; -----------------------------------------
-; gap
+; gap for tsb signature
 	!tx "!tsb!"
 
 ; -----------------------------------------
