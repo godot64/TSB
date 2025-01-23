@@ -1,0 +1,132 @@
+; -----------------------------
+; Magic Desk CRT Launcher 1.00
+; by Peter Alexander aka @td1334
+; minor modifications by A. Dettke
+; -----------------------------
+;
+; start file of cartridge
+;
+; -----------------------------
+
+
+	!to "TSBneo.crt", magicdeskcrt
+
+;bank 0
+	* = $8000
+
+	!ct pet
+	!zone BANK0
+
+	!word launcher
+	!word launcher
+	!tx "CBM80"
+
+infotext	!by $93,$11,$11,$11
+	!tx "  Please wait, TSBNeo is initializing",0
+
+launcher	sei
+	stx $d016
+	jsr $fda3		; prepare irq
+	jsr $fd50		; init memory
+	jsr $fd15		; init i/o
+	jsr $ff5b		; init video
+	lda #11		; set launcher colors
+	ldx #12
+	sta $d020
+	stx $d021
+	lda #0
+	sta $286
+
+	lda #23		; Groß-/Kleinschrift an
+	sta $d018
+
+;----------------------------------------------
+; Infotext ausgeben
+;----------------------------------------------
+ 	ldy #0
+-	lda infotext,y
+	beq +
+	jsr $ffd2
+	iny
+ 	bne -
+
++	lda #<mainprg	; tsb.neo
+	ldx #>mainprg
+	sta $03
+	stx $04
+	lda #$00		; nach $8000
+	ldx #$80
+	sta $05
+	stx $06
+	ldy #.endcopy - .startcopy
+-	lda .startcopy-1,y
+	sta $ff,y
+	dey
+	bne -
+	jmp $0100
+
+;	ZP_BANK	= $fb
+;	BANK_PTR	= $fc
+;	BANK_PTRL	= $fc
+;	BANK_PTRH	= $fd
+
+;-----------------------------------
+; Hilfroutine ab $0100 welche tsbneo
+; aus dem Modul ins Ram kopiert
+;-----------------------------------
+
+.startcopy
+!pseudopc $0100  {		; transfer
+
+	lda #0
+	sta $02
+	ldx #0
+	ldy #0
+-	lda ($03,x)
+	sta ($05),y
+	inc $03
+	bne +
+	inc $04
+	lda $04
+	cmp #$a0		; after $2000 bytes
+	bne +
+	lda #$80
+	sta $04
+	inc $02		; next bank, next $2000 bytes
+	lda $02
+	sta $de00
++	iny
+	bne -
+	inc $06
+	lda $06
+	cmp #$d0		; and then up to $d000
+	bcc -
+	lda #$80		; then switch off cartridge
+	sta $de00
+
+;	ldx #$10
+;	ldy #$70
+;	jsr $c9cf		; preload "tsb.mon"
+
+	jmp ($8000)	; start TSB
+}
+!realpc
+.endcopy
+
+; -----------------------------
+;
+; contents of cartridge
+;
+; -----------------------------
+
+mainprg	!bin "tsbneo.prg",,2
+	!align 8191,0
+	!bin "tsb.mem.prg",,2
+	!bin "tsb.hsg.prg",,2
+	!align 255,0
+	!bin "tsb.mon.prg",,2
+	free = $10000-(*)
+	!fill free,$ff
+	!bin "tsb.ext.prg",,2
+
+; -----------------------------
