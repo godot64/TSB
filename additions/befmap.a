@@ -19,9 +19,11 @@
 ; COLORS% contains the base color of each tile in the map
 ; (and *must* be an array of integers, max N for one
 ; tileset is 48).
+; The code to clear a tile location is "x" (not yet implemented).
 ;
-; v1.03 2024-02-06
-; v1.04 2024-05-03	: bugfix in FILLPAT (crashed $CA00!)
+; v1.05 2024-02-08
+; v1.06 2024-07-02
+; v1.07 2025-01-23
 ;
 ; -----------------------------------
 
@@ -53,7 +55,7 @@
 	incbasbz	= $8e2a		; increment basic pointer
 	sgetstr	= $8c3d		; get string
 }
-	setcol	= $c9f1
+	setcol	= $0131
 	setvram	= setcol+4	; routine to set data
 	pcolor	= setvram+5
 	setcram	= setvram+7
@@ -61,11 +63,11 @@
 ; ----------------------------------- MAP: FILL with 2x2 tiles derived from pattern$
 ; every 4 pattern values must be consecutive (1, then 2..3..4)
 
-fillpat	lda $c9ff		; already running?
-	cmp #$60
-	beq +
+fillpat	lda setcol+13	; already running?
+	cmp #$68
+	beq +		; yes, use it
 	ldx #(modend-setvals-1)
--	lda setvals,x	; no, install
+-	lda setvals,x	; no, install (again)
 	sta setcol,x
 	dex
 	bpl -
@@ -126,9 +128,9 @@ writemap	jsr schkcom	; get pattern string (e.g. string array MA$):
 
 loop	lda (helpvec),y	; get pattern from MA$ (petscii code number)
 	cmp #32		; skip "space"...
-	beq skip2
+	beq clearit
 	cmp #160		; or "shift space" (faster)
-	beq skip2
+	beq clearit
 
 	sec		; subtract base value 35 from pattern value
 	sbc #35
@@ -159,7 +161,7 @@ loop	lda (helpvec),y	; get pattern from MA$ (petscii code number)
 	inx		; next position:
 	jsr setvram	; store, we now have processed pattern "ab"
 			; 			         "cd"
-	txa		; subtract 41 from .x (position)
+-	txa		; subtract 41 from .x (position)
 	sec
 	sbc #41
 	tax
@@ -172,15 +174,30 @@ patlen	cpy #20		; reached LEN? (all patterns processed?)
 
 empty	jmp endsmb	; command finished
 
+clearit	lda #32
+	jsr setvram
+	inx
+	jsr setvram
+	pha
+	txa
+	clc
+	adc #39
+	tax
+	pla
+	jsr setvram
+	inx
+	jsr setvram
+	bne -
+
 ; ----------------------------------- Store to Screen
-; runs at $c9f1
-setvals	lda $0000,x	; get color value from CO%
+; runs at $0141
+setvals	lda $0000,x	; setcram: get color value from CO%
 	rts
-	sta $0000,x	; store .a to video
-	pha		; keep value
-	lda #0		; color (preset: blk)
-	sta $0000,x	; store to color ram
-	pla		; reget value
+	sta $0000,x	; setvram: store .a to video
+	pha		;          keep value
+	lda #0		;          color (preset: blk)
+	sta $0000,x	;          store to color ram
+	pla		;          reget value
 	rts
 ; -----------------------------------
 
