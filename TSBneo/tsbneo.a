@@ -492,7 +492,7 @@ mt10	inx
 	cpx #2
 	bne mt10
 	beq ++
-+	cmp names+5,x	; $8af4, REM, compare against "em"
++	cmp txrem,x	; $8af4, REM, compare against "em"
 	bne mt11
 	cpx #1
 	bne mt10		; 31 (38)
@@ -1523,7 +1523,8 @@ null	!tx "null"
 ; ----------------------------------------- Table of Extension Names
 ;
 names
-nammem	!tx "tsb.mem"
+nammem	!tx "tsb.m"
+txrem	!tx "em"
 nameext	!tx "tsb.ext"
 namehsg	!tx "tsb.hsg"
 
@@ -1536,7 +1537,7 @@ textchr	!tx "chr$(13)",0
 ;
 version	!tx "ad23"	; Signature
 	!by $0d
-	!tx "2.50123"	; Version Number
+	!tx "2.50127"	; Version Number
 
 ; -----------------------------------------
 ;
@@ -3404,10 +3405,16 @@ scd5	pla		; otherwise: just finish command
 ;
 -	jmp iffail1	; leave if fail
 
-befinst	ldx #<nameext	; load "tsb.ext"
+befinst
+!if cartridge {		; if for Magic Desk CRT:
+	ldx #4
+	ldy #$cc
+	jsr intocrt2	; load "tsb.ext" from there
+} else {
+	ldx #<nameext	; load "tsb.ext" (DOS Wedge 5.1)
 	jsr loadext
 	bcs -
-
+}
 	jsr basromaus
 	ldy #0
 	jsr extension	; cc00: init DOS Wedge
@@ -6613,7 +6620,7 @@ befgraphics
 !if cartridge {		; if for CRT:
 	ldx #12
 	ldy #$74
-	jsr mdcart+3	; load "tsb.hsg" from there
+	jsr intocrt1	; load "tsb.hsg" from there
 } else {
 	ldx #<namehsg	; else load "tsb.hsg" from disk
 	jsr loadext
@@ -8975,8 +8982,19 @@ oky0	rts
 befmonitor
 	ldx #16		; take 16 pages
 	ldy #$70		; get destination $7000
-	jsr mdcart+6	; transfer
-	jmp $7000		; start TSB.MON
+	lda #$90		; for TSB.MON
+	jsr mdcart2
+	jsr $7000
+	jmp bef0
+
+intocrt2	stx mdpatch+1	; for TSB.EXT (DOS Wedge 5.1)
+	jsr mdcart
+	lda #3
+	sta mdpatch+1
+	rts
+
+intocrt1	lda #$84		; for GRAPHICS
+	jmp mdcart2
 
 	} else {		; otherwise:
 
@@ -8985,7 +9003,6 @@ befsecure	jsr chkonoff
 	sta $22
 	clc
 	lda $2b
-}
 	adc #$ff
 	sta $20
 	lda $2c
@@ -8993,11 +9010,12 @@ befsecure	jsr chkonoff
 	sta $21
 	ldy #0
 	jsr suchcode1
-
 -	lda $20		; code found:
 	bne +
 	dec $21
-+	dec $20
++	!by $c6		; dec $20
+}
+	!by $20
 	lda #0		; insert $00 where $64 of DISAPA is
 	sta ($20),y
 	jsr simtok	; (continue search until end of PRG)
@@ -9587,7 +9605,7 @@ beflocal	jsr setoff	; set .x to 0
 	lda #$ff
 	sta ($5f),y
 
-	cpx #52		; buffer filled? (max 13 entries)
+	cpx #51		; buffer filled? (max 13 entries)
 	bcs lcf0		; yes, finish LOCALTAB
 
 	jsr chrgot	; anything following?
@@ -10016,11 +10034,14 @@ merge1	jsr basromein
 
 ; ----------------------------------------- Part of OPTION
 ;
-writesep	ldx sepline	; Trennzeile ausgeben?
-	beq +		; nein, eh nicht
-	lda helpvc2+2	; was END PROC?
+writesep	lda helpvc2+2	; was END PROC?
 	cmp #52
 	bne +
+	ldx sepline	; Trennzeile ausgeben?
+	beq +		; nein, eh nicht
+	lda helpvc2	; am Zeilenanfang?
+	cmp #4
+	bne +		; nein, dann keine Trennzeile
 	lda #$0d		; yes, write separator line
 	!by $2c
 -	lda #$2d
@@ -10036,7 +10057,7 @@ mdcart
 !if cartridge {
 	!src "MD_memhook.inc"
 	} else {
-	!fill 55		; 52 + 3 empty bytes
+	!fill 49		; 48 + 1 bytes
 }
 
 ; ----------------------------------------- X! Area
