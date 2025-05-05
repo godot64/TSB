@@ -1502,7 +1502,7 @@ fetchtab	!by $05,$11,$12,$13,$1c,$1d,$1e,$1f	; all these 26 get skipped
 
 ; ----------------------------------------- Table of Print Values (COPY/HRDCPY)
 ;
-quotetab	!by $80,$80,$83,$80,$83,$80,$08
+quotetab	!by $80,$80,$e0,$80,$e0,$80,$08
 nline	!by $31,$32,$10,$0f,$0d,$08
 grprntab	!by $08,$35,$31,$10,$0f,$0d
 ; from r to l: CR, Char mode, Tab "15", Graphic mode
@@ -1537,7 +1537,7 @@ textchr	!tx "chr$(13)",0
 ;
 version	!tx "ad23"	; Signature
 	!by $0d
-	!tx "2.50127"	; Version Number
+	!tx "2.50505"	; Version Number
 
 ; -----------------------------------------
 ;
@@ -4367,13 +4367,18 @@ sip0	lda musicadr	; get adr of music string
 ;
 sip2	sty musicz5	; check note code: store pointer into string
 	jsr notesuch	; search note, result in .a and .x
-	ldy #1		; (if invalid/no note: .a and .x are 0)
+	sta helpvec	; frequency is $0000? (then don't activate sound)
+	txa		; (if invalid/no note: .a and .x are 0)
+	ora helpvec
+	beq +
+	lda helpvec
+	ldy #1
 	sta ($fe),y
 	txa
 	dey
 	sta ($fe),y
-	jsr stimmein	; play note
-	ldy musicz5	; re-get string pointer
+	jsr gateon	; play note (if freq more than $0000)
++	ldy musicz5	; re-get string pointer
 
 sip4	cpy musiclen	; at end of music string?
 	bcs playend	; yes, end of play
@@ -4402,24 +4407,22 @@ sip9	cmp #$93		; clr (code for select voice)?
 	lda mregs,x	; pointer to voice 1..3
 	sta mregadr
 	stx stimmenr
-	lda #$d4		; set $d4xx (from voice)
-	sta mregadr+1
 -	bne sip4		; advance in music string
 ;
+; ----------------------------------------- Current Voice off
+
 sip5	cmp #$47		; code "g": voice off?
 	bne sip3
 	tya
 	pha
 	jsr svmregadr
-	ldy stimmenr
-	lda wavetab,y
-	and #$fe
-	ldy #4
-sip11	sta ($fe),y
+	jsr gateoff
 	pla
 	tay
 	bne -		; advance
 ;
+; ----------------------------------------- Sync
+
 sip3	cmp #$54		; code "t": sync bit?
 	bne sip6
 	tya
@@ -4429,8 +4432,11 @@ sip3	cmp #$54		; code "t": sync bit?
 	lda wavetab,y
 	eor #$02
 --	ldy #4
-	bne sip11		; advance
+	sta ($fe),y
+	bne sip4		; advance in string
 ;
+; ----------------------------------------- Clear Waveform
+
 sip6	cmp #$43		; code "c": clear waveform
 	bne sip7
 	tya
@@ -4439,6 +4445,8 @@ sip6	cmp #$43		; code "c": clear waveform
 	lda #0
 	beq --
 
+; ----------------------------------------- Repeat Score
+
 sip7	cmp #$52		; code "r": repeat music string
 	bne -
 	ldy #0
@@ -4446,19 +4454,23 @@ sip7	cmp #$52		; code "r": repeat music string
 	sty musicz4
 	rts
 
-; -----------------------------------------
+; ----------------------------------------- Search Note
 ;
-notesuch	ldy #19		; search in 20 notes
--	cmp nottab,y
+notesuch	pha
+	jsr svmregadr	; first: switch sound off
+	jsr gateoff
+	pla
+	ldy #19		; search in 20 notes
+-	cmp nottab,y	; "x" is first find!
 	beq sip8
 	dey
 	bpl -
--	lda #0		; not found, set freq to 0
-	sta musicz4	; and tempo to 0 (skip note)
+-	lda #0		; not found, set freq to 0 (.a and .x)
+	sta musicz4	; and tempo counter to 0 (skip note)
 	tax
 	beq svmregadr
 ;
-sip8	cpy #19		; 19=0 (x: stakkato)
+sip8	cpy #19		; 19=0 (x: next note is non legato)
 	beq -
 	lda frqtabl,y	; found note, set frequency
 	sta mfreq
@@ -4466,12 +4478,12 @@ sip8	cpy #19		; 19=0 (x: stakkato)
 	ldy #0
 	cmp #18		; 18=2 (C=c)
 	beq +
-	cmp #12		; 12=0 (z)
+	cmp #12		; 12=0 (z; Pause)
 	beq +++
-	cmp #11		; 11=2 (b)
+	cmp #11		; 11=2 (b; same as C=c)
 	bne ++
 +	iny
-++	iny		; all others=1
+++	iny		; all other notes=1
 +++	sty mfreq+1
 	inc musicz5
 	ldy musicz5	; set octave
@@ -4479,38 +4491,36 @@ sip8	cpy #19		; 19=0 (x: stakkato)
 	and #15		; (0..max 9)
 	tax
 	beq sip10
--	asl mfreq
+-	asl mfreq		; double freq for each octave
 	rol mfreq+1
 	dex
 	bne -
 ;
-sip10	lda mfreq+1
+sip10	lda mfreq+1	; resulting frequency
 	ldx mfreq
-svmregadr	ldy mregadr
+svmregadr	ldy mregadr	; choose oszi
 	sty $fe
-	ldy mregadr+1
+	ldy #$d4
 	sty $ff
 	rts
 
-; -----------------------------------------
+; ----------------------------------------- Set Sound on / off
 ;
-stimmein	ldy #6		; index to SID register 6
+gateon	ldy #1
+	!by $2c
+gateoff	ldy #0
+	sty helpvec
+	ldy #4		; register 4
 	ldx stimmenr
-	lda srtab,x	; get sustain/release values from buffer
-	sta ($fe),y	; write to register
-	dey		; register 5
-	lda adtab,x	; get attack/decay values from buffer
-	sta ($fe),y	; write to register
-	dey		; register 4
 	lda wavetab,x	; set waveform data
-	and #$fe		; clear key bit
-	ora #1		; and set it (activate voice)
+	and #$fe		; set/clear key bit
+	ora helpvec
 	sta ($fe),y
 	rts
 
 ; -----------------------------------------
 
-	!by 0
+	!by 0,0
 
 ; -----------------------------------------
 ;
@@ -8043,9 +8053,9 @@ dupit	ldy #0
 	sty $ac
 	sty $ad
 	lda ax		; save source x
-	sta $c5a4
+	sta dry
 	lda ax+1
-	sta $c5a5
+	sta dry+1
 	lda ex		; save target x
 	sta xdiff
 	lda ex+1
@@ -8099,9 +8109,9 @@ dup3	jsr incex		; yes, advance target x
 
 	lda #0		; yes, reset x-counter
 	sta $ac
-	lda $c5a4		; restore source x
+	lda dry		; restore source x
 	sta ax
-	lda $c5a5
+	lda dry+1
 	sta ax+1
 	lda xdiff		; restore target x
 	sta ex
