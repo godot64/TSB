@@ -7,7 +7,7 @@
 ; based on Simons' Basic by David Simons, 1984
 ;
 ; at $c000: "memhook.inc" to retrieve tsb.mem from REU
-; at $c9c9: "MD_memhook.inc" for Magic Desk CRT version
+; at $c9cf: "MD_memhook.inc" for Magic Desk CRT version
 ;
 ; -----------------------------------------
 
@@ -19,7 +19,7 @@
 
 ; -----------------------------------------
 ;
-	cartridge	= 0	; set to 1 to assemble CRT version
+	cartridge	= 1	; set to 1 to assemble CRT version
 
 	pport	= $01
 	int	= $14
@@ -1537,7 +1537,7 @@ textchr	!tx "chr$(13)",0
 ;
 version	!tx "ad23"	; Signature
 	!by $0d
-	!tx "2.50505"	; Version Number
+	!tx "2.50515"	; Version Number
 
 ; -----------------------------------------
 ;
@@ -8538,7 +8538,7 @@ befbckgnds
 	stx $d022
 	jsr sgetbytc	; get 3rd bkgnd
 	stx $d023
-	jsr sgetbytc	; get 4th bkgnd
+	jsr gnextpar	; get 4th bkgnd
 	stx $d024
 	jmp endsmb
 
