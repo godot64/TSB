@@ -1537,7 +1537,7 @@ textchr	!tx "chr$(13)",0
 ;
 version	!tx "ad23"	; Signature
 	!by $0d
-	!tx "2.50515"	; Version Number
+	!tx "2.50520"	; Version Number
 
 ; -----------------------------------------
 ;
@@ -2637,12 +2637,11 @@ fnc2	cpy #$51		; JOY?
 
 ; ----------------------------------------- func JOY
 ;
-fnjoy	ldy #$00		; set $dc00
-	sty helpvec
-	lda #$dc
-	sta helpvec+1
+fnjoy	ldy #0
 	jsr chrgot	; anything more?
 	beq +		; .y=0
+	cmp #$28		; "("?
+	bne +
 
 	jsr $aefa		; yes, "("?
 	jsr $b79e		; get value to .x
@@ -2652,7 +2651,7 @@ fnjoy	ldy #$00		; set $dc00
 	tay
 
 --
-+	lda (helpvec),y	; get joy
++	lda $dc00,y	; get joy
 	sta $20
 	and #$6f		; skip fire
 	sta joywert
@@ -2678,6 +2677,10 @@ fnjoy	ldy #$00		; set $dc00
 +	ldy joywert	; convert to float
 	beq fpl0		; beq -- ($f0 $e1) if JOY should wait
 	bne fpl0
+
+; -----------------------------------------
+
+	!by 0
 
 ; -----------------------------------------
 
@@ -6642,7 +6645,7 @@ befgraphics
 
 ; -----------------------------------------
 ; gap
-	!by 0,0,0,0,0,0,0
+	!by 0,0,0,0,0
 
 ; ----------------------------------------- bef HIRES
 ;
@@ -6740,11 +6743,12 @@ justmulti	txa
 ; ----------------------------------------- bef LOW COL
 ;
 beflowcol	jsr get2nyb
-	sta lcfarb12
-	lda #10
+	sta lcfarb12	; set %10- and $01- colors
+	lda #10		; set flag
 	sta lowcolflag
-	jsr sgetbytc
-	stx lcfarb3
+	ldx #$80		; preset %11-color (gets skipped in hires mode)
+	jsr gnextpar
+	stx lcfarb3	; set %11-color ($d800)
 	jmp endsmb
 
 ; ----------------------------------------- bef HICOL
