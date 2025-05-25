@@ -19,7 +19,7 @@
 
 ; -----------------------------------------
 ;
-	cartridge	= 1	; set to 1 to assemble CRT version
+	cartridge	= 0	; set to 1 to assemble CRT version
 
 	pport	= $01
 	int	= $14
@@ -1537,7 +1537,7 @@ textchr	!tx "chr$(13)",0
 ;
 version	!tx "ad23"	; Signature
 	!by $0d
-	!tx "2.50520"	; Version Number
+	!tx "2.50525"	; Version Number
 
 ; -----------------------------------------
 ;
@@ -2675,7 +2675,7 @@ fnjoy	ldy #0
 	sta joywert
 
 +	ldy joywert	; convert to float
-	beq fpl0		; beq -- ($f0 $e1) if JOY should wait
+	beq fpl0		; "beq --" ($f0 $cf) if JOY should wait
 	bne fpl0
 
 ; -----------------------------------------
@@ -6864,86 +6864,86 @@ drawto	jsr get10010	; get byte after DRAW token
 ; ----------------------------------------- bef DRAW
 ;
 befdraw	jsr drawto	; check if DRAW TO (doesn't return if yes)
-	jsr sgetstr	; no, just DRAW, get string
+
+	jsr sgetstr	; no, just DRAW, get code string
 	stx $ac		; address
 	sta $ad
 	lda $69		; len
 	pha
-	jsr sgetadrc	; comma, x
+
+	jsr sgetadrc	; comma, get x ordinate
 	sty drx
 	sta drx+1
 	jsr sgetbytc	; comma?
-	stx dry		; y
-	jsr getpktf	; draw mode
-	pla		; len back
+	stx dry		; get y ordinate
+	jsr getpktf	; get draw mode (returns .y=0)
+
+	pla		; get len back
 	sta $5f
 	lda #0
-	sta drstrz
-	lda rotgr
+	sta drstrz	; init pointer into draw string
+	lda rotgr		; init line length (from ROT)
 	sta drgrz
 
---	sty drstatus
-	stx dryanf
-	ldy drstrz
-	lda ($ac),y
-	cpy $5f
-	beq -
-	iny
-	clc
+--	ldy drstrz	; get pointer into code string
+	lda ($ac),y	; get code
+	cpy $5f		; end of code string?
+	beq -		; yes, finished
+	iny		; pointer plus 1
+	clc		; normalize code and save to stack
 	sbc #$2f
 	pha
-	dec drgrz
+
+	dec drgrz		; dec line length
 	lda drgrz
 	bne +
-	lda rotgr
+	lda rotgr		; if 0: re-init length and code pointer
 	sta drgrz
 	sty drstrz
-+	ldx dryanf
-	pla
-	ldy drstatus
-	cmp #9
-	bcs -
-	sta drricht
-	cmp #5
+
++	pla		; then re-get code from stack
+	cmp #9		; code 9 (end of DRAW)?
+	bcs -		; yes, finish command
+	sta drricht	; no, set as next code (0..8)
+	cmp #5		; pen up or pen down?
 	bcc +
-	clc
-	sbc #4
+	sbc #5		; if pen down: code minus 5 (as index into table)
 +	tax
-	lda drawtabx,x
+	lda drawtabx,x	; set inc- or dec-values (00, 01 or ff, from ROT)
 	sta drincx
 	lda drawtaby,x
 	sta drincy
-	lda drincx
-	beq +++
+
+	lda drincx	; advance in drawing line: x
+	beq +++		; 00: do nothing
 	cmp #$ff
 	bne ++
-	lda drx
+	lda drx		; ff: x minus 1
 	bne +
 	dec drx+1
 +	dec drx
 	jmp +++
-
-++	inc drx
+++	inc drx		; 01: x plus 1
 	bne +++
 	inc drx+1
-+++	lda drincy
-	beq ++
++++	lda drincy	; advance: y
+	beq ++		; 00: do nothing
 	cmp #$ff
 	bne +
-	dec dry
+	dec dry		; ff: y minus 1
 	jmp ++
++	inc dry		; 01: y plus 1 (this skips the 1st to draw pixel)
 
-+	inc dry
-++	lda drx
+++	lda drx		; then set new x ordinate
 	sta $09
 	lda drx+1
 	sta $0a
-	lda dry
+	lda dry		; set y ordinate
 	sta $a4
-	lda drricht
+	lda drricht	; pen down or pen up?
 	cmp #5
 	bcc +
-	jsr punkt
+	jsr punkt		; pen down, so draw (returns .y=0)
 	jsr kerromein
 +	jmp --
 
@@ -6953,7 +6953,7 @@ befrot	jsr sgetbytn	; get direction: 0=N, 1=NO, ..., 7=NW
 	cpx #8
 	bcc +
 	jmp swarm
-+	ldy #0		; get dir indicators:
++	ldy #0		; get direction indicators:
 	lda tabrot1,x	; positive (if bit set)
 	sta helpvec
 	lda tabrot2,x	; negative (if bit set)
@@ -6961,17 +6961,26 @@ befrot	jsr sgetbytn	; get direction: 0=N, 1=NO, ..., 7=NW
 -	lda #0		; init .a to 0
 	rol helpvec+1
 	bcc +		; first: negative?
-	lda #$ff		; yes, set
+	lda #$ff		; yes, set ff
 +	rol helpvec
 	bcc +		; second: positive?
-	ora #1		; yes, set
-+	sta drawtabx,y	; store result
-	iny		; until 8 dir values
+	ora #1		; yes, set 01
++	sta drawtabx,y	; otherwise set 00
+	iny		; until 8 values
 	cpy #8
 	bcc -
-	jsr sgetbytc	; get step width
-	stx rotgr
+	jsr sgetbytc	; get length of line (minus 1)
++	dex
+	beq +
+	bpl ++
+	inx
++	inx		; (but at least 1)
+++	stx rotgr
 	jmp endsmb	; finished
+
+; -----------------------------------------
+
+	!by 0,0,0,0,0,0
 
 ; ----------------------------------------- bef CIRCLE
 ;
