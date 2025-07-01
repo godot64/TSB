@@ -1537,7 +1537,7 @@ textchr	!tx "chr$(13)",0
 ;
 version	!tx "ad23"	; Signature
 	!by $0d
-	!tx "2.50525"	; Version Number
+	!tx "2.50630"	; Version Number
 
 ; -----------------------------------------
 ;
@@ -4812,6 +4812,7 @@ mve8	inx
 	beq +
 	jsr l20pl40
 	bne --
+-
 +	rts
 
 ; ----------------------------------------- bef MOVE
@@ -4891,6 +4892,7 @@ mdb0	sta helpvec+1	; displacement
 
 mcontright
 	dec spaltenanz
+	beq -
 	lda helpvec	; w-marker (if=1)
 	and #1
 	beq +
@@ -4912,8 +4914,7 @@ mcontright
 	beq +
 	jsr l20pl40	; next dest row
 	jsr l23pl40	; next src row
-	jmp --
-	iny		; INY unused
+	bne --
 +	jmp mfbox		; restore leftmost w/ previous rightmost
 
 ; ----------------------------------------- DOWN(B/W)
