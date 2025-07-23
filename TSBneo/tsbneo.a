@@ -783,7 +783,7 @@ auto	clc
 	jmp $a486		; sys Eingabewarteschleife (ohne inc)
 
 ; ----------------------------------------- bef MOBCOL
-;
+; formerly: DISAPA
 befmobcol	jsr getx8n	; get sprite number
 	stx $aa
 	jsr sgetbytc	; get mob color
@@ -1537,7 +1537,7 @@ textchr	!tx "chr$(13)",0
 ;
 version	!tx "ad23"	; Signature
 	!by $0d
-	!tx "2.50630"	; Version Number
+	!tx "2.50722"	; Version Number
 
 ; -----------------------------------------
 ;
@@ -5208,12 +5208,13 @@ beffetch	jsr get1ststr	; get ctrl string and its len
 	sta fetchlen	; store len of ctrl string
 	jsr chkfchlen	; get (and check) max len
 	stx fetchanz	; store max len (max 88)
-	jsr schkcom	; comma?
+	jsr schkcom	; comma? returns .y=0
 	sty helpvec+1	; init force-flag
-	jsr sgetvar	; get target string (at a9/aa, no len needed)
-	sta $a9
-	sty $aa
-	jsr chrgot	; is there a force parameter?
+	jsr sgetvar	; get target string (at 47/8, no len needed)
+	lda $0d		; is a string?
+	bmi +
+	jmp err32		; no, error "bad mode"
++	jsr chrgot	; is there a force parameter?
 	beq +
 	jsr sgetbytc	; yes, get and set
 	stx helpvec+1
@@ -5237,9 +5238,9 @@ fetchit	jsr fgetkey	; gather input chars
 	sta pos
 	jsr getinput	; create string (part of DUP), returns .y=$ff
 	iny		; .y=0, now apply result to FETCH string
-	ldx $17		; index in string stack
--	lda $00,x
-	sta ($a9),y
+	ldx $17		; get index in string stack
+-	lda $00,x		; store len and address to string stack
+	sta ($47),y
 	inx
 	iny
 	cpy #3
@@ -5255,7 +5256,6 @@ fgetkey	ldx #0		; .x=0: start length of input
 ;
 floop	jsr $ffe4		; sys get key
 	sta joywert	; merken
-	lda joywert
 	beq floop		; nothing typed?
 
 	cmp #$0d		; cr?
@@ -8284,8 +8284,7 @@ hdy2	cmp #$22		; char is a quote?
 	tax
 	lda #$0f		; send ctrl o (graphics off)
 +	jsr bsout
-	lda #$92		; send rvs off
-	jsr bsout
+	jsr rvsoff	; send rvs off
 
 	iny		; then proceed:
 	cpy #40		; one screen row?
@@ -8298,6 +8297,10 @@ hdy2	cmp #$22		; char is a quote?
 
 	jsr sclose	; close printer
 	jmp bef0		; finished
+
+; -----------------------------------------
+
+	!by 0,0
 
 ; -----------------------------------------
 ;
@@ -9803,6 +9806,10 @@ dit6	jsr return	; sys out cr
 dit1	jmp bef0		; yes, end of command
 
 ; -----------------------------------------
+
+	!by 0,0,0,0
+
+; -----------------------------------------
 ;
 dit0	lda ($20),y	; get 1st char of varname
 	sta $a6
@@ -9820,8 +9827,7 @@ dit0	lda ($20),y	; get 1st char of varname
 
 dit4	and #$7f		; 2nd is shifted, so integer
 	jsr bsout
-	lda #$25		; %
-	jsr bsout
+	jsr proz		; %
 	jsr outeql
 	jsr inc20
 	lda ($20),y
@@ -9845,8 +9851,7 @@ dit3	jsr bsout
 
 	and #$7f		; shifted, so string
 	jsr bsout
-	lda #$24		; $
-	jsr bsout
+	jsr doll		; $
 	jsr outeql
 
 	jsr quote		; string start
