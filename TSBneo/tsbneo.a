@@ -38,9 +38,9 @@
 	insertbuf = $0137
 	xreu	= $0140	; the resident mem-hook
 	autozi	= $01fe
-	basinbuf  = $0200
+	basinbuf	= $0200
 	keybuf	= $0277
-	ramstart  = $0281
+	ramstart	= $0281
 	aktfarb	= $0286
 	video	= $0288
 	outstring = $02a7
@@ -226,7 +226,7 @@
 	kry	= $c645	; $cb49	Kreis: Radius Y
 	keyflag	= $c646	;	Flag: F-Tasten aktiv (Wert 10)
 	sepline	= $c647	;	Flag&Value: separator length
-			; ! unused (1 bytes)
+			; ! unused (1 byte)
 	reuflag	= $c649	;	flag for REU
 	wavetab	= $c64a	;	Teil von WAVE (3 bytes)
 	keytab	= $c64d	;	F-Tasten-Belegung (bis $c74c)
@@ -502,7 +502,7 @@ mt10	inx
 	tay
 	pla
 
-ma3	lda #0		; then skip to line end (0=dummy  value)
+ma3	lda #0		; then skip to line end (0=dummy value)
 	beq ma4
 
 mt11	pla		; restore .a and .y
@@ -586,7 +586,7 @@ ma	plp		; war nicht TSB, nun:
 	jmp $a71a		; sys: romlistb (V2-Befehle ausgeben)
 
 ; ------------------------------------------------------------
-;  tsb detokenizer (from sys: $a717 via $0306/07)
+; tsb detokenizer (from sys: $a717 via $0306/07)
 ; ------------------------------------------------------------
 ;
 slist3	sty helpvc2	; register retten
@@ -820,7 +820,7 @@ warmstart	stx errn	 	; here: errnum in .x
 	txs
 swm0	jmp endsmb	; end on error
 
-endcheck  jsr basromein
+endcheck	jsr basromein
 	txa		; any error?
 	bpl +
 eck0	lda #0		; no, clear on error flag
@@ -1134,11 +1134,11 @@ tsbvecs	!wo warmstart,sloop,tokenize,slist,sbasbef,sgetari
 
 ; ----------------------------------------- Table for Vectors of LOAD and SAVE
 ;
-loadsave  !wo sysload,syssave
+loadsave	!wo sysload,syssave
 
 ; -----------------------------------------
 ;
-tsbpudef  !by $2b,$2a,$2c,$2e,$2d,$23	; +*,.-#
+tsbpudef	!by $2b,$2a,$2c,$2e,$2d,$23	; +*,.-#
 
 ; ----------------------------------------- tsb start message
 ;
@@ -1433,7 +1433,7 @@ vecbmode  !wo err2a-1	;		(^)
 	!wo beflowcol-1	; 118 low col
 	!wo befcopy-1	; 119 copy
 	!wo befmerge-1	; 120 merge
-vecrenum  !wo befrenum-1	; 121 renumber
+vecrenum	!wo befrenum-1	; 121 renumber
 	!wo befmem-1	; 122 mem
 	!wo befdetect-1	; 123 detect
 	!wo befcheck-1	; 124 check	(fn check)
@@ -1443,7 +1443,7 @@ vecrenum  !wo befrenum-1	; 121 renumber
 
 ; ----------------------------------------- Table of Error Message Addresses
 ;
-fehlmtab  !wo tsbf0,tsbf1,tsbf2,tsbf3,tsbf4,tsbf5,tsbf6,tsbf7
+fehlmtab	!wo tsbf0,tsbf1,tsbf2,tsbf3,tsbf4,tsbf5,tsbf6,tsbf7
 	!wo tsbf8,tsbf9,tsbfa,tsbfb,tsbfc,tsbfd
 
 ; ----------------------------------------- Table of Joystick Values
@@ -1464,10 +1464,10 @@ frqtabl	!by $16,$27,$39,$4b,$5f,$74,$8a,$a1
 
 ; ----------------------------------------- Tables of Bitmasks
 ;
-gbittabs  !by $80,$40,$20,$10,$08,$04,$02,$01
-gbittabl  !by $7f,$bf,$df,$ef,$f7,$fb,$fd,$fe
-mbittabs  !by $01,$02,$04,$08,$10,$20,$40,$80
-mbittabl  !by $fe,$fd,$fb,$f7,$ef,$df,$bf,$7f
+gbittabs	!by $80,$40,$20,$10,$08,$04,$02,$01
+gbittabl	!by $7f,$bf,$df,$ef,$f7,$fb,$fd,$fe
+mbittabs	!by $01,$02,$04,$08,$10,$20,$40,$80
+mbittabl	!by $fe,$fd,$fb,$f7,$ef,$df,$bf,$7f
 
 ; ----------------------------------------- Table of Multicolor Bitmasks
 ; a725
@@ -1478,9 +1478,9 @@ destab1	!by $40,$10,$04,$01	; %01: B $d022
 
 ; ----------------------------------------- Table of Graphics Addresses
 ;
-gadrtabl  !by $00,$40,$80,$c0
+gadrtabl	!by $00,$40,$80,$c0
 ;
-gadrtabh  !by $e0,$e1,$e2,$e3,$e5,$e6,$e7,$e8
+gadrtabh	!by $e0,$e1,$e2,$e3,$e5,$e6,$e7,$e8
 	!by $ea,$eb,$ec,$ed,$ef,$f0,$f1,$f2
 	!by $f4,$f5,$f6,$f7,$f9,$fa,$fb,$fc
 	!by $fe
@@ -1496,16 +1496,16 @@ fcursor	!by $9d,$92,$20,$12 ; rvs on, space, rvs off, crsr lft
 	!by $9d,$9d,$20	; space, crsr lft, crsr lft
 ; -----------------------------------------
 ;
-fetchtab  !by $05,$11,$12,$13,$1c,$1d,$1e,$1f	; all these 26 get skipped
+fetchtab	!by $05,$11,$12,$13,$1c,$1d,$1e,$1f	; all these 26 get skipped
 	!by $90,$91,$92,$93,$94,$9c,$9d,$9e	; (color codes, crsr, rvs, home)
 	!by $9f,$8d,$81,$95,$96,$97,$98,$99
 	!by $9a,$9b
 
 ; ----------------------------------------- Table of Print Values (COPY/HRDCPY)
 ;
-quotetab  !by $80,$80,$e0,$80,$e0,$80,$08
+quotetab	!by $80,$80,$e0,$80,$e0,$80,$08
 nline	!by $31,$32,$10,$0f,$0d,$08
-grprntab  !by $08,$35,$31,$10,$0f,$0d
+grprntab	!by $08,$35,$31,$10,$0f,$0d
 ; from r to l: CR, Char mode, Tab "15", Graphic mode
 
 ; ----------------------------------------- Table for (shifted) F-KEYs
@@ -2083,7 +2083,7 @@ toa8	lda $20
 	sta $a9
 	rts
 
-; -----------------------------------------  a8/a9 to 20/21
+; ----------------------------------------- a8/a9 to 20/21
 ;
 to20	lda $a8
 	sta $20
@@ -3635,7 +3635,7 @@ trace7	sty $49		; points via $5f to token number
 ++	lda ($20),y
 	php
 	and #$7f
-	jsr $ab47		; no, sys: out char in  .a
+	jsr $ab47		; no, sys: out char in .a
 	plp
 	bmi +
 	bne -		; uncond. branch
@@ -3795,7 +3795,7 @@ waitkey	jsr getkey+5
 
 ; ----------------------------------------- part of DO/DONE
 ;
-donecont  dec doindex	; from DONE: dec stack pointer
+donecont	dec doindex	; from DONE: dec stack pointer
 ;
 docont	lda doindex	; stack pointer DO
 	cmp #11		; 10 Verschachtelungen möglich
@@ -3809,7 +3809,7 @@ faildo	jmp err0f		; "overflow error"
 ; ----------------------------------------- bef RCOMP
 ; -----------------------------------------
 ;
-befrcomp  jsr incbasbz
+befrcomp	jsr incbasbz
 	jsr basromein
 	jsr chrgot
 	lda ifflag
@@ -4093,7 +4093,7 @@ memplus	dey		; .y=0
 	ldx helpvc2
 
 ; ----------------------------------------- Part of MEMLOAD/SAVE
-;  by P. Hagemann
+; by P. Hagemann
 execdma	bmi +		; carries FF00 flag
 	lda #$30	 	; no color ram access wanted
 	bne ++
@@ -4169,7 +4169,7 @@ param2	jsr sgetadr	; OR: get c64 start
 	beq ready		; no
 	jsr schkcom
 
-param3u4  jsr sgetadr	; POS: get reu start (and bank)
+param3u4	jsr sgetadr	; POS: get reu start (and bank)
 	sty $df04		; get offset
 	sta $df05
 	jsr sgetbytc	; get bank
@@ -4183,7 +4183,7 @@ param5	jsr sgetbyt1	; RESTORE: get autoinc flag
 	ldy $df01		; get autoinc register
 	stx helpvc2	; store dma flag (pos/neg)
 	txa
-	and #1		;  0 or 1?
+	and #1		; 0 or 1?
 	beq +		; if autoinc=0: off
 	tya
 	ora #$20	 	; else set ON
@@ -4336,7 +4336,7 @@ befold	jsr basromein	; basic ein
 
 ; ----------------------------------------- Execute PLAY 2
 ;
-sirqplay  lda musicz4	; from sirq5: get tempo counter
+sirqplay	lda musicz4	; from sirq5: get tempo counter
 	beq sip0	 	; finished? then next note
 	dec musicz2	; decrease duration counter of note
 	beq sip1	 	; if finished: dec tempo count and duration count
@@ -4528,7 +4528,7 @@ gateoff	ldy #0
 
 ; -----------------------------------------
 ;
-useready  pla
+useready	pla
 	pla
 	lda #$00
 	jsr genout
@@ -4850,7 +4850,7 @@ mdistrb	and #$0f	 	; reduce token nums
 
 ; ----------------------------------------- bef RIGHTW (7) / LEFTW (2)
 ;			enhanced
-befleftw  lda #1
+befleftw	lda #1
 	sta helpvec	; set w-marker
 	bne mdb0
 ; ----------------------------------------- bef UPW (1)
@@ -4860,15 +4860,15 @@ befupw	lda #1
 	bne befupb
 ; ----------------------------------------- bef RIGHTB (6) / LEFTB (3)
 ;			enhanced
-befleftb  lda #1		; set displacement to 1
+befleftb	lda #1		; set displacement to 1
 	bne mdb0
 ; ----------------------------------------- bef DOWNB (4)
 ;			enhanced
-befdownb  lda #2		; set down flag
+befdownb	lda #2		; set down flag
 	bne mdb1
 ; ----------------------------------------- bef DOWNW (5)
 ;			enhanced
-befdownw  lda #3		; set down flag and w-marker
+befdownw	lda #3		; set down flag and w-marker
 mdb1	sta helpvec
 
 ; ----------------------------------------- bef UPB (0)
@@ -5357,7 +5357,7 @@ fchkdig	cpx #$20	 	; below space?
 	bcs notinit
 	bcc legal		; no, legal
 ;
-fchkazup  cpx #$c1	 	; below A?
+fchkazup	cpx #$c1	 	; below A?
 	bcc fchkaz	;		upper and...
 	cpx #$db	 	; beyond Z?
 	bcs notinit
@@ -6509,7 +6509,7 @@ desloop	jsr incbasbz
 	cpy #2		; type 0 or 2? (hires objects)
 	beq deshires
 ;
-desmulti  ldy $a8		; no, multi: get gatherbyte
+desmulti	ldy $a8		; no, multi: get gatherbyte
 	ldx $a9		; get index into multi bits
 	inc $a9		; and increment it for next pass
 	inc $ab		; also normal index (to gain 8 there)
@@ -6651,7 +6651,7 @@ befgraphics
 
 ; ----------------------------------------- bef HIRES
 ;
-befhires  jsr sethiresm	; x-limit: 319 (returns .y=0)
+befhires	jsr sethiresm	; x-limit: 319 (returns .y=0)
 	sty $a6		; $a6/7: $e000 (bitmap)
 	sty lowcolflag
 	lda #$e0
@@ -6682,7 +6682,7 @@ setmod	jsr clrhicols
 
 ; ----------------------------------------- bef MOD
 ;
-befmod	jsr get2nyb	; get  ink and paper
+befmod	jsr get2nyb	; get ink and paper
 	jmp setmod	; and colorize
 
 ; ----------------------------------------- Set Hires Mode
@@ -7133,7 +7133,7 @@ txtst	cpy helpvec
 	bne txloop
 	rts		; finished
 
-; -----------------------------------------  set pixel colors
+; ----------------------------------------- set pixel colors
 ;
 -	lda #$08	 	; Koordinate nicht plausibel
 	sta status
@@ -8008,7 +8008,7 @@ pnt7	clc
 
 ; -----------------------------------------
 ;
-testfrei  lda $5c
+testfrei	lda $5c
 	ldx $5d
 	ldy $5b
 	sta $09
@@ -8584,7 +8584,7 @@ befpause	jsr chrget
 ;			; patch here:
 	!by $d0,$0b	; (TSB reads: bne +)
 			; to $24,$0b:
-			; (SB:  bit $0b)
+			; (SB: bit $0b)
 	cmp #$0d	 	; return?
 	beq +		; yes, leave
 	lda zaesec	; check timer
@@ -9021,7 +9021,7 @@ intocrt2	stx mdpatch+1	; for TSB.EXT (DOS Wedge 5.1)
 	sta mdpatch+1
 	rts
 
-intocrt1  lda #$84		; for GRAPHICS
+intocrt1	lda #$84		; for GRAPHICS
 	jmp mdcart2
 
 	} else {	 	; otherwise:
@@ -9053,7 +9053,7 @@ befsecure	jsr chkonoff
 
 ; ----------------------------------------- bef (FLASH) OFF
 ;
-endflash  jsr dec7a
+endflash	jsr dec7a
 befoff	ldx #0
 -	lda flashing
 	bmi -
@@ -9413,7 +9413,7 @@ bl01	jmp endsmb
 
 ; ----------------------------------------- bef D!POKE
 ;
-befdpoke  jsr chrget	; skip TSB-Token for d!
+befdpoke	jsr chrget	; skip TSB-Token for d!
 	cmp #$97	 	; now: POKE?
 	beq +		; no, return to d!
 	rts
@@ -10114,7 +10114,7 @@ befrenum	jsr get10010	; .a=0
 	jsr sgetadr	; get start line number
 	sty $a4		; result in .y (lo) and .a (hi)
 	sta $a5
-	jsr isstep0	; get step, is it 0? Doesn't return if  yes
+	jsr isstep0	; get step, is it 0? Doesn't return if yes
 	sty ay		; in .y (lo) and in...
 	jsr basromaus
 	lda $c4		; ...c4 (hi)
@@ -10339,7 +10339,7 @@ rnb3	jsr moveprg	; make prg 1 byte longer (returns .a=0)
 
 ; ----------------------------------------- RENUMBER: Count Basic Lines
 ;
-enternum  ldy #0		; reset counter (58/9)
+enternum	ldy #0		; reset counter (58/9)
 	sty $59
 	sty $58
 	lda $20		; get start line num (to 62/3)
@@ -10653,7 +10653,7 @@ err2d	ldx #$2d	 	; error "array nor found"
 
 ; -----------------------------------------
 ;
-arrbreak  jsr $ffe1		; sys STOP?
+arrbreak	jsr $ffe1		; sys STOP?
 	beq stopped	; yes
 	jsr getkey	; get key - affects "tsb.mem"!
 	jsr $ffe1
