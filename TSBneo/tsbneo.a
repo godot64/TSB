@@ -23,6 +23,7 @@
 
 	pport	= $01
 	int	= $14	; word
+	varstart	= $2d	; word
 	help	= $54
 	progz	= $7a	; word
 	status	= $90
@@ -50,7 +51,6 @@
 	nmivec	= $0318
 	iovecs	= $0330
 
-	faststack = $c400
 	settings1 = $c500
 	settings2 = $cb00
 	extension = $cc00
@@ -310,7 +310,7 @@ befcold	jsr basromein
 	jsr colsout	; sys init VIC and keyboard, set TSB colors
 	lda #0
 	tax
--	sta faststack,x
+-	sta proctable,x
 	sta settings1,x
 	sta $d400,x	; init SID
 	inx
@@ -1538,7 +1538,7 @@ textchr	!tx "chr$(13)",0
 ;
 version	!tx "ad23"	; Signature
 	!by $0d
-	!tx "2.50828"	; Version Number
+	!tx "2.50908"	; Version Number
 
 ; -----------------------------------------
 ;
@@ -9148,10 +9148,6 @@ found	ldy #0		; branch to found position
 
 ; -----------------------------------------
 ;
-	!by 0,0,0
-
-; -----------------------------------------
-;
 suchcode	ldy #0
 weiter	jsr inc20
 suchcode1	lda ($20),y	; end of line?
@@ -9251,7 +9247,7 @@ fillfast	ldx prstack	; stack voll?
 +	stx prstack
 ++	rts
 
-; -----------------------------------------
+; ----------------------------------------- part of CALL
 ;
 cfreset	lda #0
 	sta execflag
@@ -9259,30 +9255,31 @@ cfreset	lda #0
 ; ----------------------------------------- part of CALL
 ;
 fastcall	ldx prstack	; einträge im labelstack?
-	beq ++		; nein
+	beq ++		; nein, zurück zu CALL (-> RTS)
 	inx		; voll?
-	beq ++		; ja
+	beq ++		; ja, auch zurück
 
-fast	dex		; nein
-	jsr incbasbz	; pz auf 1. zeichen
+fast	ldx #$ff		; nein, PROC im stack suchen
+	jsr incbasbz	; pz auf 1. PROC-zeichen in PRG
 
-m8	dex
+m8	inx		; startet mit null
 	lda proctable,x	; vektor auf label setzen
-	sta $21
-	dex
-	lda proctable,x
 	sta $20
+	inx
+	lda proctable,x
+	sta $21
+	beq m9		; vektor leer: normale suche
 	ldy #$ff	 	; .y=$ff wg. labelvergleich
 	jsr space		; führendes blank überlesen
 	jsr compare	; vergleichen von aufruf und label
 	beq +
 	txa		; alle labels durch?
 	bne m8		; nein, weiter
-	jmp dec7a		; sonst: pz eins zurück, normale suche:
+m9	jmp dec7a		; sonst: pz eins zurück, normale suche
 
-+	pla
++	pla		; gefunden!
 	pla
-	jmp found
+	jmp found		; fortsetzen bei gefundener PROC
 
 ; -----------------------------------------
 ;
@@ -9305,16 +9302,17 @@ befcheck	lda #>proctable	; set proctable address ($c400)
 -	sta ($20),y
 	iny
 	bne -
+	sty prstack	; reset index
 
 	ldx #$ff
 	jsr setsstart	; von programmstart
 --	ldy #0
 -	jsr inc20
 	lda $20		; ende erreicht?
-	cmp loaded	; $ae
+	cmp varstart	; $2d
 	bcc +
 	lda $21		; bis PRG-ende
-	cmp loaded+1	; $af
+	cmp varstart+1	; $2e
 	bcs fsende
 +	lda ($20),y	; nein, ist laufendes byte ein tsb token?
 	cmp #$64
@@ -9409,7 +9407,7 @@ bl01	jmp endsmb
 
 ; -----------------------------------------
 ;
-	!by 0,0,0,0
+	!by 0
 
 ; ----------------------------------------- bef D!POKE
 ;
