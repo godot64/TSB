@@ -1,12 +1,13 @@
 
 ; -----------------------------------------
 ;
-; TSB-HSG 1.03
+; TSB-HSG 1.04
 ;
 ; High-Speed-Grafik by W. Lohwasser, 1986
 ; 64'er Sonderheft 6/86
 ;
 ; TSB Version by A. Dettke, 2024
+; v1.04, 10.09.25, added identification (identify)
 ;
 ; -----------------------------------------
 
@@ -30,6 +31,7 @@ irqvec	= $0314	; irq vector
 brkvec	= $0316	; break vector
 endsmb	= $9567	; end simons basic command routine
 over2tsb	= $80eb	; tsb interpreter
+identify	= $c648	; flag for SMON
 bsout	= $ffd2	;($0326/ichrout) output vector, chrout
 
 ; -----------------------------------------
@@ -49,6 +51,7 @@ tsbhsg	jsr setinterpr
 	sty basic_end+1
 	lda #$80		; "set pixels" = default mode
 	sta mode
+	sta identify	; $80: HSG was here!
 	lda progz+1	; direct mode?
 	cmp #$02
 	beq +
@@ -105,7 +108,7 @@ cleargfx	ldx #$e0		; $e000,$e800
 	ldx #$08		; 8 mal
 	ldy #$00
 	tya
-ch0	sta $e800,y
+ch0	sta $e800,y	; all self mod
 ch1	sta $f000,y
 ch2	sta $f800,y
 ch3	sta $0000,y
@@ -770,13 +773,13 @@ c_split	cmp #$53		; "S"?
 	jmp $af08		; no, syntax error
 
 +	jsr chrget	; get next char (split lines)
-	jsr getraster	; get line for graphics on
+	jsr getrow	; get row for graphics on (min 0)
 	sta gfxon
-	jsr getraster	; get line for text on
+	jsr getrow	; get row for text on (max 25)
 	sta txton
 	rts
 
-getraster	jsr $aefd		; Komma?
+getrow	jsr $aefd		; Komma?
 	jsr $b79e		; getbyt (ab hier Grafik/Text)
 	txa
 	asl		; Textzeile anwählen (Syntax also geändert!!!)
@@ -784,7 +787,7 @@ getraster	jsr $aefd		; Komma?
 	asl
 	clc
 	adc #$2f; -8	; Das -8 ist, wenn man den Wertebereich 1-25 nutzen
-          		; will. Ohne -8 dann 0-24, je nachdem wie man den
+          		; will. Ohne -8 dann 0-25, je nachdem wie man den
 			; Parameter auslegt. Soll *ab* der Zeile oder soll
 			; *nach* der Zeile umgeschaltet werden?
 	cmp #248		; größer als 25?
@@ -888,8 +891,8 @@ hsgirq	lda $d019		; IRQ ausgelöst?
 std011	!byte $1b,$3b	; $d011
 std018	!byte $17,$0b	; $d018
 stdd00	!byte $97,$94	; $dd00
-gfxon	!byte $00		; line: graphics on
-txton	!byte $00		; line: text on
+gfxon	!byte $00		; row: graphics on
+txton	!byte $00		; row: text on
 toggle	!byte $00
 irqon	!byte $00
 tsbirq	!wo 0
@@ -944,7 +947,7 @@ commands	!tx "qinmhvcekbrsdpl"	; hsg command chars (15)
 
 ; -----------------------------------------
 
-cmdvecs	!wo c_combine	; q (combine: qa oder qo)
+cmdvecs	!wo c_combine	; q (combine: qa or qo)
 	!wo c_split	; i (is split, i0/1 split on/off)
 	!wo c_nrm		; n (normal screen = NRM)
 	!wo c_screen	; m (choose screen)
@@ -1583,14 +1586,14 @@ L7C09	clc
 
 c_combine	cmp #$41		; "a"?
 	bne +
-	lda #$31		; yes, set AND (..),y
+	lda #$31		; yes, set AND(..),y
 	bne ++
 
 +	cmp #$4f		; "o"?
 	beq +
 	jmp $af08		; no, syntax error
 
-+	lda #$11		; set ORA (..),y
++	lda #$11		; set ORA(..),y ($51=EOR!)
 ++	sta L7C48
 	jsr chrget	; proceed to next char in line (":" or $00)
 	lda #$00		; set screen addresses $4000 and $e000
@@ -1608,19 +1611,21 @@ c_combine	cmp #$41		; "a"?
 	sta pport
 	ldy #$00		; 32 pages
 	ldx #$20
--	lda ($57),y
-L7C48	and ($5a),y	; self mod
-	sta ($5a),y
+-	lda ($57),y	; get source
+L7C48	and ($5a),y	; self mod, combine with target
+	sta ($5a),y	; set target
 	iny
 	bne -
 	inc $58
 	inc $5b
-	inc $c2
+	inc $c2		; unused: discard!
 	dex
 	bne -
 	pla
 	sta pport
 	cli
-	jmp sete000
+	jmp sete000	; reset vector to bitmap ($c1/$c2)
 
 errnum	!by 0
+
+

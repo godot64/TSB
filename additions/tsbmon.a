@@ -1,9 +1,10 @@
 ; ###############################################################
 ; #                                                             #
-; #  TSB.MON 1.04	                                            #
+; #  TSB.MON 1.05	                                            #
 ; #                                                             #
 ; #  patched for TSB by Arndt Dettke,  2023.01.30               #
 ; #  enhanced by Claus Schlereth, 2023.01.31 and 2023.03.03     #
+; #  1.05: 10.09.2025, adapted to HSG                           #
 ; #                                                             #
 ; #  based on SMON RELOCATABLE SOURCE CODE                      #
 ; #  Version 1.1.4.007 (2023.01.14)                             #
@@ -16,20 +17,19 @@
 ; #  This version of the source code is under MIT License       #
 ; ###############################################################
 
-	neo	= 0
-
 ; ----------------------------------------- equates
 ; hidden commands (constants)
 
-	hck	= $27	; "'"
-	hcm	= $3a	; ":"
-	hcr	= $3b	; ";"
-	hcd	= $2c	; ","
+;	hck	= $27	; "'"
+;	hcm	= $3a	; ":"
+;	hcr	= $3b	; ";"
+;	hcd	= $2c	; ","
 
 ; used zero page addresses
 
+	pport	= $01
 	ramend_hi	= $38	; high byte of sys ram end
-	_01buff	= $41	; buffer for $01 zero page value used in ram under rom version
+;	_01buff	= $41	; buffer for $01 zero page value used in ram under rom version
 	flag	= $aa	; universal flag
 	adrcode	= $ab	; addressing code for assembler/disassembler
 	command	= $ac	; smon-command code
@@ -58,7 +58,7 @@
 ; addresses used from disk monitor:
 
 	savex	= $02c1	; temp storage for x- und y-register
-	tmptrck	= $02c2
+;	tmptrck	= $02c2
 	tmpsecto	= $02c3	; temp storage for track and sector
 	dcmdst	= $02d0	; disc command string
 	track	= $02d8
@@ -68,29 +68,27 @@
 	buf3	= $039c
 	buf4	= $03cc
 
+; tsb addresses:
 
-if neo=0 {
-; tsb:
-	tsbcols	= $83c9	; set tsb screen colors
-} else {
-; tsbneo:
-	tsbcols	= $8bb8
-}
+	tsbcols	= $8bb8	; set tsb screen colors
 
 ; all other:
+
 	irq_lo	= $0314	; vector: hardware irq interrupt address lo
 	irq_hi	= $0315	; vector: hardware irq interrupt address hi
 	brk_lo	= $0316	; vector: brk lo
 	brk_hi	= $0317	; vector: brk hi
-	loadvect	= $0330	; vector: kernal load
-	savevect	= $0332	; vector: kernal save
+;	loadvect	= $0330	; vector: kernal load
+;	savevect	= $0332	; vector: kernal save
 
-	warmstart	= $a474	; restart basic
+	ready	= $a474	; restart basic
+	befgrfx	= $ab28	; command GRAPHICS
 	add	= $bc49	; addition
 	intout	= $bdcd	; output positive integer in a/x
 	intout1	= $bdd1	; output positive integer in a/x
 	flpstr	= $bddd	; convert fac#1 to ascii string
 	diskbuf	= $c000
+	identify	= $c648	; hsg identifier (if $80)
 	vic_ctrl1	= $d011	; vic control register 1
 	border	= $d020	; border color
 	bkgrnd	= $d021	; background clor
@@ -164,70 +162,40 @@ setbrk	lda #<break	; set break-vector to program start
 ; 700f
 cmdtbl	!by $27,$23,$24,$25,$2c,$3a,$3b,$3d	; "'#$%,:;="
 	!by $3f,$41,$42,$43,$44,$46,$47,$49	; "?abcdfgi"
-	!by $4b,$4c,$4d,$4f,$50,$52,$53	; "klmoprs"
-	!by $54				; "t"
-	!by $56,$57,$58			; "vwx"
-	!by $5a				; "z"
+	!by $4b,$4c,$4d,$4f,$50,$52,$53,$54	; "klmoprst"
+	!by $56,$57,$58,$5a			; "tvwxz"
 	!by $00
 
 ; the command addresses:
 
-cmds	!by <tick-1	; ' 01
-	!by >tick-1
-	!by <befdec-1	; # 02
-	!by >befdec-1
-	!by <befhex-1	; $ 03
-	!by >befhex-1
-	!by <befbin-1	; % 04
-	!by >befbin-1
-	!by <comma-1	; , 05
-	!by >comma-1
-	!by <colon-1	; : 06
-	!by >colon-1
-	!by <semis-1	; ; 07
-	!by >semis-1
-	!by <comp-1	; = 08
-	!by >comp-1
-	!by <addsub-1	; ? 09
-	!by >addsub-1
-	!by <assembler-1	; a 0a
-	!by >assembler-1
-	!by <basicdata-1	; b 0b
-	!by >basicdata-1
-	!by <convert-1	; c 0c
-	!by >convert-1
-	!by <disass-1	; d 0d
-	!by >disass-1
-	!by <find-1	; f 0f
-	!by >find-1
-	!by <go-1		; g 10
-	!by >go-1
-	!by <ioset-1	; i 11
-	!by >ioset-1
-	!by <kontrolle-1	; k 12
-	!by >kontrolle-1
-	!by <loadsave-1	; l 13
-	!by >loadsave-1
-	!by <memdump-1	; m 14
-	!by >memdump-1
-	!by <occupy-1	; o 15
-	!by >occupy-1
-	!by <setprinter-1	; p 16
-	!by >setprinter-1
-	!by <register-1	; r 17
-	!by >register-1
-	!by <loadsave-1	; s 18
-	!by >loadsave-1
-	!by <trace-1	; t 19
-	!by >trace-1
-	!by <verschieb-1	; v 1a
-	!by >verschieb-1
-	!by <write-1	; w 1b
-	!by >write-1
-	!by <exit-1	; x 1c
-	!by >exit-1
-	!by <dmon-1	; z 1d
-	!by >dmon-1
+cmds	!wo tick-1	; ' 01
+	!wo befdec-1	; # 02
+	!wo befhex-1	; $ 03
+	!wo befbin-1	; % 04
+	!wo comma-1	; , 05
+	!wo colon-1	; : 06
+	!wo semis-1	; ; 07
+	!wo comp-1	; = 08
+	!wo addsub-1	; ? 09
+	!wo assembler-1	; a 0a
+	!wo basicdata-1	; b 0b
+	!wo convert-1	; c 0c
+	!wo disass-1	; d 0d
+	!wo find-1	; f 0f
+	!wo go-1		; g 10
+	!wo ioset-1	; i 11
+	!wo kontrolle-1	; k 12
+	!wo loadsave-1	; l 13
+	!wo memdump-1	; m 14
+	!wo occupy-1	; o 15
+	!wo setprinter-1	; p 16
+	!wo register-1	; r 17
+	!wo loadsave-1	; s 18
+	!wo trace-1	; t 19
+	!wo verschieb-1	; v 1a
+	!wo write-1	; w 1b
+	!wo exit-1	; x 1c
+	!wo dmon-1	; z 1d
 
 ; -----------------------------------------
 ; 7064
@@ -238,12 +206,11 @@ findflg:    !by $80,$20,$40,$10,$00
 findflg1:   !by $02,$01,$01,$02,$00
 
 ; code for generating basic lines:
-sys172	!by $91,$91,$0d
-	!by $53,$d9,$31,$37,$32,$0d   ; "sy172."
+sys172	!by $91,$91,$0d		; 2x crsr up,return
+	!by $53,$d9,$31,$37,$32,$0d   ; "sY172", return
 datatab	!by $00,$7d		; basic line number 32000
 	!by $4c			; jmp dataloop
-	!by <dataloop
-basjmp	!by >dataloop
+	!wo dataloop
 
 ; the register header:
 reghead	!by $0d,$0d,$20,$2d,$50,$43,$2d,$20	; ".. -pc- "
@@ -255,6 +222,7 @@ reghead	!by $0d,$0d,$20,$2d,$50,$43,$2d,$20	; ".. -pc- "
 lc0ac	!by $00,$02,$04
 lc0af	!by $01,$2c,$00
 lc0b2	!by $2c,$59,$29
+
 lc0b5	!by $58,$9d,$1f,$ff,$1c,$1c,$1f,$1f
 	!by $1f,$1c,$df,$1c,$1f,$df,$ff,$ff
 	!by $03
@@ -269,11 +237,10 @@ lc0ea	!by $00,$40,$40,$80,$80,$20,$10,$25
 	!by $08
 lc0fb	!by $08,$e7,$e7,$e7,$e7,$e3,$e3,$e3
 	!by $e3,$e3,$e3,$e3,$e3,$e3,$e3,$e7
-	!by $a7,$e7,$e7,$f3,$f3,$f7
-lc111	!by $df
+	!by $a7,$e7,$e7,$f3,$f3,$f7,$df
 
 ; --------- 6510 commands -----------------------------------
-lc112: 	!by $26,$46,$06,$66,$41,$81,$e1,$01	;rol,lsr,asl,....
+opcodes 	!by $26,$46,$06,$66,$41,$81,$e1,$01	;rol,lsr,asl,....
 	!by $a0,$a2,$a1,$c1,$21,$61,$84,$86
 	!by $e6,$c6,$e0,$c0,$24,$4c,$20,$90
 	!by $b0,$f0,$30,$d0,$10,$50,$70,$78
@@ -376,9 +343,9 @@ get2adr	jsr getadr1
 getadr1	ldx #$fb		; points to pcl
 ;
 getadr	jsr getbyt	; get address
-	sta $01,x		; store according to .x
+	sta pport,x	; store according to .x
 	jsr getbyt1
-	sta $00,x
+	sta pport-1,x
 	inx
 	inx
 	rts
@@ -466,7 +433,7 @@ cmdstore	sta command	; store command
 
 ; --------- check user input --------------------------------
 ; 72fe
-cmdsearch	cmp cmdtbl-1,x	; compare users char
+cmdsearch	cmp cmdtbl-1,x	; compare user's char
 	beq cmdfound	; matched
 	dex
 	bne cmdsearch	; repeat compare
@@ -549,14 +516,18 @@ pcrts	rts
 ; --------- exit (x) ----------------------------------------
 ; -----------------------------------------
 ; 7367
-exit	jsr tsbcols
-	lda #$00		; restore
-	sta color		; system
-	lda #$37		; default rom-config
-	sta $01
+exit	jsr tsbcols	; returns .a=0
+	ldx #$36
+	stx pport
+	ldx identify
+	cpx #$80		; HSG was here?
+	bne +
+	sta identify	; yes, restore
+	jmp befgrfx
++	inc pport		; no, default rom-config
 	ldx spsave	; restore stack
 	txs
-	jmp warmstart	; basic warmstart
+	jmp ready		; basic warmstart
 
 ; -----------------------------------------
 ; --------- register (r) ------------------------------------
@@ -780,14 +751,14 @@ lc4e3	cmp lc14a-1,x
 	dex
 	bne lc4e3
 	ldx #$38
-lc4f2	cmp lc111,x
+lc4f2	cmp opcodes-1,x
 	beq lc50b
 	dex
 	cpx #$16
 	bne lc4f2
 lc4fc	lda (pcl),y
 	and lc0fb,x
-	eor lc111,x
+	eor opcodes-1,x
 	beq lc50b
 	dex
 	bne lc4fc
@@ -861,15 +832,15 @@ lc564	jsr lc58c		; output one line
 	cmp #$21		; compare with "brk"
 	bne lc586
 
-lc576	jsr printer1
+lc576	jsr printer1	; print one line with "-"
 ; 757d
 ; here the bounding line after 'jmp','rts' and 'brk' will be printed
 !ifdef bndline {
 	jsr return	; next line
-	ldx #$23		; amount of bounding line chars
+	ldx #$23		; amount of bounding line chars (35)
 	lda #$2d		; load with '-'
 lc580	jsr chrout	; print char
-	dex			; dec amount
+	dex		; dec amount
 	bne lc580		; not last
 }
 ; end printing bounding line
@@ -908,7 +879,7 @@ spcoc	lda #$20		; output opcode with leading space
 	ldy #$00
 	ldx befcode
 lc5c7	bne lc5da
-lc5c9	ldx #$03
+	ldx #$03
 lc5cb	lda #$2a		; show "***" (unknown code)
 	jsr chrout
 	dex
@@ -943,7 +914,7 @@ lc607	lda lc15c-1,x
 	lda lc194-1,x
 	jsr chrout
 	lda lc1cc-1,x
-lc616	jsr chrout
+	jsr chrout
 	lda #$20
 	bit adrcode
 	beq lc622
@@ -1164,7 +1135,7 @@ lc788	lda $a7
 	lda $a8
 	cmp lc1cc-1,x
 	bne lc783
-	lda lc111,x
+	lda opcodes-1,x
 	sta befcode
 	jsr lc6a1
 	ldy #$00
@@ -1264,7 +1235,7 @@ lserror	jmp error
 ; -----------------------------------------
 ; 784e
 loadsave	ldy #$02
-	sty $bc		; name at $0201
+	sty $bc		; name to $0201
 	dey
 	sty $b9		; sa: 1
 	sty $bb
@@ -1355,15 +1326,15 @@ lc8c5	sty pch
 lc8e8	jsr hexout	; output as 4 digit hex
 lc8eb	jsr space		; output space
 	ldx #$90
-	lda $01
+	lda pport
 	sta mem
 	lda #$37
-	sta $01
+	sta pport
 	plp
 	jsr add
 	jsr flpstr
 	ldx mem
-	stx $01
+	stx pport
 	jmp print
 
 ; -----------------------------------------
@@ -1443,7 +1414,7 @@ lc948	sta $fd
 ; 796c
 basicdata	jsr get2adr
 	lda #$37
-	sta $01
+	sta pport
 	ldx #$04
 lc975	lda datatab,x
 	sta flag,x
@@ -2062,7 +2033,7 @@ lce08	rts
 dmon	lda #$07
 	sta border
 	lda #$36
-	sta $01
+	sta pport
 	ldx #$00
 lce14	lda lcfe4,x
 	sta dcmdst,x
@@ -2136,7 +2107,7 @@ lce9a	ldx #$00		; r
 	sta tmpsecto	; save track
 	inx
 	lda diskbuf,x	; save sector
-	sta $02c4
+	sta tmpsecto+1
 	txa
 	jmp lcecb
 ; 7ea8			read
@@ -2147,7 +2118,7 @@ lcead	jsr getret	; check for return
 lceb5	jsr getbyt	; input  track
 	sta tmpsecto
 	jsr getbyt	; input sector
-	sta $02c4
+	sta tmpsecto+1
 	jsr lcf55		; open "#"
 	lda savex
 	cmp #$02		; r or w?
@@ -2191,7 +2162,7 @@ lcf0d	sta $02d1
 	jsr lcf79
 	stx track
 	sta $02d9
-	lda $02c4
+	lda tmpsecto+1
 	jsr lcf79
 	stx secto
 	sta secto+1
@@ -2287,7 +2258,7 @@ lcfbc	lda #$0d
 lcfc6	lda #$06
 	sta border
 	lda #$37
-	sta $01
+	sta pport
 	jmp execute	; go back, wait for next input
 
 ; -----------------------------------------
@@ -2296,18 +2267,12 @@ lcfd2	!by $3a,$52,$57,$4d,$58	; ":rwmx" , new floppy commands
 ; 7fd1
 	!by $40		; "@"   used in normal fmon mode
 ; 7fd2
-lcfd8	!by <lce73-1
-	!by >lce73-1
-	!by <lcead-1
-	!by >lcead-1
-	!by <lcead-1
-	!by >lcead-1
-	!by <lce49-1
-	!by >lce49-1
-	!by <lcfc6-1
-	!by >lcfc6-1
-	!by <dcf85	; address for normal fmon command
-	!by >dcf85
+lcfd8	!wo lce73-1
+	!wo lcead-1
+	!wo lcead-1
+	!wo lce49-1
+	!wo lcfc6-1
+	!wo dcf85		; address for normal fmon command
 ; 7fde
 lcfe4	!by $55,$31,$3a,$31,$33,$20,$30,$20	; "u1:13 0 "
 	!by $31,$38,$20,$30,$30		; "18 00"
@@ -2316,8 +2281,6 @@ lcff1	!by $23				; "#"
 ; 7fec
 dcff2	!by $42,$2d,$50,$20,$31,$33,$20,$30	; "b-p 13 0"
 
-; 7ff1
-ver	!tx "1.04"
 ; -----------------------------------------------------------
 ; --------- end fcom/fmon part ------------------------------
 ; -----------------------------------------------------------
