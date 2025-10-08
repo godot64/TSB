@@ -1,0 +1,765 @@
+
+; -----------------------------------------
+;
+; Reactor 64 für TSB
+; Original von C. von der Lippe, 1984
+;
+; Maschinensprache-Teil
+; enthält das eigentliche Spiel,
+; steuert die Sonde, die Neutronen und das Proton
+; und alles, was damit zusammenhängt (Ereignisse, Zähler)
+; Aufruf mit SYS ga in Basic-Zeile 10090
+;
+; Optimierte Routinen (150 Bytes Einsparung)
+; von Arndt Dettke, 2025
+;
+; -----------------------------------------
+
+	*= $7a00
+
+; ----------------------------------------- Declarations
+
+	gamestate	= $02	; rückmelde-adresse, kann von basic aus 1 oder 8 enthalten
+	what	= $033c	; hindernisse
+	t_counter	= $03cd	; timer calls (when 5, dec time column)
+	timer	= $03ce	; zähler
+	stasis	= $03cf	; zähler
+	proton_on	= $03d0	; status of proton (0: aus, 1: an)
+	touched	= $03d1	; wall touched
+	walls	= $03d2	; bits 0..3: neutralized walls of reactor
+	n_busy	= $03d4	; neutralizing, but not yet finished all walls
+
+; ----------------------------------------- Game
+
+game	lda #$00		; init all
+	sta gamestate
+	sta t_counter
+	sta timer
+	sta stasis
+	sta touched
+	sta walls
+	sta n_busy
+
+; ----------------------------------------- Main Loop
+
+loop	jsr joystick	; joystick bewegt?
+	bcc +
+
+	jsr neutrons	; nein, neutronen bewegen
+	jsr time_run	; zeitsäule erniedrigen
+	jsr proton	; wenn proton aktiv: bewegen
+
++	jsr chk_track	; check, ob sonde auf etwas trifft
+	jsr cherenkov	; flimmern des reaktorkerns
+	jsr powered	; sonde flimmert, wenn reaktorkern berührt
+	jsr retouch	; nach wandungsberührung flag kurz offenhalten
+
+	lda gamestate	; hat es einen vorfall gegeben?
+	beq loop		; nein, loop
+	jmp n_tralize	; ja, reaktorwandung neutralisieren, dann loop/finish
+
+; ----------------------------------------- Neutronen
+
+neutrons	lda #$00		; vektor auf $cc00 (spielfeld)
+	sta $fb
+	lda #$cc
+	sta $fc
+
+n_loop	lda $fc		; loop für die neutronenbewegung
+	sta $fe		; zwei zeiger: aktuelles zeichen, nächstes zeichen
+
+	ldx #$00		; zeichen dort neutron? (zeichen @ bis g)
+	lda ($fb,x)
+	cmp #$40		; @ oder größer?
+	bcs +
+	jmp n_cont	; nein, kleiner, weiter bewegen
+
++	cmp #$50		; kleiner als p?
+	bcc +
+	jmp n_cont	; nein, größer (also reaktorwandung usw.)
+
++	cmp #$4c		; 76 (l):
+	bcc +
+	sbc #$08		; größer, minus 8 ($44: d) (nach links)
+	sta ($fb,x)
+	jmp n_cont
+
+; ----------------------------------------- bewegung
+
++	cmp #$40		; @ (neutron 1)?
+	bne +
+	sec		; ja, position  minus 41 (oben links)
+	lda $fb
+	sbc #$29
+	jmp n_cont0
+
++	cmp #$41		; a (neutron 2)?
+	bne +
+	sec
+	lda $fb
+	sbc #$28		; minus 40 (oben)
+	jmp n_cont0
+
++	cmp #$42		; b (neutron 3)?
+	bne +
+	sec
+	lda $fb
+	sbc #$27		; minus 39 (oben rechts)
+	jmp n_cont0
+
++	cmp #$43		; c (neutron 4)?
+	bne +
+	sec
+	lda $fb
+	sbc #$01		; minus 1 (links)
+	jmp n_cont0
+
++	cmp #$44		; d (neutron 5)?
+	bne ++
+	lda #$4c
+	sta ($fb,x)
+	clc
+	lda $fb
+	adc #$01		; plus 1 (rechts)
+	jmp n_cont1
+
+++	cmp #$45		; e (neutron 6)?
+	bne ++
+	lda #$4d
+	sta ($fb,x)
+	clc
+	lda $fb
+	adc #$27		; plus 39 (unten links)
+	jmp n_cont1
+
+++	cmp #$46		; f (neutron 7)?
+	bne ++
+	lda #$4e
+	sta ($fb,x)
+	clc
+	lda $fb
+	adc #$28		; plus 40 (unten)
+	jmp n_cont1
+
+++	cmp #$47		; g (neutron 8)?
+	bne n_cont
+	lda #$4f
+	sta ($fb,x)
+	clc
+	lda $fb
+	adc #$29		; plus 41 (rechts unten)
+	jmp n_cont1
+
+n_cont0	sta $fd
+	bcs +
+	dec $fe
+	jmp +
+
+n_cont1	sta $fd
+	bcc +
+	inc $fe
++	jsr chgdir
+
+n_cont	inc $fb		; weiter
+	bne +
+	inc $fc
++	lda $fc
+	cmp #$cf		; spielfeld durch (hi)?
+	beq +
+	jmp n_loop
+
++	lda $fb
+	cmp #$e7		; spielfeld durch (lo)?
+	beq +
+	jmp n_loop
+
++	rts		; ja, zurück
+
+; ----------------------------------------- Change Direction of Neutron
+
+chgdir	lda ($fd,x)	; leerzeichen? (kein hindernis)
+	cmp #$20
+	beq ++		; ja, weiterbewegen
+
+	ldy #$00		; nein, richtung wechseln, zuerst sound
+	sty $d40b
+	ldy #$21
+	sty $d40b
+	lda ($fb,x)	; zeichen holen, nächstes anwählen
+	clc
+	adc #$01
+	cmp #$48		; neutron-liste überschritten?
+	bne +
+-	lda #$40		; wenn ja, dann bei ersten eintrag wieder anfangen
++	cmp #$50
+	beq -
+	sta ($fb,x)
+	rts
+
+++	lda ($fb,x)	; aktuelles neutron eins weiterrücken
+	sta ($fd,x)
+	lda #$20		; (und durch space ersetzen)
+	sta ($fb,x)
+	rts
+
+; ----------------------------------------- Joystick
+
+joystick	lda $dc00
+	and $dc01
+	sta $fb		; up?
+	and #$01
+	cmp #$01
+	beq +
+	lda $d001		; Y - 8
+	sec
+	sbc #$08
+	sta $d001
++	lda $fb		; down?
+	and #$02
+	cmp #$02
+	beq +
+	lda $d001		; Y + 8
+	clc
+	adc #$08
+	sta $d001
++	lda $fb		; left?
+	and #$04
+	cmp #$04
+	beq +
+	lda $d000		; X - 8
+	sec
+	sbc #$08
+	sta $d000
++	lda $fb		; right?
+	and #$08
+	cmp #$08
+	beq +
+	lda $d000		; X + 8
+	clc
+	adc #$08
+	sta $d000
++	lda $fb		; fire?
+	and #$10
+	cmp #$10
+	bne +
+	sec		; nein, nichts davon (carry an)
+	rts
+
+; ----------------------------------------- Stasis erniedrigen
+
++	lda #$00		; fire: stasis-säule erniedrigen
+	sta $fb
+	lda #$e6		; vektor auf $e600 (zeichen ab 192: stasis-säule)
+	sta $fc
+	ldy stasis
+	cpy #$68		; 104?
+	bne +
+	rts		; ja (carry an)
+
++	lda #$00		; nein, $e600: 4 linien löschen (halbes zeichen)
+	sta ($fb),y
+	iny
+	sta ($fb),y
+	iny
+	sta ($fb),y
+	iny
+	sta ($fb),y
+	iny
+	sty stasis	; letzte position merken
+	tay
+-	iny		; wait a little:
+	bne -
+	clc
+	adc #$01		; 40 mal 256 zählen
+	cmp #$28
+	bne -
+	clc
+	rts
+
+; ----------------------------------------- Check Track
+
+chk_track	lda #$cc		; vector auf $ccxx
+	sta $fc
+	lda $d000		; (X - 24) / 8 = lo (sonde)
+	sec
+	sbc #$18
+	lsr
+	lsr
+	lsr
+	sta $fb
+	lda $d001		; (Y - 48) / 8 -> .y
+	sec
+	sbc #$30
+	lsr
+	lsr
+	lsr
+	tay
+
+-	cpy #$00		; .y mal
+	beq +
+	dey
+	lda $fb		; X + 40 (down)
+	clc
+	adc #$28
+	sta $fb
+	bcc -
+	inc $fc
+	bcs -		; uncond. branch
+
++	lda ($fb,x)	; was liegt im weg?
+	jsr chkcrash	; checken
+	ldy #$01
+	lda ($fb),y
+	jsr chkcrash
+	ldy #$28		; 40
+	lda ($fb),y
+	jsr chkcrash
+	ldy #$29		; 41
+	lda ($fb),y
+	jsr chkcrash
+	rts
+
+; ----------------------------------------- Check for Crash
+
+chkcrash	cmp #$20		; space: keine gefahr
+	beq +
+	cmp #$60		; sondenstartplatz: keine gefahr
+	beq +
+
+	sta what		; sonst: hinderniszeichen merken
+	lda gamestate	; und crash-flag an
+	ora #$02
+	sta gamestate
++	rts
+
+; ----------------------------------------- Kernflimmern
+
+cherenkov	inc $d028		; sprite 1 (reaktorkern): Farbe erhöhen
+	ldy $cff9
+	dey
+	bne +
+	ldy #$03		; 3 spriteblöcke rückwärts abwechseln
++	sty $cff9		; (kernflimmern)
+	rts
+
+; ----------------------------------------- Zeitsäule
+
+time_run	jsr time_short	; achtung, zeit läuft ab
+	lda #$20		; vektor auf $e320 (zeichen ab 100: time)
+	sta $fb
+	lda #$e3
+	sta $fc
+
+	ldy t_counter	; bei jedem 5. aufruf:
+	iny
+	cpy #$05
+	beq +
+	sty t_counter
+	rts
+
++	ldy #$00		; zähler wieder auf null
+	sty t_counter
+	tya
+	ldy timer		; time säule um einen strich erniedrigen
+	sta ($fb),y
+	iny
+	sty timer
+	cpy #$9f		 ; bis 159 (160: 20*8 striche)
+	bne +
+
+	lda gamestate	; zeit abgelaufen: flag setzen ("china syndrom")
+	ora #$01
+	sta gamestate
+
++	lda n_busy
+	cmp #$01
+	bne +
+	rts
+
++	lda #$00		; sid 3 aus
+	sta $d412
+	rts
+
+; ----------------------------------------- Time runs out
+
+time_short
+	ldy timer
+	cpy #$87		; bis 135
+	bcs +
+	rts
+
++	lda #$34		; sid 3 rechteck (pulse?): warnton
+	sta $d40f
+	lda #$41
+	sta $d412
+	rts
+
+; ----------------------------------------- Proton bewegen
+
+proton	lda proton_on	; proton aktiv?
+	cmp #$01
+	beq +
+	rts
+
++	lda $d006		; ja, sprite 3 (proton): X - 2
+	cmp $d000
+	beq ++
+	bcc +
+	sbc #$02
+	sta $d006
+	jmp ++
+
++	adc #$02		; X + 2
+	sta $d006
+++	lda $d007		; Y - 2
+	cmp $d001
+	beq ++
+	bcc +
+	sbc #$02
+	sta $d007
+	jmp ++
+
++	adc #$02		; Y + 2
+	sta $d007
+
+++	ldy $cffb		; sprite-block erhöhen (proton rotiert)
+	iny
+	cpy #$08
+	bne +
+	ldy #$05
++	sty $cffb
+	inc $d024		; ??? bgr 3 erhöhen
+	lda $d006		; proton: X / 16
+	lsr
+	lsr
+	lsr
+	lsr
+	sta $fb
+	lda $d000		; sonde: X / 16
+	lsr
+	lsr
+	lsr
+	lsr
+	cmp $fb		; gleich?
+	beq +
+	rts
+
++	lda $d007		; ja, proton: Y / 16
+	lsr
+	lsr
+	lsr
+	lsr
+	sta $fb
+	lda $d001		; proton: Y / 16
+	lsr
+	lsr
+	lsr
+	lsr
+	cmp $fb		; gleich?
+	beq +
+	rts
+
++	lda gamestate	; ja, proton-crash, flag setzen
+	ora #$04
+	sta gamestate
+	rts
+
+; ----------------------------------------- Sonde hat kernwandung berührt
+
+powered	lda touched	; wandung wurde berührt?
+	cmp #$01
+	bne +
+	inc $d027		; ja, sprite 0 (sonde): Farbe erhöhen
++	rts
+
+; -----------------------------------------
+
+retouch	lda n_busy	; neutralisierung im gange?
+	cmp #$01
+	beq +
+	rts
+
++	inc $03d3		; ja, zählen
+	inc $03d3
+	lda $03d3
+	cmp #$60		; 96? (48 mal gezählt)
+	beq +
+	sta $d40f		; dann sid 3: ton erhöhen
+	rts
+
++	lda #$00		; sonst:
+	sta n_busy
+	sta $d412		; sid 3 aus
+	rts
+
+; ----------------------------------------- Reaktor neutralisieren
+
+n_tralize	lda gamestate	; gecrasht?
+	cmp #$02
+	beq +
+	jmp finished	; nein, weiter
+
++	lda what		; ja, womit?
+	cmp #$58		; mit 88? ("x") unsichtbares zeichen
+	bne +
+
+	lda #$01		; ja, merken
+	sta touched
+	lda #$00		; crash zurücksetzen
+	sta gamestate
+	jmp loop		; spiel fortsetzen
+
++	lda touched	; bereits etwas berührt?
+	cmp #$01
+	beq +
+	jmp finished	; nein, weiter
+
++	lda what		; ja, mit was?
+	cmp #$5a		; mit 90: reaktormantel links oben?
+	bne ++
+
+	lda #$01		; dann weiß färben (reaktormantel links oben)
+	sta $d94e
+	sta $d975
+	sta $d99c
+	sta $d9c3
+	lda $d000		; X - 8 (sofort sonde vom reaktor lösen)
+	sec
+	sbc #$08
+	sta $d000
+
+	lda $d001
+	sec
+	sbc #8
+	sta $d001
+
+	lda walls		; erstes stück geschafft (links oben)
+	ora #$01
+	sta walls
+	bne aw1		; uncond. branch
+
+; -----------------------------------------
+
+++	cmp #$5b		; 91: reaktormantel links unten?
+	bne ++
+
+	lda #$01		; weiß färben (reaktormantel links unten)
+	sta $d9eb
+	sta $da14
+	sta $da3d
+	sta $da66
+	lda $d000		; X - 8 (sonde vom mantel lösen)
+	sec
+	sbc #$08
+	sta $d000
+	lda $d001		; Y + 8
+	clc
+	adc #$08
+	sta $d001
+
+	lda walls		; zweites stück geschafft (links unten)
+	ora #$02
+	sta walls
+aw1	bne allwalls	; uncond. branch
+
+; -----------------------------------------
+
+++	cmp #$5c		; 92? rechts oben
+	bne ++
+
+	lda #$01		; weiß färben (reaktormantel rechts oben)
+	sta $d94f
+	sta $d978
+	sta $d9a1
+	sta $d9ca
+	lda $d000		; X + 8 (sonde vom mantel lösen)
+	clc
+	adc #$08
+	sta $d000
+	lda $d001		; Y - 8
+	sec
+	sbc #$08
+	sta $d001
+
+	lda walls		; drittes stück geschafft (rechts oben)
+	ora #$04
+	sta walls
+	bne allwalls	; uncond. branch
+
+; -----------------------------------------
+
+++	cmp #$5d		; 93? rechts unten
+	bne finished
+
+	lda #$01		; weiß färben (reaktormantel rechts unten)
+	sta $d9f2
+	sta $da19
+	sta $da40
+	sta $da67
+	lda $d000		; X + 8 (sonde vom mantel lösen)
+	clc
+	adc #$08
+	sta $d000
+	lda $d001		; Y + 8
+	clc
+	adc #$08
+	sta $d001
+
+	lda walls		; viertes stück geschafft (rechts unten)
+	ora #$08
+	sta walls
+
+allwalls	cmp #$0f		; jetzt alle?
+	bne move_on
+	lda #$08		; ja, level geschafft: 8 -> 02
+	sta gamestate
+	bne finished	; weiter
+
+; ----------------------------------------- spiel fortsetzen
+
+move_on	lda #$00		; sid 3: ton aus
+	sta $d40f
+	sta $03d3		; retouchzähler aus
+	lda #$41		; sid 3: retouch-ton auf anfang
+	sta $d412
+
+	lda #$01		; kern noch nicht neutralisiert, aber begonnen
+	sta n_busy
+	lda #$00		; game-status auf 0
+	sta gamestate
+	sta touched	; touched: aus
+	lda #$0a		; sprite 0 (sonde): hellrot
+	sta $d027
+	jmp loop		; zurück in den loop
+
+; ----------------------------------------- finished
+
+finished	lda gamestate	; Reaktor komplett neutralisiert?
+	cmp #$08
+	bne +
+	rts		; ja, zurück nach basic
+
++	cmp #$01		; nein, zeit abgelaufen?
+	bne +
+
+	jmp china		; ja, china syndrom, zurück nach basic
+
+; ----------------------------------------- Explosion
+
++	lda #$81		; nein, crash explosion
+	sta $d404
+	lda #$0c		; sid 1: filter, rauschen
+	sta $d418
+	lda #$00		; sid 2: aus
+	sta $d40b
+	sta $d412
+	lda $d000		; sprite 0 (sonde)  X ->
+	sta $d008		; sprite 4 (explos 1)
+	sta $d00a		; sprite 5 (explos 2)
+	sta $d00c		; sprite 6 (explos 3)
+	sta $d00e		; sprite 7 (explos 4)
+	lda $d001		; Y: dito ->
+	sta $d009
+	sta $d00b
+	sta $d00d
+	sta $d00f
+
+	lda #$08		; spriteblock 8 für sprite 0
+	sta $cff8
+
+	ldy #$00
+
+---	inc $d027		; sprite 0 (sonde): farbe erhöhen
+	dec $d008		; sprite 4 (exlosion) bewegen
+	dec $d009
+	inc $d00a		; sprite 5
+	dec $d00b
+	dec $d00c		; sprite 6
+	inc $d00d
+	inc $d00e		; sprite 7
+	inc $d00f
+
+	lda $d011		; screen wackeln lassen
+	sbc #$01
+	and #$07
+	ora #$98
+	sta $d011
+	lda $d016
+	adc #$01
+	and #$07
+	ora #$c8
+	sta $d016
+	cpy #$28		; 40. mal?
+	bne +
+	inc $cff8		; ja, nächster spriteblock
+
++	cpy #$50		; nein, 80. mal?
+	bne +
+	inc $cff8		; ja, nächster spriteblock
+
++	lda #$10
+--	ldx #$00		; wait a little
+-	inx
+	nop
+	bne -
+	sec
+	sbc #$01
+	cmp #$00
+	bne --
+	iny		; bis .y=128
+	cpy #$80
+	bne ---
+
+	lda #$9b		; screen wieder ruhig
+	sta $d011
+	lda #$c8
+	sta $d016
+	lda #$00		; sid 1 aus
+	sta $d404
+	lda $d015
+	and #$0f		; filter aus
+	sta $d015
+	rts		; zurück nach basic
+
+; ----------------------------------------- China Syndrome
+
+china	lda #$81		; sid 1: rauschen
+	sta $d404
+	lda #$0f
+	sta $d418
+	lda #$11
+	sta $d412
+	sta $d40b
+
+	ldy #$05		; 5 mal:
+
+---	lda #$00
+--	ldx #$00
+-	inc $d020		; screen blinkt
+	inc $d021
+	inc $d408
+	inc $d40f
+	inx
+	bne -
+	stx $d40b		; .x=0
+	ldx #$11
+	stx $d40b
+	clc
+	adc #$01		; 255 mal
+	cmp #$ff
+	bne --
+	lda #$00
+	sta $d404
+	lda #$81
+	sta $d404
+
+	dey
+	bne ---
+
+	tya		; screen schwarz
+	sta $d020
+	sta $d021
+	sta $d40b		; sid 1 aus
+	sta $d404
+	sta $d412
+	rts		; zurück nach basic
