@@ -1,10 +1,10 @@
 ; -----------------------------
-; Magic Desk CRT Launcher 1.00
+; Magic Desk CRT Launcher 1.01
 ; by Peter Alexander aka @td1334
 ; minor modifications by A. Dettke
 ; -----------------------------
 ;
-; start file of cartridge
+; start file of TSB cartridge
 ;
 ; -----------------------------
 
@@ -71,28 +71,30 @@ launcher	sei
 ;	BANK_PTRH	= $fd
 
 ;-----------------------------------
-; Hilfroutine ab $0100 welche tsbneo
+; Hilfsroutine ab $0100, welche tsbneo
 ; aus dem Modul ins Ram kopiert
 ;-----------------------------------
 
 .startcopy
 !pseudopc $0100  {		; transfer
 
-	lda #0
+	lda $02		; save $02	### 1.01
+	pha
+	lda #0		; bank indicator
 	sta $02
 	ldx #0
 	ldy #0
--	lda ($03,x)
-	sta ($05),y
+-	lda ($03,x)	; source
+	sta ($05),y	; destination
 	inc $03
 	bne +
 	inc $04
 	lda $04
-	cmp #$a0		; after $2000 bytes
+	cmp #$a0		; after $2000 bytes...
 	bne +
 	lda #$80
 	sta $04
-	inc $02		; next bank, next $2000 bytes
+	inc $02		; ...next bank, next $2000 bytes
 	lda $02
 	sta $de00
 +	iny
@@ -108,6 +110,8 @@ launcher	sei
 ;	ldy #$70
 ;	jsr $c9cf		; preload "tsb.mon"
 
+	pla		; restore $02	### 1.01
+	sta $02
 	jmp ($8000)	; start TSB
 }
 !realpc
@@ -119,14 +123,15 @@ launcher	sei
 ;
 ; -----------------------------
 
-mainprg	!bin "tsbneo.prg",,2
+mainprg	!bin "tsbneo.prg",,2	; bank 0
 	!align 8191,0
-	!bin "tsb.mem.prg",,2
-	!bin "tsb.hsg.prg",,2
+	!bin "tsb.mem.prg",,2	; bank 3, $80
+	!bin "tsb.hsg.prg",,2	; bank 3, $84
 	!align 255,0
-	!bin "tsb.mon.prg",,2
+	!bin "tsb.mon.prg",,2	; bank 3, $90
 	free = $10000-(*)
 	!fill free,$ff
-	!bin "tsb.ext.prg",,2
+	!bin "tsb.ext.prg",,2	; bank 4, $80
+	!align 255,0		; ### 1.01
 
 ; -----------------------------
