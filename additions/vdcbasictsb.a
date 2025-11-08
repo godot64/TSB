@@ -1,38 +1,33 @@
 ; -----------------------------------------
 ;
-; vdcbasic_tsb v2c
+; vdcbasic_tsb
 ; by GoDot (12 Jan 2024)
-; adapted from Goodwell's version of VDCBasic 2c (2023)
+; adapted from Goodwell's version of VDCBasic 2f (2025)
 ; by Mac Bacon (2013) and originally by Felix 'skOi!nk' Rosenhahn (2003)
 ; adapted to TSB for the C128's C64 mode
 ;
 ; v1.05 (04 Feb 2024)
+; v1.06 (16 Oct 2025)
 ;
 ; -----------------------------------------
-
-!src "vdclib.a"		; macros and code parts (by ACME)
-!src "opcodes.a"		; for AND/ORA self-mods (by ACME)
-!src "x_TSB.lib"		; calls to TSB (by GoDot)
 
 ; -----------------------------------------
 ; Zuweisungen
 
-	MODIFIED8		= $ff	; dummy value
-	FST_FE_TOKEN	= $27	; BASIC 7 commands beyond  $fe $27
-	FST_CE_TOKEN	= $0b	; BASIC 7 functions beyond $ce $0b
-	commstart		= FST_FE_TOKEN-1
-	funcstart		= FST_CE_TOKEN-1
-
 	pport	= $01	; Processor Port
 	int	= $14
 	linnum	= $20	; uint16 for POKE, PEEK(), etc.
+	offset_1	= $26
 	prgindex	= $7a
+	arg_add	= $a4	; word
+	str_add	= $a6	; word
 	helpvec	= $b0	; TSB's temporary variables ($b0..$b5)
-	arg1	= $b0	; actually tape and rs232 vars
-	arg2	= $b2
-	arg3	= $b4
-	arg4	= $a8
-	arg5	= $a9
+	arg1	= $b0	; word, actually tape and rs232 vars
+	arg2	= $b2	; word
+	arg3	= $b4	; word
+	arg4	= $a8	; word
+	arg5	= $aa	; word
+	arg6	= $ac	; word
 	helpvc2	= $b6	; counter in VCC
 
 	help	= $54	; JMP to TSB routines
@@ -46,7 +41,8 @@
 	ex	= $c5a9	; 	word: Endwert x
 	ey	= $c5ab	; 	word: Endwert y
 
-	tsblist	= $823f
+	tsbtknz	= $8178	; TSB tokenizer
+	tsblist	= $8240
 	tsbinterp	= $80dc
 	schkklz	= $8b56	; check for closing parenthesis
 	charen1	= $8e46	; switch c64 chargen on
@@ -56,15 +52,32 @@
 	sgetari	= $8f4b	; decode expressions of all kind
 	befold	= $9bc9	; performs an OLD
 
+	MODIFIED8		= $ff	; dummy value
+	FST_FE_TOKEN	= $27	; BASIC 7 commands beyond  $fe $27
+	FST_CE_TOKEN	= $0b	; BASIC 7 functions beyond $ce $0b
+
+	VDCLIB_OPTION_SELFMOD = 1	; parameters for vdclib.a-makros
+	VDCLIB_OPTION_BANKING = 1
+	VDC_RAM_READPTR	= arg1
+	VDC_RAM_WRITEPTR	= arg2
+	VDC_COUNTER	= arg3
+
+	commstart		= FST_FE_TOKEN-1
+	funcstart		= FST_CE_TOKEN-1
 
 ; -----------------------------------------
 ; entry point: intercept four BASIC vectors
 
-	* = $7900
+	*= $7800
+	!ct pet
+
+	!src "x_TSB.lib"		; calls to TSB
+	!src "vdclib.a"		; macros and code parts (by ACME)
+	!src "opcodes.a"		; for AND/ORA self-mods (by ACME)
 
 ; ----------------------------------------- VDC-Basic TSB Init
 
-start	lda #$79		; delimit RAM
+start	lda #$78		; delimit RAM
 	sta $38
 
 	ldx #$07		; set new vdcbasic vectors
@@ -77,8 +90,8 @@ start	lda #$79		; delimit RAM
 	jsr clear
 	lda #<message
 	ldy #>message
-	jsr $ab1e		; now: go!
-	jmp startup
+	jsr $ab1e
+	jmp startup	; now: go!
 
 ; -----------------------------------------
 
@@ -87,9 +100,9 @@ detokenizer
 	sty helpvec	; register retten
 	stx helpvec+1
 
-sl2	ldx #>keywords	; zeiger setzen
+sl2	ldx #>keywrd	; zeiger setzen
 	stx linnum+1
-	ldx #<keywords
+	ldx #<keywrd
 	stx linnum
 	cmp #$fe		; ist VDC token im .a?
 	beq list		; ja, list vdc
@@ -195,9 +208,9 @@ decoder	ldy #1
 
 ; ----------------------------------------- VDC Tokenizer
 ;
-tokenizer	jsr $8178		; 1st: tokenize TSB (and then V2)
+tokenizer	jsr tsbtknz	; 1st: tokenize TSB (and then V2)
 
-	ldy #4		; check $0200 (until $00)
+	ldy #4		; only then: check $0200 (until $00)
 next	iny
 next1	lda $01fb,y
 	bne ma1
@@ -219,9 +232,9 @@ ziffer	cmp #$41		; is a char? (less than "a"?)
 	bcs next
 
 	sty helpvec	; yes, save index into $0200 in helpvec
-	ldx #>keywords
+	ldx #>keywrd
 	stx linnum+1
-	ldx #<keywords
+	ldx #<keywrd
 	stx linnum
 
 	ldx #commstart	; init token counter to #$26 (1st token: $27)
@@ -255,14 +268,14 @@ token1	ldx helpvec	; otherwise:
 	lda #$fe		; write vdc token,
 	sta $01fb,x
 token2	lda codezae	; write counter as token number
-	cmp #$37		; 38/39: these are functions!
+	cmp #$3d		; 3e/3f: these are functions!
 	bcc +
 
 	pha		; then: set CE-Token 0b/0c
 	lda #$ce
 	sta $01fb,x
 	pla
-	sbc #$2d
+	sbc #$33		; $3d-$32=$0a -> gets $0b/$0c in next step:
 
 +	inx
 	sta $01fb,x
@@ -285,16 +298,17 @@ tonext	jmp next
 
 ; -----------------------------------------
 ; keywords and pointers, starting at $fe.27 and $ce.0b
-; fe27:
-keywords	!pet "rgW", "rgA", "rgR"
-	!pet "vmW", "vmA", "vmO"
-	!pet "vmF", "vmC"
-	!pet "rtV", "vtR", "vcC", "swP"
-	!pet "rsT", "syN"
-	!pet "disP", "attR", "crsR"
 ; RGR instead of RGO because GO gets tokenized by Basic V2
+keywrd	!pet "rgW", "rgA", "rgR"		; 27, 28, 29
+	!pet "vmW", "vmA", "vmO"		; 2a, 2b, 2c
+	!pet "vmF", "vmC"			; 2d, 2e
+	!pet "rtV", "vtR", "vcC", "swP"	; 2f, 30, 31, 32
+	!pet "rsT", "syN"			; 33, 34
+	!pet "disP", "attR", "crsR"		; 35, 36, 37
+	!pet "vcS", "vmP", "zzZ", "vcL"	; 38, 39, 3a, 3b
+	!pet "vmS", "vmB"			; 3c, 3d
 ; ce0b:
-functions	!pet "rgD", "vmD"
+functions	!pet "rgD", "vmD"			; 0b, 0c
 	!byte 0			; terminator
 
 ipointer	!word rgw - 1, rga - 1, rgo - 1
@@ -303,56 +317,65 @@ ipointer	!word rgw - 1, rga - 1, rgo - 1
 	!word rtv - 1, vtr - 1, vcc - 1, swp - 1
 	!word rst - 1, syn - 1
 	!word disp - 1, attr - 1, crsr - 1
+	!word vcs - 1, vmp - 1, zzz - 1, vcl - 1
+	!word vms -1, vmb - 1
 
 fpointer	!word rgd, vmd
 
 vectors	!word tokenizer, detokenizer, execvdc, decoder
-message	!pet 13,"vdcbasic tsb v1.05 installed",13,0
+message	!pet 13,"vdcbasic tsb v1.06 installed",13,0
+
+csetaddr	!wo 0	; the address in VRAM where the character set is stored
+csetwidth	!by 0	; width in bytes of one character
+csetheigt	!by 0	; height in scanlines of one character
+csetsize	!by 0	; the product of width*height. used to calculate offset of character in charset
+scr_width	!by 0	; the number of bytes in a scanline. can be eg 160 for printing with empty lines in between
+vmp_len	!by 0	; length of the text to print
 
 ; ----------------------------------------- Tables
 ; Tabellen
 
 vdcinit			; register, value
-          !byte $00,$7f       ; 00 total   columns (127, NTSC: $7e/126)
-          !byte $01,$50       ; 01 visible columns ( 80)
-          !byte $02,$66       ; 02 horizonatl sync
-          !byte $03,$49       ; 03 VSYNC / HSYNC
-          !byte $04,$27       ; 04 total rows (39, NTSC: $20/32)
-          !byte $05,$00       ; 05 rows adjust
-          !byte $06,$19       ; 06 visible rows (25)
-          !byte $07,$20       ; 07 VSYNC position (for PAL)
+	!byte $00,$7f       ; 00 total   columns (127, NTSC: $7e/126)
+	!byte $01,$50       ; 01 visible columns ( 80)
+	!byte $02,$66       ; 02 horizonatl sync
+	!byte $03,$49       ; 03 VSYNC / HSYNC
+	!byte $04,$27       ; 04 total rows (39, NTSC: $20/32)
+	!byte $05,$00       ; 05 rows adjust
+	!byte $06,$19       ; 06 visible rows (25)
+	!byte $07,$20       ; 07 VSYNC position (for PAL)
 
-          !byte $08,$00       ; 08 Interlace
-          !byte $09,$07       ; 09 scanlines minus 1 per character (7 means 8)
-          !byte $0a,$20       ; 0A cursor mode / start
-          !byte $0b,$07       ; 0B cursor end
-          !byte $0c,$00       ; 0C character RAM start high
-          !byte $0d,$00       ; 0D character RAM start low
-          !byte $0e,$00       ; 0E cursor position high
-          !byte $0f,$00       ; 0F cursor position low
+	!byte $08,$00       ; 08 Interlace
+	!byte $09,$07       ; 09 scanlines minus 1 per character (7 means 8)
+	!byte $0a,$20       ; 0A cursor mode / start
+	!byte $0b,$07       ; 0B cursor end
+	!byte $0c,$00       ; 0C character RAM start high
+	!byte $0d,$00       ; 0D character RAM start low
+	!byte $0e,$00       ; 0E cursor position high
+	!byte $0f,$00       ; 0F cursor position low
 
-          !byte $14,$08       ; 14 attribute RAM start high
-          !byte $15,$00       ; 15 attribute RAM start low
-          !byte $16,$78       ; 16 character width
-          !byte $17,$08       ; 17 scanlines minus 1 per character (8 means 9)
-          !byte $18,$20       ; 18 block copy / blink frequency
-          !byte $19,$47       ; 19 text / graphics mode
-          !byte $1a,$f0       ; 1A foreground / background color
-          !byte $1b,$00       ; 1B row step value
+	!byte $14,$08       ; 14 attribute RAM start high
+	!byte $15,$00       ; 15 attribute RAM start low
+	!byte $16,$78       ; 16 character width
+	!byte $17,$08       ; 17 scanlines minus 1 per character (8 means 9)
+	!byte $18,$20       ; 18 block copy / blink frequency
+	!byte $19,$47       ; 19 text / graphics mode
+	!byte $1a,$f0       ; 1A foreground / background color
+	!byte $1b,$00       ; 1B row step value
 
-          !byte $1c,$20       ; 1C character generator page
-          !byte $1d,$07       ; 1D underline count
+	!byte $1c,$20       ; 1C character generator page
+	!byte $1d,$07       ; 1D underline count
 			; 1E..21: blockcopy regs
-          !byte $22,$7d       ; 22 left margin
-          !byte $23,$64       ; 23 right margin
-          !byte $24,$05       ; 24 refresh cycles
+	!byte $22,$7d       ; 22 left margin
+	!byte $23,$64       ; 23 right margin
+	!byte $24,$05       ; 24 refresh cycles
 	!byte $25,$ff	; 25 on VDC8568 only
 
-          !byte $ff           ; end of table marker
+	!byte $ff	 ; end of table marker
 
-          !byte $00,$7e	; NTSC (Offset 62)
+	!byte $00,$7e	; NTSC (Offset 62)
 	!byte $04,$20
-          !byte $ff           ; end of table marker
+	!byte $ff	 ; end of table marker
 
 ; -----------------------------------------
 ; Interpreter
@@ -381,18 +404,31 @@ get3parms	jsr sgetadrn
 
 getmparms	jsr get3parms
 	jsr chrgot	; anything else?
-	beq +		; if 0: no
+	beq ++		; if 0: no
 
 	jsr sgetbytc
 	stx arg4
-	jsr sgetbytc
-	stx arg5
+	jsr sgetadrc
+	sty arg5
+	sta arg5 + 1
+
+-	jsr chrgot
+	beq +
+	jsr sgetadrc
+	sty arg6
+	sta arg6+ 1
+	rts
+
++	ldx #0
+	stx arg6
+	stx arg6 + 1
+	ldy arg3
 	rts
 
 ; set nr of repetitions to 1
-+	ldx #1
+++	ldx #1
 	stx arg4
-	rts
+	bne -
 
 ; 7079 ------------------------------------
 
@@ -497,43 +533,43 @@ resetvdc	ldx #0
 ; 7147 ------------------------------------ Copy C64 ROM Font to VDC
 
 copycset	ldy #>cset		; from $d000 (in C64)
-          sty helpvec+1
-          ldx #$12			; reg 18,$20, reg 19,$00, so
-          lda #$20			; set target address to $2000 in VDC
-          jsr A_to_vdc_reg_X
-          inx
-          lda #0
-          sta helpvec
-          jsr A_to_vdc_reg_X
+	sty helpvec+1
+	ldx #$12			; reg 18,$20, reg 19,$00, so
+	lda #$20			; set target address to $2000 in VDC
+	jsr A_to_vdc_reg_X
+	inx
+	lda #0
+	sta helpvec
+	jsr A_to_vdc_reg_X
 	ldx #31			; ! prepare VRAM access: set data reg
 	stx vdc_reg		; !
 
-          ldy #0			; transfer:
+	ldy #0			; transfer:
 edlc_10	jsr charen0		; switch char generator on
 	lda (helpvec),y
 	pha
-          jsr charen1		; and switch char generator off
+	jsr charen1		; and switch char generator off
 	cli
 	pla
 	+vdc_sta			; ! and write to VDC
-          iny
-          cpy #8			; 8 bytes per character
-          bcc edlc_10
+	iny
+	cpy #8			; 8 bytes per character
+	bcc edlc_10
 
-          lda #0
-edlc_20   +vdc_sta			; ! followed by 8 zeros
-          dey
-          bne edlc_20
+	lda #0
+edlc_20	+vdc_sta			; ! followed by 8 zeros
+	dey
+	bne edlc_20
 
-          clc			; advance in charset
-          lda helpvec
-          adc #8			; position to next character
-          sta helpvec		; in $d000 area
-          bcc edlc_10
-          inc helpvec+1
-          lda helpvec+1
-          cmp #$e0			; up to $e000
-          bcc edlc_10
+	clc			; advance in charset
+	lda helpvec
+	adc #8			; position to next character
+	sta helpvec		; in $d000 area
+	bcc edlc_10
+	inc helpvec+1
+	lda helpvec+1
+	cmp #$e0			; up to $e000
+	bcc edlc_10
 	rts
 
 ; 718a ------------------------------------ CRSR
@@ -615,7 +651,7 @@ vmd	jsr chrget	; skip token indicator ($ce)
 	+addcode_vdc_do_YYAA_cycles
 ; 71fd
 vmf	jsr incbasbz
-	jsr get3parms	; > AAYY = arg3
+	jsr getmparms	; > AAYY = arg3
 	tya		; take a look at low byte
 	bne +
 	dec arg3 + 1
@@ -624,14 +660,27 @@ vmf	jsr incbasbz
 	jsr vdc_reg_X_to_A
 	and #$7f
 	jsr A_to_vdc_reg_X
-	lda arg2		; write first byte
+
+-	lda arg2		; write first byte
 	ldy arg1		; set target
 	ldx arg1 + 1
 	jsr A_to_vram_XXYY
 	lda arg3		; set count
 	ldy arg3 + 1
 	jsr vdc_do_YYAA_cycles
-	jmp endsmb
+
+	dec arg4
+	beq +
+	clc
+	lda arg1
+	adc arg5
+	sta arg1
+	lda arg1+1
+	adc arg5+1
+	sta arg1+1
+	jmp -
+
++	jmp endsmb
 
 ; 7221 ------------------------------------ VMC
 ; copy VRAM to VRAM
@@ -639,52 +688,67 @@ vmf	jsr incbasbz
 vmc	jsr incbasbz
 	jsr getmparms 	; > AAYY = arg3
 
-	ldx #24		; BLOCK COPY (reg24)
+vmcexec	ldx #24		; BLOCK COPY (reg24)
 	jsr vdc_reg_X_to_A	; get value of vdcreg in .x to .a
 	ora #128
 	jsr A_to_vdc_reg_X	; write .a to vdcreg in .x
 
--	ldy arg1		; get source address
+--	ldy arg1		; get source address
 	lda arg1 + 1
 	ldx #32		; write .a (hi) and .y (lo) to vdcregs in .x
 	jsr AY_to_vdc_regs_Xp1
 
-	ldy arg2		; loop: get target address
+-	ldy arg2		; loop: get target address
 	lda arg2 + 1
 	jsr AY_to_vdc_regs_18_19
 	ldy arg3 + 1	; get byte counter
 	lda arg3
 	jsr vdc_do_YYAA_cycles
+
 	dec arg4		; repetition counter
-	beq +
+	beq vmcleave	; when 0: finished
 	clc
 	lda arg2		; add value to target address
 	adc arg5
 	sta arg2
-	bcc -		; and loop
-	inc arg2+1
-	jmp -
+	lda arg2+1
+	adc arg5+1
+	sta arg2+1
 
-+	jmp endsmb	; until finished
+	lda arg6+1	; should source address be increased? (hi)
+	bne +		; yes. jump to increasing source address
+	lda arg6		; check lo (only when hi equals zero)
+	beq -		; LB not zero. jump to updating target address register (ie leave source address register alone)
+
++	clc		; yes, increase source address
+	lda arg1
+	adc arg6
+	sta arg1
+	lda arg1+1
+	adc arg6+1
+	sta arg1+1
+	jmp --		; jump to updating source address register
+
+vmcleave	jmp endsmb	; until finished
 
 
 ; 7258 ------------------------------------ VCC
 ; copy charset from RAM to VRAM
-; get low byte of RAM pointer into Y and clear base pointer's low byte instead
 
 vcc	jsr incbasbz
 	jsr get3parms	; src: arg1, dst: arg2, len: arg3
 	ldy #0		; arg1: $b0  arg2: $b2  arg3: $b4
-	ldx #0
-	stx arg3		; arg3 gets abandoned and fixed to 256 chars
+	ldx #0		; x=0 counts 256
+	stx arg3		; arg3 gets abandoned and fixed to 256 chars (0)
 
----	ldx #18		; set VRAM pointer to target (arg2):
+-	ldx #18		; set VRAM pointer to target (arg2):
 	lda arg2 + 1
-          jsr A_to_vdc_reg_X	; hi
+	stx vdc_reg
+	sta vdc_data
 	inx
 	lda arg2		; and lo
 	stx vdc_reg
-          jsr A_to_vdc_reg_X
+	sta vdc_data
 	ldx #31		; prepare VRAM access: set data reg
 	stx vdc_reg
 	clc		; prepare target address for next iteration (plus 16)
@@ -694,7 +758,7 @@ vcc	jsr incbasbz
 	inc arg2 + 1
 +	jsr copychar
 	dec arg3		; yes, all 256 done?
-	bne ---
+	bne -
 	jmp endsmb	; yes, finished
 
 ; loop to copy a single character pattern
@@ -716,9 +780,6 @@ copychar	ldx #8		; set loop counter (8 bytes per char)
 ; 72a3 ------------------------------------ Transfer
 ;
 
-VDCLIB_OPTION_SELFMOD = 1
-VDCLIB_OPTION_BANKING = 1
-
 rtv_vtr_swp_shared_setup
 	jsr AY_to_vdc_regs_18_19
 	ldx #31		; VRAM register
@@ -736,10 +797,6 @@ rtv_vtr_swp_shared_setup
 
 ; 72b9 ------------------------------------ Transfer
 ; copy RAM to VRAM
-
-VDC_RAM_READPTR	= arg1
-VDC_RAM_WRITEPTR	= arg2
-VDC_COUNTER	= arg3
 
 	+addcode_ram_to_vram
 	+addcode_vram_to_ram
@@ -896,4 +953,155 @@ setvdc	ldy vdcinit,x	; register
 
 startup	jsr initvdc
 	jmp befold	; perform OLD
+
+;  ------------------------------------ VCS
+; part of VMP (VDC-PRINT)
+; VCS: VDC Charset Set - sets the parameters for the VMP command.
+; these settings stick, so they don't need to be given for each VMP call
+; VCS address_of_cset_in_vdc, width_of_char, height_of_char
+
+vcs	jsr incbasbz
+	jsr get3parms	; arg1: $b0, arg2: $b2, arg3: $b4
+	lda arg1		; store cset addr
+	sta csetaddr
+	lda arg1+1
+	sta csetaddr+1
+	lda arg2		; store character width (in bytes)
+	sta csetwidth
+	ldy arg3		; store character height (in scanlines)
+	sty csetheigt
+
+	jsr chrgot
+	beq +
+
+	jsr sgetbytc
+	stx scr_width
+	jmp ++
+
++	ldx #1
+	jsr vdc_reg_X_to_A
+	sta scr_width
+
+++	lda #0		; compute amount of bytes for cset
+	ldy csetheigt
+	clc
+-	adc csetwidth
+	sta csetsize
+	dey
+	bne -
+	jmp endsmb
+
+;  ------------------------------------ VMB
+
+;parse target address (where to render the text to)
+vmb	jsr incbasbz
+	jsr sgetadrn
+	sty arg_add
+	sta arg_add+1
+;parse location of string in bank 0; set new stringaddress
+	jsr sgetadrc
+	sty str_add
+	sta str_add+1
+;parse  length of string; set new stringlength
+	jsr sgetbytc
+	stx vmp_len
+	jmp vmp_prepare
+
+;  ------------------------------------ VMP
+; vmp - VDC Print instruction
+;  this command basically chains VMC in a way that full strings can be printed,
+;  not just single characters
+;  parameters: target address, location of string, length of string
+
+;parse target address (where to render the text to)
+vmp	jsr incbasbz
+	jsr sgetadrn
+	sty arg_add	; arg4
+	sta arg_add + 1
+;parse location and length of string
+	jsr schkcom	; $aefd: chkcom
+	jsr sgetstr	; address in .a/.x, len in $69
+	stx str_add	; arg6
+	sta str_add + 1
+	lda $69
+	sta vmp_len
+;arg3(count16) is not changed in VMC, so we can set it here already
+vmp_prepare
+	lda csetwidth
+	sta arg3		; hi gets zero'ed below
+;  read virtual screen width from register 1 and store it in arg5
+	lda scr_width
+	sta arg5
+; iterate over characters - from 0 to arg3-1
+	ldy #0
+	sty offset_1	;keeps track of current character position we're iterating
+	sty arg3+1	;setting this here (instead of a couple lines above) because we have zero handy
+	sty arg5+1
+	sty arg6
+	sty arg6+1
+; load first (next) character of second parameter (arg2)
+; the address of that is stored in $22/$23
+.vmp_next_character
+	ldy offset_1
+	lda (str_add),y
+	inc offset_1
+; calculate offset of character in charset
+; sub 32 from offset. quick and dirty.
+	sec
+	sbc #31
+	tax
+	lda csetaddr
+	sta arg1
+	lda csetaddr+1
+	sta arg1+1
+-	dex
+	beq +
+	clc
+	lda arg1
+	adc csetsize
+	sta arg1
+	bcc -
+	inc arg1+1
+	jmp -
+
++	lda arg_add
+	sta arg2
+	lda arg_add+1
+	sta arg2+1
+;arg3 has been set above already
+	lda csetheigt
+	sta arg4
+;	jsr remember_mem_conf
+	lda #$60			; in interpreter, patch JMP at $7c25 to RTS
+	sta vmcleave
+	jsr vmcexec
+	dec vmp_len
+	beq .vmp_done
+	clc
+	lda arg_add
+	adc csetwidth
+	sta arg_add
+	bcc +
+	inc arg_add+1
++	jmp .vmp_next_character
+
+.vmp_done	lda #$4c			; and here un-patch RTS at $7c25 to JMP
+	sta vmcleave
+;  ------------------------------------ ZZZ
+; dummy entry to skip token $fe3a
+zzz	jmp endsmb
+
+;  ------------------------------------ VCL
+; Video Memory Sprite-Copy. Like VMC with a mix of VCL.
+; vram-source is read continuously, target address can have gaps (used for transparency)
+; effectively executes a number of VMC calls
+; parameters: vram-source, vram-target, address of command-bytes (target-increment, nr bytes to copy). first command-byte holds number of commands
+vcl
+;  ------------------------------------ VMS
+; Video Memory Sprite-Copy. Like VMC with a mix of VCL.
+; vram-source is read continuously, target address can have gaps (used for transparency)
+; effectively executes a number of VMC calls
+; parameters: vram-source, vram-target, address of command-bytes (target-increment, nr bytes to copy). first command-byte holds number of commands
+vms
+	jmp endsmb
 
