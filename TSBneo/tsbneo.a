@@ -226,7 +226,7 @@
 	kry	= $c645	; $cb49	Kreis: Radius Y
 	keyflag	= $c646	;	Flag: F-Tasten aktiv (Wert 10)
 	sepline	= $c647	;	Flag&Value: separator length
-			; ! unused (1 byte)
+	identify	= $c648	; 	Flag for HSG/SMON
 	reuflag	= $c649	;	flag for REU
 	wavetab	= $c64a	;	Teil von WAVE (3 bytes)
 	keytab	= $c64d	;	F-Tasten-Belegung (bis $c74c)
@@ -301,6 +301,7 @@ befcold	jsr basromein
 	ldx #$00
 	stx ramstart
 	stx doindex
+	stx identify	; init presence flag for HSG or SMON
 	ldy #$80
 	jsr $fd8c		; sys set memory top
 	jsr $e453		; sys load basic vectors ($0300..$030b)
@@ -312,7 +313,7 @@ befcold	jsr basromein
 	tax
 -	sta proctable,x
 	sta settings1,x
-	sta $d400,x	; init SID
+;	sta $d400,x	; init SID
 	inx
 	bne -
 ;
@@ -1538,7 +1539,7 @@ textchr	!tx "chr$(13)",0
 ;
 version	!tx "ad23"	; Signature
 	!by $0d
-	!tx "2.50908"	; Version Number
+	!tx "2.60102"	; Version Number
 
 ; -----------------------------------------
 ;
@@ -8651,7 +8652,7 @@ befkey	jsr keyget	; check for KEYGET (doesn't return if successful)
 
 ; -----------------------------------------
 
-	!by 0,0,0,0
+	!by 0,0
 
 ; -----------------------------------------
 ;
@@ -8712,6 +8713,7 @@ befdisable
 ;
 befexit	jsr incbasbz
 	jsr chrgot
+	beq +
 	lda #$8b	 	; IF follows?
 	jsr schkzei	; (if not: SYNTAX ERROR)
 	jsr sfrmevl	; evaluate
