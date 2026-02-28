@@ -229,8 +229,8 @@
 	identify	= $c648	; 	Flag for HSG/SMON
 	reuflag	= $c649	;	flag for REU
 	wavetab	= $c64a	;	Teil von WAVE (3 bytes)
-	keytab	= $c64d	;	F-Tasten-Belegung (bis $c74c)
-;		  $c74d	;	Text: "ata" (string to compare w/ keyword DATA)
+;		  $c64d	;	Text: "ata" (string to compare w/ keyword DATA)
+	keytab	= $c650	;	F-Tasten-Belegung (bis $c74f)
 
 ; -----------------------------------------
 ;
@@ -903,7 +903,7 @@ repchrget	lda progz+2	; chrget changed (by INST)?
 ; ----------------------------------------- TSB IRQ (set in SLOOP)
 ; -----------------------------------------
 ;
-sirq	ldy #0
+sirq	ldy #0		; 1. Jiffy-Counter
 	inc zaeirq	; count 60 jiffies
 	lda zaeirq
 	cmp #60
@@ -911,7 +911,7 @@ sirq	ldy #0
 	inc zaesec	; 60 jiffies = 1 sec
 	sty zaeirq
 
-+	lda bflashjn
++	lda bflashjn	; 2. BFLASH
 	cmp #10		; bflash active?
 	bne sirq2		; no, skip
 
@@ -942,8 +942,8 @@ sirq2	lda $ff		; save $fc to $ff
 	lda $fc
 	pha
 ;
-	lda flashfl	; is flash active?
-	cmp #10
+	lda flashfl	; 3. FLASH
+	cmp #10		; is flash active?
 	bne sirq3		; no, skip
 
 	inc flashzae	; is counter at speed?
@@ -988,8 +988,8 @@ sirq2	lda $ff		; save $fc to $ff
 sirq3	lda $d4
 	bne sirq4
 
-	ldy $028d		; Shift/C=?
-	lda shwerttab,y
+	ldy $028d		; 4. INKEY
+	lda shwerttab,y	; Shift/C=?
 	sta inkey
 	lda $cb
 	cmp #4		; F1?
@@ -1018,7 +1018,7 @@ wasf1	inc inkey
 sirq4	lda $cc
 	bne sirq5
 
-	lda keyflag
+	lda keyflag	; 5. KEY (F-Tasten-Befehle)
 	cmp #10
 	beq sirq5
 	lda $d4
@@ -1068,7 +1068,7 @@ ams5	lda $cb
 sirq5	lda playflag
 	cmp #10
 	bne +
-	jsr sirqplay
+	jsr sirqplay	; 6. PLAY
 ;
 +	pla		; restore $fc to $ff
 	sta $fc
@@ -1078,7 +1078,7 @@ sirq5	lda playflag
 	sta $fe
 	pla
 	sta $ff
-	jmp $ea31	; sys IRQ
+	jmp $ea31		; sys IRQ
 
 ; -----------------------------------------
 
@@ -1539,7 +1539,7 @@ textchr	!tx "chr$(13)",0
 ;
 version	!tx "ad23"	; Signature
 	!by $0d
-	!tx "2.60102"	; Version Number
+	!tx "2.60228"	; Version Number
 
 ; -----------------------------------------
 ;
@@ -6075,7 +6075,7 @@ mobposs	ldy $aa
 	lda mobsptab,y
 	sta helpvec
 	ldx #0
-mmb6	cpx helpvec	; first slowdown
+mmb6	cpx helpvec	; first apply speed
 	beq mmb5
 	inx
 	ldy #0
@@ -6155,10 +6155,10 @@ vloop	lda ax
 	lda mobbew	; mmob or line?
 	cmp #$f0
 	bne +
-	jsr mobposs	; mmob
+	jsr mobposs	; -> mmob
 	jmp vergl
 
-+	jsr punkt	; line
++	jsr punkt		; -> line
 ;
 vergl	lda helpvc2
 	ora helpvc2+1
@@ -9432,7 +9432,7 @@ befdpoke	jsr chrget	; skip TSB-Token for d!
 	pla
 	iny
 	sta (helpvec),y
-	bne bl01	 ; uncond. branch
+	bne bl01		; uncond. branch
 
 ; ----------------------------------------- bef D!
 ;
@@ -9689,26 +9689,42 @@ proctable !fill 256			; table area for proc
 ; c600
 	!fill 77	 		; tsb variables
 
-; c64d (keytab):
-	!by $50,$41,$47,$45,$32,$33,$0d,$00,$00,$00,$00,$00,$00,$00,$00,$00	; 1:  PAGE23+cr
-	!by $52,$55,$4e,$3a,$0d,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00	; 2:  RUN:+cr
-	!by $4c,$49,$53,$54,$20,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00	; 3:  LIST
-	!by $4c,$4f,$41,$44,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00	; 4:  LOAD
-	!by $44,$55,$4d,$50,$0d,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00	; 5:  DUMP+cr
-	!by $50,$4c,$41,$43,$45,$30,$9d,$00,$00,$00,$00,$00,$00,$00,$00,$00	; 6:  PLACE0
-	!by $45,$52,$52,$4f,$52,$0d,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00	; 7:  ERROR+cr
-	!by $43,$4f,$4c,$4f,$52,$31,$31,$2c,$31,$32,$2c,$30,$0d,$00,$00,$00	; 8:  COLOR11,12,0+cr
-
-	!by $44,$49,$53,$50,$4c,$41,$59,$0d,$00,$00,$00,$00,$00,$00,$00,$00	; 9:  DISPLAY+cr
-	!by $44,$49,$52,$22,$24,$22,$0d,$00,$00,$00,$00,$00,$00,$00,$00,$00	; 10: DIR"$"+cr
-	!by $46,$49,$ce,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00	; 11: FI+shift n
-	!by $44,$49,$53,$4b,$22,$53,$3a,$00,$00,$00,$00,$00,$00,$00,$00,$00	; 12: DISK"S:
-	!by $0e,$08,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00	; 13: lock lower case chars
-	!by $53,$43,$52,$4c,$44,$20,$31,$2c,$38,$2c,$33,$2c,$22,$00,$00,$00	; 14: SCRLD,$1,8,3,"
-	!by $43,$53,$45,$54,$20,$32,$3a,$00,$00,$00,$00,$00,$00,$00,$00,$00	; 15: CSET,$2:
-	!by $44,$4f,$20,$4e,$55,$4c,$4c,$0d,$00,$32,$00,$00,$00,$00,$00,$00	; 16: DO NULL+cr
-; c74d (D-ATA)
+; c64d (D-ATA)
 ata	!by $41,$54,$41
+
+; c650 (keytab), contains:
+	!tx "page23:"			; key 1
+	!align $0f,0
+	!tx "run:", $0d			; key 2
+	!align $0f,0
+	!tx "list "			; key 3
+	!align $0f,0
+	!tx "load"			; key 4
+	!align $0f,0
+	!tx "dump:" , $0d			; key 5
+	!align $0f,0
+	!tx "place0" , $9d			; key 6
+	!align $0f,0
+	!tx "error:" , $0d			; key 7
+	!align $0f,0
+	!tx "color11,12,0:" , $0d		; key 8
+	!align $0f,0
+	!tx "option 32" , $9d , $9d		; key 9
+	!align $0f,0
+	!tx "dir" , $22 , "$:*" , $22 , $9d , $9d ; key 10
+	!align $0f,0
+	!tx "fiN"				; key 11
+	!align $0f,0
+	!tx "disk" , $22 , "s:"		; key 12
+	!align $0f,0
+	!tx $0e , $08			; key 13
+	!align $0f,0
+	!tx "scrld1,use,3," , $22		; key 14
+	!align $0f,0
+	!tx "cset2:"			; key 15
+	!align $0f,0
+	!tx "do null" , $0d			; key 16
+	!align $0f,0
 
 ; ----------------------------------------- Part of PLACE (for Arrays)
 ; c750
